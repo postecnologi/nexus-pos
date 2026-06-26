@@ -1,0 +1,30 @@
+# Virtual environment
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Node modules
+node_modules/
+dist/
+
+# Environment variables (SECRETS)
+.env
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Uploads
+uploads/
+
+# Logs
+*.log
+
+# Database dumps
+*.sql
+*.dump

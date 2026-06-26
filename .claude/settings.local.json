@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(../../.venv/Scripts/python -c \"from main import app; print\\(f'OK - {len\\(app.routes\\)} rutas registradas'\\)\")",
+      "Bash(npx vite *)"
+    ]
+  }
+}
