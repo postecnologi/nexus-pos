@@ -8,13 +8,26 @@ from contextlib import contextmanager
 
 load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")
 
-DB_CONFIG = {
-    "host":     os.getenv("DB_HOST", "localhost"),
-    "port":     int(os.getenv("DB_PORT", "5433")),
-    "database": os.getenv("DB_NAME", "nexus_db"),
-    "user":     os.getenv("DB_USER", "postgres"),
-    "password": os.getenv("DB_PASSWORD", ""),
-}
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+if DATABASE_URL:
+    import urllib.parse
+    parsed = urllib.parse.urlparse(DATABASE_URL)
+    DB_CONFIG = {
+        "host":     parsed.hostname,
+        "port":     parsed.port or 5432,
+        "database": parsed.path.lstrip("/"),
+        "user":     parsed.username,
+        "password": parsed.password,
+    }
+else:
+    DB_CONFIG = {
+        "host":     os.getenv("DB_HOST", "localhost"),
+        "port":     int(os.getenv("DB_PORT", "5433")),
+        "database": os.getenv("DB_NAME", "nexus_db"),
+        "user":     os.getenv("DB_USER", "postgres"),
+        "password": os.getenv("DB_PASSWORD", ""),
+    }
 
 # Thread-local storage for tenant database override
 _tenant_local = threading.local()

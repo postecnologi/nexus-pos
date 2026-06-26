@@ -10,11 +10,21 @@ from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")
 
-MASTER_DB = os.getenv("DB_NAME", "nexus_db")
-DB_HOST = os.getenv("DB_HOST", "localhost")
-DB_PORT = int(os.getenv("DB_PORT", "5433"))
-DB_USER = os.getenv("DB_USER", "postgres")
-DB_PASS = os.getenv("DB_PASSWORD", "")
+DATABASE_URL = os.getenv("DATABASE_URL")
+if DATABASE_URL:
+    import urllib.parse
+    _parsed = urllib.parse.urlparse(DATABASE_URL)
+    MASTER_DB = _parsed.path.lstrip("/")
+    DB_HOST = _parsed.hostname
+    DB_PORT = _parsed.port or 5432
+    DB_USER = _parsed.username
+    DB_PASS = _parsed.password
+else:
+    MASTER_DB = os.getenv("DB_NAME", "nexus_db")
+    DB_HOST = os.getenv("DB_HOST", "localhost")
+    DB_PORT = int(os.getenv("DB_PORT", "5433"))
+    DB_USER = os.getenv("DB_USER", "postgres")
+    DB_PASS = os.getenv("DB_PASSWORD", "")
 MULTI_TENANT = os.getenv("MULTI_TENANT", "false").lower() == "true"
 
 
