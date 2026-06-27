@@ -135,6 +135,9 @@ def create_tenant_database(codigo, nombre, ruc='', email='',
     finally:
         conn_fix.close()
 
+    # Force uppercase
+    codigo = codigo.upper().strip()
+
     # Register in master
     conn = get_master_connection()
     try:
