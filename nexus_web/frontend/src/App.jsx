@@ -37,6 +37,7 @@ import PrintFactura from './pages/PrintFactura'
 import NotFound from './pages/NotFound'
 import SuperAdmin from './pages/SuperAdmin'
 import Landing from './pages/Landing'
+import Registro from './pages/Registro'
 
 function useAuth() {
   return !!localStorage.getItem('nexus_token')
@@ -44,13 +45,13 @@ function useAuth() {
 
 function PrivateRoute({ children }) {
   const auth = useAuth()
-  if (!auth) return <Navigate to="/login" replace />
+  if (!auth) return <Navigate to="/" replace />
   return children
 }
 
 function PublicRoute({ children }) {
   const auth = useAuth()
-  if (auth) return <Navigate to="/" replace />
+  if (auth) return <Navigate to="/app" replace />
   return children
 }
 
@@ -60,8 +61,10 @@ export default function App() {
     <ToastProvider>
     <BrowserRouter>
       <Routes>
-        {/* Landing page */}
+        {/* Landing page - public home */}
+        <Route path="/" element={<Landing />} />
         <Route path="/landing" element={<Landing />} />
+        <Route path="/registro" element={<Registro />} />
 
         <Route path="/login" element={
           <PublicRoute><Login /></PublicRoute>
@@ -75,7 +78,7 @@ export default function App() {
           <PrivateRoute><PrintFactura /></PrivateRoute>
         } />
 
-        <Route path="/" element={
+        <Route path="/app" element={
           <PrivateRoute><Layout /></PrivateRoute>
         }>
           <Route index element={<Dashboard />} />

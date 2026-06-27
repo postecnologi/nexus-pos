@@ -1,6 +1,7 @@
 import os
 from fastapi import APIRouter, Depends, HTTPException, Form
 from fastapi.security import OAuth2PasswordRequestForm
+from pydantic import BaseModel
 from database import query_one, set_tenant_db, clear_tenant_db
 from auth import verify_password, create_token, get_current_user
 from permisos import get_permisos_efectivos
@@ -63,3 +64,60 @@ def login(form: OAuth2PasswordRequestForm = Depends(), empresa_codigo: str = For
 @router.get("/me")
 def me(u=Depends(get_current_user)):
     return u
+
+
+class RegistroEmpresa(BaseModel):
+    empresa_nombre: str
+    ruc: str = ""
+    email: str
+    telefono: str = ""
+    admin_nombre: str
+    admin_username: str
+    admin_password: str
+    plan: str = "BASICO"
+
+@router.post("/registro")
+def registro_publico(data: RegistroEmpresa):
+    """Public self-registration endpoint. Creates a new company + admin user."""
+    if not MULTI_TENANT:
+        raise HTTPException(400, "Registro no disponible")
+
+    from multitenant import create_tenant_database, get_master_connection
+    import re
+
+    if not data.empresa_nombre or not data.admin_username or not data.admin_password:
+        raise HTTPException(400, "Nombre de empresa, usuario y contrasena son obligatorios")
+    if len(data.admin_password) < 6:
+        raise HTTPException(400, "La contrasena debe tener al menos 6 caracteres")
+
+    codigo = re.sub(r'[^a-zA-Z0-9]', '', data.empresa_nombre)[:10].upper()
+    if not codigo:
+        codigo = "EMP"
+
+    conn = get_master_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT id FROM mt_empresas WHERE codigo=%s", (codigo,))
+        if cur.fetchone():
+            import uuid
+            codigo = codigo[:6] + uuid.uuid4().hex[:4].upper()
+    finally:
+        conn.close()
+
+    try:
+        result = create_tenant_database(
+            codigo=codigo, nombre=data.empresa_nombre,
+            ruc=data.ruc, email=data.email,
+            admin_nombre=data.admin_nombre,
+            admin_username=data.admin_username,
+            admin_password=data.admin_password,
+            admin_email=data.email,
+        )
+        return {
+            "msg": "Empresa registrada exitosamente",
+            "codigo_empresa": codigo,
+            "username": data.admin_username,
+            "instrucciones": f"Use el codigo '{codigo}' para iniciar sesion",
+        }
+    except Exception as e:
+        raise HTTPException(400, str(e))

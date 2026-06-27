@@ -60,7 +60,7 @@ export default function Landing() {
               padding: '8px 20px', borderRadius: 8, border: '1px solid rgba(124,58,237,.5)',
               background: 'transparent', color: '#A78BFA', fontSize: 13, fontWeight: 600, cursor: 'pointer',
             }}>Iniciar sesion</button>
-            <button onClick={() => nav('/login')} style={{
+            <button onClick={() => nav('/registro')} style={{
               padding: '8px 20px', borderRadius: 8, border: 'none',
               background: 'linear-gradient(135deg,#7C3AED,#EC4899)', color: 'white',
               fontSize: 13, fontWeight: 700, cursor: 'pointer',
@@ -90,7 +90,7 @@ export default function Landing() {
             Todo en un solo sistema. Sin instalaciones. Desde cualquier dispositivo.
           </p>
           <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap' }}>
-            <button onClick={() => nav('/login')} style={{
+            <button onClick={() => nav('/registro')} style={{
               padding: '14px 36px', borderRadius: 12, border: 'none',
               background: 'linear-gradient(135deg,#7C3AED,#EC4899)', color: 'white',
               fontSize: 16, fontWeight: 700, cursor: 'pointer',
@@ -219,7 +219,7 @@ export default function Landing() {
                     </li>
                   ))}
                 </ul>
-                <button onClick={() => nav('/login')} style={{
+                <button onClick={() => nav('/registro')} style={{
                   width: '100%', padding: '14px', borderRadius: 12, border: 'none',
                   background: p.popular ? 'linear-gradient(135deg,#7C3AED,#EC4899)' : '#F1F5F9',
                   color: p.popular ? 'white' : '#374151',
@@ -245,7 +245,7 @@ export default function Landing() {
             Unete a las empresas que ya confian en NEXUS POS para gestionar su negocio de manera profesional.
           </p>
           <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 48 }}>
-            <button onClick={() => nav('/login')} style={{
+            <button onClick={() => nav('/registro')} style={{
               padding: '16px 40px', borderRadius: 12, border: 'none',
               background: 'linear-gradient(135deg,#7C3AED,#EC4899)', color: 'white',
               fontSize: 17, fontWeight: 700, cursor: 'pointer',

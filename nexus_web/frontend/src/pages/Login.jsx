@@ -19,7 +19,7 @@ export default function Login() {
       const { data } = await api.post('/auth/login', body)
       localStorage.setItem('nexus_token', data.access_token)
       localStorage.setItem('nexus_user',  JSON.stringify(data.user))
-      window.location.href = '/'
+      window.location.href = '/app'
     } catch (err) {
       setError(err.response?.data?.detail || 'Error de conexion')
     } finally {
