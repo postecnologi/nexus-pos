@@ -487,14 +487,11 @@ function PanelLote({mov, onCerrar, onActualizado}) {
                   {fmt$(t.monto)}
                 </span>
                 <div style={{textAlign:'center'}}>
-                  <button onClick={()=>toggleConciliar(t)}
-                    style={{padding:'5px 12px',borderRadius:7,cursor:'pointer',
-                      border:`1px solid ${t.conciliada?C.green:C.bord2}`,
-                      background:t.conciliada?C.greenD:C.sur3,
-                      color:t.conciliada?C.green:C.muted,
-                      fontSize:11,fontWeight:700}}>
-                    {t.conciliada?'✅ OK':'Conciliar'}
-                  </button>
+                  <span style={{padding:'3px 10px',borderRadius:20,fontSize:10,fontWeight:700,
+                    background:t.conciliada?`${C.green}20`:`${C.amber}20`,
+                    color:t.conciliada?C.green:C.amber}}>
+                    {t.conciliada?'Conciliado':'Pendiente'}
+                  </span>
                 </div>
               </div>
             ))}
@@ -768,15 +765,11 @@ export default function Bancos() {
                                 Vouchers
                               </button>
                             )}
-                            {!conciliado&&!esLote&&(
-                              <button onClick={()=>conciliarMov(m)}
-                                style={{padding:'4px 10px',borderRadius:7,
-                                  cursor:'pointer',fontSize:11,fontWeight:700,
-                                  border:`1px solid ${C.green}44`,
-                                  background:C.greenD,color:C.green}}>
-                                Conciliar
-                              </button>
-                            )}
+                            <span style={{padding:'3px 10px',borderRadius:20,fontSize:10,fontWeight:700,
+                              background:conciliado?`${C.green}20`:`${C.amber}20`,
+                              color:conciliado?C.green:C.amber}}>
+                              {conciliado?'Conciliado':'Pendiente'}
+                            </span>
                           </div>
                         </td>
                       </tr>

@@ -64,7 +64,7 @@ def crear_conciliacion(c: ConciliacionIn, u=Depends(get_current_user)):
     """, (c.cuenta_id, fecha_ini, fecha_fin))
 
     for m in movs:
-        es_credito = m["tipo"] in ("DEPOSITO_EFECTIVO","LOTE_TARJETA","TRANSFERENCIA_RECIBIDA")
+        es_credito = m["tipo"] in ("DEPOSITO","DEPOSITO_EFECTIVO","LOTE_TARJETA","TRANSFERENCIA_RECIBIDA")
         monto = float(m["monto"])
         insert("""
             INSERT INTO fin_estado_cuenta
