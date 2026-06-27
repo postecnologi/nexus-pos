@@ -15,8 +15,10 @@ MULTI_TENANT = os.getenv("MULTI_TENANT", "false").lower() == "true"
 def login(form: OAuth2PasswordRequestForm = Depends(), empresa_codigo: str = Form("")):
     empresa_db = None
 
-    # If multi-tenant is enabled and a company code was provided, resolve the DB
-    if MULTI_TENANT and empresa_codigo and empresa_codigo.strip():
+    # If multi-tenant is enabled, company code is REQUIRED
+    if MULTI_TENANT:
+        if not empresa_codigo or not empresa_codigo.strip():
+            raise HTTPException(status_code=401, detail="Debe ingresar el codigo de empresa")
         from multitenant import get_empresa_db
         empresa_db = get_empresa_db(codigo=empresa_codigo.strip())
         if not empresa_db:
