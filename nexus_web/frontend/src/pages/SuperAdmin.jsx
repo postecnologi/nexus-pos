@@ -692,13 +692,21 @@ function ModalEditEmpresa({ emp, sa, planes, onClose, onSaved }) {
   }
 
   async function resetAdmin() {
-    if (!adminForm.admin_username || !adminForm.admin_password || !adminForm.admin_nombre) {
-      setMsg('Nombre, usuario y contrasena son obligatorios'); return
+    if (!adminForm.admin_username || !adminForm.admin_nombre) {
+      setMsg('Nombre y usuario son obligatorios'); return
     }
     try {
       const r = await sa.post(`/superadmin/empresas/${emp.id}/reset-admin`, adminForm)
       setMsg(r.data.msg)
     } catch (e) { setMsg('Error: ' + (e.response?.data?.detail || e.message)) }
+  }
+
+  function generarPassword() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
+    let pw = ''
+    for (let i = 0; i < 8; i++) pw += chars[Math.floor(Math.random() * chars.length)]
+    setAdminForm(p => ({...p, admin_password: pw}))
+    setMsg(`Nueva contrasena generada: ${pw}  —  Guardale y enviala al cliente`)
   }
 
   return (
@@ -774,19 +782,34 @@ function ModalEditEmpresa({ emp, sa, planes, onClose, onSaved }) {
                 placeholder="jperez" style={inputS} />
             </div>
             <div>
-              <label style={labelS}>Nueva contrasena *</label>
-              <input value={adminForm.admin_password} onChange={e => setAdminForm(p => ({...p, admin_password: e.target.value}))}
-                type="password" placeholder="********" style={inputS} />
+              <label style={labelS}>Nueva contrasena (vacia = mantener actual)</label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input value={adminForm.admin_password} onChange={e => setAdminForm(p => ({...p, admin_password: e.target.value}))}
+                  placeholder="Dejar vacio para no cambiar" style={{...inputS, flex: 1}} />
+                <button onClick={generarPassword} type="button"
+                  style={{ padding: '8px 14px', borderRadius: 8, border: 'none', background: '#3B82F6', color: 'white', cursor: 'pointer', fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap' }}>
+                  Generar
+                </button>
+              </div>
             </div>
             <div>
               <label style={labelS}>Email</label>
               <input value={adminForm.admin_email} onChange={e => setAdminForm(p => ({...p, admin_email: e.target.value}))}
                 type="email" placeholder="admin@empresa.com" style={inputS} />
             </div>
-            <button onClick={resetAdmin}
-              style={{ padding: '10px', borderRadius: 8, border: 'none', background: '#F59E0B', color: 'white', cursor: 'pointer', fontWeight: 700, marginTop: 4 }}>
-              Cambiar administrador
-            </button>
+            <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+              <button onClick={resetAdmin}
+                style={{ flex: 1, padding: '10px', borderRadius: 8, border: 'none', background: '#F59E0B', color: 'white', cursor: 'pointer', fontWeight: 700 }}>
+                Guardar cambios
+              </button>
+              {adminForm.admin_password && (
+                <a href={`https://wa.me/?text=${encodeURIComponent(`Hola! Tus credenciales de NEXUS IA:\n\nWeb: pos-tecnologi.com/login\nCodigo empresa: ${emp.codigo}\nUsuario: ${adminForm.admin_username}\nContrasena: ${adminForm.admin_password}\n\nGuarda estos datos.`)}`}
+                  target="_blank" rel="noopener"
+                  style={{ padding: '10px 14px', borderRadius: 8, border: 'none', background: '#25D366', color: 'white', cursor: 'pointer', fontWeight: 700, textDecoration: 'none', display: 'flex', alignItems: 'center', fontSize: 13 }}>
+                  Enviar por WhatsApp
+                </a>
+              )}
+            </div>
           </div>
         )}
 
