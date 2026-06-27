@@ -121,8 +121,19 @@ def init_master_tables():
 
 def create_tenant_database(codigo, nombre, ruc='', email='',
                             admin_nombre='', admin_username='', admin_password='', admin_email=''):
-    """Create a new company database by cloning the current one."""
+    """Create a new company database or shared-mode tenant."""
     db_name = f"nexus_emp_{codigo.lower()}"
+
+    # Drop unique constraint on db_name if exists (shared mode needs same db_name)
+    conn_fix = get_master_connection()
+    try:
+        cur_fix = conn_fix.cursor()
+        cur_fix.execute("ALTER TABLE mt_empresas DROP CONSTRAINT IF EXISTS mt_empresas_db_name_key")
+        conn_fix.commit()
+    except Exception:
+        conn_fix.rollback()
+    finally:
+        conn_fix.close()
 
     # Register in master
     conn = get_master_connection()
