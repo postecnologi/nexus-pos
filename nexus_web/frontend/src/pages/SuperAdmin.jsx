@@ -240,7 +240,7 @@ export default function SuperAdmin() {
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 16 }}>
                     <div>
                       <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>Codigo *</label>
-                      <input value={newEmp.codigo} onChange={e => setNewEmp({...newEmp, codigo: e.target.value})}
+                      <input value={newEmp.codigo} onChange={e => setNewEmp({...newEmp, codigo: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,'')})}
                         placeholder="001" required style={inputStyle} />
                     </div>
                     <div>
