@@ -184,9 +184,44 @@ def create_tenant_database(codigo, nombre, ruc='', email='',
                 tcur.execute("UPDATE sys_empresas SET ruc=%s, razon_social=%s, email=%s WHERE activa=true", (ruc, nombre, email))
             except Exception:
                 tenant_conn.rollback()
-            for table in ["ven_factura_detalles","ven_facturas","com_compras","crm_oportunidades","srv_ordenes","nom_empleados"]:
-                try: tcur.execute(f"DELETE FROM {table}")
-                except: tenant_conn.rollback()
+            cleanup_order = [
+                "fin_caja_movimientos", "fin_cobros", "fin_pagos", "fin_movimientos_banco",
+                "fin_estado_cuenta", "fin_lote_transacciones", "fin_conciliaciones",
+                "fin_saldos_favor", "fin_cxc", "fin_cxp",
+                "ven_factura_detalles", "ven_facturas", "ven_devolucion_detalles", "ven_devoluciones",
+                "ven_cotizacion_detalles", "ven_cotizaciones", "ven_guia_remision_detalles", "ven_guias_remision",
+                "ven_nota_debito_detalles", "ven_notas_debito", "ven_facturas_recurrentes",
+                "com_compra_detalles", "com_compras", "com_liquidacion_detalles", "com_liquidaciones",
+                "sri_retencion_detalles", "sri_retenciones",
+                "inv_stock", "inv_stock_series", "inv_ajuste_detalles", "inv_ajustes",
+                "inv_transferencia_series", "inv_transferencia_detalles", "inv_transferencias",
+                "inv_toma_fisica_detalles", "inv_tomas_fisicas",
+                "inv_precios_historial", "inv_precio_historial", "inv_precios", "inv_ofertas", "inv_lotes",
+                "inv_producto_bodegas", "inv_productos", "inv_categorias", "inv_marcas",
+                "imp_plantillas_etiqueta",
+                "srv_repuestos_usados", "srv_seguimientos", "srv_ordenes", "srv_tecnicos",
+                "crm_notas", "crm_actividades", "crm_historial_etapas", "crm_oportunidades",
+                "crm_automatizaciones", "crm_plantillas",
+                "cont_asiento_detalles", "cont_asientos", "cont_presupuestos",
+                "nom_permisos", "nom_horas_acumuladas", "nom_roles_pago", "nom_vacaciones",
+                "nom_prestamos", "nom_empleados",
+                "sys_audit_log", "sys_permisos_usuario",
+                "sys_whatsapp_log",
+                "ven_clientes", "ven_vendedores", "com_proveedores",
+                "fin_cajas", "fin_bancos",
+            ]
+            for table in cleanup_order:
+                try:
+                    tcur.execute(f"DELETE FROM {table}")
+                    tenant_conn.commit()
+                except Exception:
+                    tenant_conn.rollback()
+            # Insert default client
+            try:
+                tcur.execute("INSERT INTO ven_clientes (identificacion, razon_social, tipo_identificacion) VALUES ('9999999999999','CONSUMIDOR FINAL','RUC')")
+                tenant_conn.commit()
+            except Exception:
+                tenant_conn.rollback()
             try:
                 from passlib.context import CryptContext
                 pwd_ctx = CryptContext(schemes=["bcrypt"])
