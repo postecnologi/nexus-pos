@@ -4,6 +4,10 @@ import { useTheme } from '../theme'
 
 export default function Depositos() {
   const C = useTheme()
+  const isDark = C.bg !== '#F8FAFC' && C.bg !== '#ffffff' && C.bg !== '#FFFFFF'
+  const FI = { width:'100%', padding:'10px 12px', borderRadius:10, border:`1px solid ${C.bord}`,
+    background: isDark ? '#1E293B' : '#F9FAFB', color: isDark ? '#E2E8F0' : '#1F2937',
+    fontSize:14, boxSizing:'border-box', outline:'none', colorScheme: isDark ? 'dark' : 'light' }
   const [tab, setTab] = useState('pendientes')
   const [pendientes, setPendientes] = useState(null)
   const [depositos, setDepositos] = useState([])
@@ -271,26 +275,26 @@ export default function Depositos() {
               <div>
                 <label style={{ fontSize: 13, fontWeight: 700, color: C.tx, display: 'block', marginBottom: 6 }}>Cuenta bancaria destino *</label>
                 <select value={crearForm.cuenta_bancaria_id} onChange={e => setCrearForm(f => ({ ...f, cuenta_bancaria_id: parseInt(e.target.value) }))}
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: `1px solid ${C.bord}`, background: C.sur, color: C.tx, fontSize: 14, boxSizing: 'border-box' }}>
-                  {cuentas.map(c => <option key={c.id} value={c.id}>{c.nombre} - {c.numero}</option>)}
+                  style={{...FI}}>
+                  {cuentas.map(c => <option key={c.id} value={c.id} style={{background:C.sur,color:C.tx}}>{c.nombre} - {c.numero}</option>)}
                 </select>
               </div>
               <div>
                 <label style={{ fontSize: 13, fontWeight: 700, color: C.tx, display: 'block', marginBottom: 6 }}>Fecha del deposito</label>
-                <input type="date" value={crearForm.fecha_deposito || new Date().toISOString().slice(0, 10)}
+                <input type="date" value={crearForm.fecha_deposito || new Date().toISOString().slice(0,10)}
                   onChange={e => setCrearForm(f => ({ ...f, fecha_deposito: e.target.value }))}
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: `1px solid ${C.bord}`, background: C.sur, color: C.tx, fontSize: 14, boxSizing: 'border-box', colorScheme: C.bg === '#0F172A' ? 'dark' : 'light' }} />
+                  style={{...FI}} />
               </div>
               <div>
                 <label style={{ fontSize: 13, fontWeight: 700, color: C.tx, display: 'block', marginBottom: 6 }}>Referencia / Comprobante</label>
                 <input value={crearForm.referencia} onChange={e => setCrearForm(f => ({ ...f, referencia: e.target.value }))}
-                  placeholder="Numero de papeleta" style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: `1px solid ${C.bord}`, background: C.sur, color: C.tx, fontSize: 14, boxSizing: 'border-box' }} />
+                  placeholder="Numero de papeleta" style={{...FI}} />
               </div>
               <div>
                 <label style={{ fontSize: 13, fontWeight: 700, color: C.tx, display: 'block', marginBottom: 6 }}>Observaciones</label>
                 <textarea value={crearForm.observaciones} onChange={e => setCrearForm(f => ({ ...f, observaciones: e.target.value }))}
                   rows={2} placeholder="Notas adicionales (opcional)"
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: `1px solid ${C.bord}`, background: C.bg, color: C.tx, fontSize: 14, resize: 'vertical', boxSizing: 'border-box' }} />
+                  style={{...FI, resize:'vertical'}} />
               </div>
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
