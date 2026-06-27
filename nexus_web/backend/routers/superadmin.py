@@ -2,6 +2,7 @@
 Super Admin router for multi-tenant management.
 Only accessible by superadmin users.
 """
+import os
 from fastapi import APIRouter, HTTPException, Form
 from pydantic import BaseModel
 from typing import Optional
@@ -175,6 +176,53 @@ def reset_admin_empresa(eid: int, data: AdminReset):
         return {"msg": f"Admin '{data.admin_username}' configurado"}
     finally:
         tenant_conn.close()
+
+@router.delete("/empresas/{eid}")
+def eliminar_empresa(eid: int):
+    """Delete a company and its database completely."""
+    from multitenant import get_master_connection
+    import psycopg2
+
+    conn = get_master_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT codigo, db_name FROM mt_empresas WHERE id=%s", (eid,))
+        emp = cur.fetchone()
+        if not emp:
+            raise HTTPException(404, "Empresa no encontrada")
+
+        db_name = emp["db_name"]
+
+        # Delete from master tables
+        cur.execute("DELETE FROM mt_pagos WHERE empresa_id=%s", (eid,))
+        cur.execute("DELETE FROM mt_empresas WHERE id=%s", (eid,))
+        conn.commit()
+    finally:
+        conn.close()
+
+    # Drop the tenant database if it's separate
+    if db_name and db_name != os.getenv("DB_NAME", "nexus_db"):
+        try:
+            conn2 = psycopg2.connect(
+                host=os.getenv("DB_HOST", "localhost"),
+                port=int(os.getenv("DB_PORT", "5432")),
+                database="postgres",
+                user=os.getenv("DB_USER", "postgres"),
+                password=os.getenv("DB_PASSWORD", "")
+            )
+            conn2.autocommit = True
+            cur2 = conn2.cursor()
+            # Terminate connections to the database
+            cur2.execute("""
+                SELECT pg_terminate_backend(pid) FROM pg_stat_activity
+                WHERE datname=%s AND pid <> pg_backend_pid()
+            """, (db_name,))
+            cur2.execute(f'DROP DATABASE IF EXISTS "{db_name}"')
+            conn2.close()
+        except Exception as e:
+            print(f"Warning dropping DB {db_name}: {e}")
+
+    return {"msg": f"Empresa '{emp['codigo']}' eliminada completamente"}
 
 @router.patch("/empresas/{eid}/toggle")
 def toggle_empresa_ep(eid: int):

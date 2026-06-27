@@ -332,7 +332,7 @@ export default function SuperAdmin() {
                       }}>{emp.activa ? 'ACTIVA' : 'INACTIVA'}</span>
                     </td>
                     <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                      <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
+                      <div style={{ display: 'flex', gap: 4, justifyContent: 'center', flexWrap: 'wrap' }}>
                         <button onClick={() => setEditEmp(emp)} style={{
                           padding: '5px 12px', borderRadius: 6, border: 'none', cursor: 'pointer',
                           fontSize: 11, fontWeight: 600, background: '#EDE9FE', color: '#7C3AED',
@@ -343,6 +343,14 @@ export default function SuperAdmin() {
                           background: emp.activa ? '#FEE2E2' : '#D1FAE5',
                           color: emp.activa ? '#DC2626' : '#065F46',
                         }}>{emp.activa ? 'Desactivar' : 'Activar'}</button>
+                        <button onClick={async () => {
+                          if (!confirm('ELIMINAR empresa "' + emp.nombre + '"? Se borrara la base de datos completa. Esta accion no se puede deshacer.')) return
+                          try { await sa.delete('/superadmin/empresas/' + emp.id); loadData() }
+                          catch (e) { alert('Error: ' + (e.response?.data?.detail || e.message)) }
+                        }} style={{
+                          padding: '5px 12px', borderRadius: 6, border: 'none', cursor: 'pointer',
+                          fontSize: 11, fontWeight: 600, background: '#7F1D1D', color: 'white',
+                        }}>Eliminar</button>
                       </div>
                     </td>
                   </tr>
