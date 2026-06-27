@@ -13,7 +13,7 @@ from routers import (
     usuarios, reportes, kardex, cotizaciones, toma_fisica, servicio_tecnico,
     crm, retenciones, notas_debito, contabilidad,
     guias_remision, liquidaciones, nomina, admin, superadmin,
-    whatsapp,
+    whatsapp, depositos,
 )
 
 app = FastAPI(title="NEXUS POS API", version="2.0.0")
@@ -393,6 +393,29 @@ def run_migrations():
         )""",
         "CREATE INDEX IF NOT EXISTS idx_audit_fecha ON sys_audit_log(created_at DESC)",
         "CREATE INDEX IF NOT EXISTS idx_audit_usuario ON sys_audit_log(usuario_id)",
+        # ── Depositos Bancarios ──
+        """CREATE TABLE IF NOT EXISTS fin_depositos (
+            id SERIAL PRIMARY KEY,
+            cuenta_bancaria_id INTEGER,
+            fecha DATE DEFAULT CURRENT_DATE,
+            total NUMERIC(12,2) DEFAULT 0,
+            cantidad_pagos INTEGER DEFAULT 0,
+            metodos_pago VARCHAR(200),
+            referencia VARCHAR(200),
+            observaciones TEXT,
+            estado VARCHAR(20) DEFAULT 'PENDIENTE',
+            fecha_confirmacion TIMESTAMP,
+            usuario_id INTEGER,
+            created_at TIMESTAMP DEFAULT NOW()
+        )""",
+        """CREATE TABLE IF NOT EXISTS fin_deposito_pagos (
+            id SERIAL PRIMARY KEY,
+            deposito_id INTEGER REFERENCES fin_depositos(id) ON DELETE CASCADE,
+            pago_id INTEGER,
+            monto NUMERIC(12,2)
+        )""",
+        "ALTER TABLE ven_pagos ADD COLUMN IF NOT EXISTS pendiente_deposito BOOLEAN DEFAULT true",
+        "ALTER TABLE ven_pagos ADD COLUMN IF NOT EXISTS liquidacion_id INTEGER",
         # ── Solicitudes Demo ──
         """CREATE TABLE IF NOT EXISTS sys_solicitudes_demo (
             id SERIAL PRIMARY KEY,
@@ -487,6 +510,7 @@ app.include_router(liquidaciones.router)
 app.include_router(nomina.router)
 app.include_router(admin.router)
 app.include_router(whatsapp.router)
+app.include_router(depositos.router)
 if MULTI_TENANT:
     app.include_router(superadmin.router)
 

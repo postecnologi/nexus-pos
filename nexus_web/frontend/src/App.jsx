@@ -32,6 +32,7 @@ import NotasDebito from './pages/NotasDebito'
 import Contabilidad from './pages/Contabilidad'
 import Nomina from './pages/Nomina'
 import Administracion from './pages/Administracion'
+import Depositos from './pages/Depositos'
 import Layout from './components/Layout'
 import PrintFactura from './pages/PrintFactura'
 import NotFound from './pages/NotFound'
@@ -109,6 +110,7 @@ export default function App() {
           <Route path="/contabilidad" element={<Contabilidad />} />
           <Route path="/nomina" element={<Nomina />} />
           <Route path="/administracion" element={<Administracion />} />
+          <Route path="/depositos" element={<Depositos />} />
         </Route>
         <Route path="*" element={<NotFound />} />
       </Routes>

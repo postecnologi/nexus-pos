@@ -4,7 +4,7 @@ import {
   Landmark, Building2, GitMerge, ClipboardList, Tag, Warehouse, BarChart3,
   Truck, Award, Settings, LogOut, CreditCard, ChevronDown, ChevronRight,
   ShoppingCart, DollarSign, Box, ScrollText, ClipboardCheck, Sun, Moon, Wrench,
-  Target, FileCheck2, Calculator
+  Target, FileCheck2, Calculator, ArrowUpCircle
 } from 'lucide-react'
 import { useState, useMemo, useEffect } from 'react'
 import { useThemeToggle } from '../theme'
@@ -28,6 +28,7 @@ const pathToModule = {
   '/proveedores':     'proveedores',
   '/cxp-pagar':       'cxp',
   '/bancos':          'bancos',
+  '/depositos':       'bancos',
   '/conciliacion':    'conciliacion',
   '/vendedores':      'vendedores',
   '/cotizaciones':    'cotizaciones',
@@ -103,6 +104,7 @@ const grupos = [
     icon: DollarSign,
     items: [
       { to: '/bancos',          icon: Building2,  label: 'Bancos'             },
+      { to: '/depositos',       icon: ArrowUpCircle, label: 'Depósitos'       },
       { to: '/conciliacion',    icon: GitMerge,   label: 'Conciliación'       },
     ]
   },
