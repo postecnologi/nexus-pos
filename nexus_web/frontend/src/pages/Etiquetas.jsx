@@ -3,6 +3,7 @@
 // ============================================================
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
+const API_HOST = (import.meta.env.VITE_API_URL || 'http://localhost:8000/api').replace('/api', '')
 import api from '../api'
 import { useTheme } from '../theme'
 
@@ -677,7 +678,7 @@ function GaleriaImagenes({onSeleccionar}) {
     setCargando(true)
     try{
       const token=localStorage.getItem('nexus_token')
-      const res=await fetch('http://localhost:8000/api/imagenes?carpeta=etiquetas',
+      const res=await fetch('${API_HOST}/api/imagenes?carpeta=etiquetas',
         {headers:{Authorization:'Bearer '+token}})
       setImgs(await res.json())
     }catch{}finally{setCargando(false)}
@@ -687,7 +688,7 @@ function GaleriaImagenes({onSeleccionar}) {
     e.stopPropagation()
     if(!window.confirm('¿Eliminar esta imagen del servidor?')) return
     const token=localStorage.getItem('nexus_token')
-    await fetch(`http://localhost:8000/api/imagenes/${img.carpeta}/${img.filename}`,
+    await fetch(`${API_HOST}/api/imagenes/${img.carpeta}/${img.filename}`,
       {method:'DELETE',headers:{Authorization:'Bearer '+token}})
     setImgs(p=>p.filter(i=>i.filename!==img.filename))
   }
@@ -718,7 +719,7 @@ function GaleriaImagenes({onSeleccionar}) {
                   border:`1px solid ${C.bord2}`}}
                 onMouseEnter={e=>e.currentTarget.style.borderColor=C.blue}
                 onMouseLeave={e=>e.currentTarget.style.borderColor=C.bord2}>
-                <img src={'http://localhost:8000'+img.url}
+                <img src={API_HOST+img.url}
                   style={{width:'100%',height:'100%',objectFit:'cover'}}/>
                 <button onClick={e=>eliminar(img,e)}
                   style={{position:'absolute',top:2,right:2,background:'rgba(239,68,68,.9)',
@@ -1082,18 +1083,18 @@ function EditorElemento({el, idx, totalEls, onChange, onDelete, onMover, product
                 const fd=new FormData(); fd.append('file',file); fd.append('carpeta','etiquetas')
                 try{
                   const token=localStorage.getItem('nexus_token')
-                  const res=await fetch('http://localhost:8000/api/imagenes/subir',{
+                  const res=await fetch('${API_HOST}/api/imagenes/subir',{
                     method:'POST',headers:{Authorization:'Bearer '+token},body:fd
                   })
                   const data=await res.json()
-                  if(data.url) onChange({...el,src:'http://localhost:8000'+data.url})
+                  if(data.url) onChange({...el,src:API_HOST+data.url})
                   else alert('Error al subir: '+JSON.stringify(data))
                 }catch(err){alert('Error: '+err.message)}
               }}/>
             🖼 {el.src?'Cambiar':'Subir'} imagen al servidor
           </label>
           {/* Galería de imágenes subidas */}
-          <GaleriaImagenes onSeleccionar={url=>onChange({...el,src:'http://localhost:8000'+url})}/>
+          <GaleriaImagenes onSeleccionar={url=>onChange({...el,src:API_HOST+url})}/>
           {/* Quitar */}
           {el.src&&(
             <button onClick={()=>onChange({...el,src:''})}
