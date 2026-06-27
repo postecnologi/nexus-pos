@@ -788,6 +788,11 @@ function ModalEditEmpresa({ emp, sa, planes, onClose, onSaved }) {
 
 function TabSolicitudes({ sa }) {
   const [data, setData] = useState([])
+  const [crearPara, setCrearPara] = useState(null)
+  const [crearForm, setCrearForm] = useState({ admin_username: '', admin_password: '' })
+  const [crearMsg, setCrearMsg] = useState('')
+  const [creando, setCreando] = useState(false)
+
   useEffect(() => { if (sa) sa.get('/superadmin/solicitudes').then(r => setData(r.data)).catch(() => {}) }, [])
 
   const marcar = async (id, estado) => {
@@ -796,6 +801,26 @@ function TabSolicitudes({ sa }) {
       await sa.patch(`/superadmin/solicitudes/${id}?${params}`, {})
       setData(d => d.map(s => s.id === id ? { ...s, estado } : s))
     } catch {}
+  }
+
+  const crearEmpresa = async () => {
+    if (!crearForm.admin_username || !crearForm.admin_password) {
+      setCrearMsg('Usuario y contrasena son obligatorios'); return
+    }
+    setCreando(true); setCrearMsg('')
+    try {
+      const s = crearPara
+      const { data: r } = await sa.post('/superadmin/empresas', {
+        codigo: s.empresa_nombre.replace(/[^a-zA-Z0-9]/g, '').slice(0, 8).toUpperCase(),
+        nombre: s.empresa_nombre, ruc: s.ruc || '', email: s.email || '',
+        plan: 'BASICO', admin_nombre: s.contacto_nombre,
+        admin_username: crearForm.admin_username, admin_password: crearForm.admin_password,
+        admin_email: s.email || '',
+      }, { headers: { 'Content-Type': 'application/json' } })
+      setCrearMsg(`Empresa creada! Codigo: ${r.codigo_empresa || r.empresa_id}. Enviale al cliente: Usuario: ${crearForm.admin_username} / Contrasena: ${crearForm.admin_password}`)
+      marcar(s.id, 'CONVERTIDA')
+    } catch (e) { setCrearMsg('Error: ' + (e.response?.data?.detail || e.message)) }
+    finally { setCreando(false) }
   }
 
   const colEstado = { NUEVA: '#3B82F6', CONTACTADA: '#F59E0B', CONVERTIDA: '#10B981', DESCARTADA: '#9CA3AF' }
@@ -836,17 +861,17 @@ function TabSolicitudes({ sa }) {
                   </span>
                 </td>
                 <td style={{ padding: '10px 12px' }}>
-                  <div style={{ display: 'flex', gap: 4 }}>
+                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                     {s.estado === 'NUEVA' && (
                       <button onClick={() => marcar(s.id, 'CONTACTADA')}
                         style={{ padding: '3px 8px', borderRadius: 6, border: 'none', background: '#FEF3C7', color: '#92400E', cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>
                         Contactada
                       </button>
                     )}
-                    {(s.estado === 'NUEVA' || s.estado === 'CONTACTADA') && (
-                      <button onClick={() => marcar(s.id, 'CONVERTIDA')}
-                        style={{ padding: '3px 8px', borderRadius: 6, border: 'none', background: '#D1FAE5', color: '#065F46', cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>
-                        Convertida
+                    {s.estado !== 'CONVERTIDA' && (
+                      <button onClick={() => { setCrearPara(s); setCrearForm({ admin_username: '', admin_password: '' }); setCrearMsg('') }}
+                        style={{ padding: '3px 8px', borderRadius: 6, border: 'none', background: '#7C3AED', color: 'white', cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>
+                        Crear Empresa
                       </button>
                     )}
                   </div>
@@ -855,6 +880,58 @@ function TabSolicitudes({ sa }) {
             ))}
           </tbody>
         </table>
+      )}
+
+      {/* Modal Crear Empresa desde Solicitud */}
+      {crearPara && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9000 }}
+          onClick={() => setCrearPara(null)}>
+          <div style={{ background: 'white', borderRadius: 16, padding: 28, width: 460, maxHeight: '85vh', overflow: 'auto' }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ margin: '0 0 16px', color: '#111827' }}>Crear empresa para: {crearPara.contacto_nombre}</h3>
+
+            <div style={{ background: '#F8FAFC', borderRadius: 10, padding: 16, marginBottom: 16, fontSize: 13, color: '#374151', lineHeight: 1.8 }}>
+              <div><strong>Empresa:</strong> {crearPara.empresa_nombre}</div>
+              <div><strong>RUC:</strong> {crearPara.ruc || '-'}</div>
+              <div><strong>Email:</strong> {crearPara.email}</div>
+              <div><strong>Telefono:</strong> {crearPara.telefono}</div>
+              <div><strong>Giro:</strong> {crearPara.giro_negocio || '-'}</div>
+              <div><strong>Ciudad:</strong> {crearPara.ciudad || '-'}</div>
+            </div>
+
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#7C3AED', marginBottom: 12, paddingBottom: 8, borderBottom: '2px solid #EDE9FE' }}>
+              Credenciales para el cliente
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>Usuario *</label>
+                <input value={crearForm.admin_username} onChange={e => setCrearForm(p => ({...p, admin_username: e.target.value}))}
+                  placeholder="jperez" style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #D1D5DB', fontSize: 14, boxSizing: 'border-box' }} />
+              </div>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>Contrasena *</label>
+                <input value={crearForm.admin_password} onChange={e => setCrearForm(p => ({...p, admin_password: e.target.value}))}
+                  placeholder="MiClave123" style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #D1D5DB', fontSize: 14, boxSizing: 'border-box' }} />
+              </div>
+            </div>
+
+            {crearMsg && <div style={{ padding: 12, borderRadius: 8, fontSize: 13, fontWeight: 600, marginBottom: 12, textAlign: 'center',
+              background: crearMsg.startsWith('Error') ? '#FEE2E2' : '#D1FAE5',
+              color: crearMsg.startsWith('Error') ? '#DC2626' : '#065F46',
+              whiteSpace: 'pre-wrap' }}>{crearMsg}</div>}
+
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={crearEmpresa} disabled={creando}
+                style={{ flex: 1, padding: '12px', borderRadius: 8, border: 'none', background: creando ? '#9CA3AF' : '#7C3AED',
+                  color: 'white', cursor: creando ? 'default' : 'pointer', fontWeight: 700, fontSize: 14 }}>
+                {creando ? 'Creando...' : 'Crear empresa y usuario'}
+              </button>
+              <button onClick={() => setCrearPara(null)}
+                style={{ padding: '12px 20px', borderRadius: 8, border: '1px solid #D1D5DB', background: 'white', cursor: 'pointer', color: '#374151' }}>
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
