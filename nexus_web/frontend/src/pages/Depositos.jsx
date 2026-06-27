@@ -4,10 +4,14 @@ import { useTheme } from '../theme'
 
 export default function Depositos() {
   const C = useTheme()
-  const isDark = C.bg !== '#F8FAFC' && C.bg !== '#ffffff' && C.bg !== '#FFFFFF'
-  const FI = { width:'100%', padding:'10px 12px', borderRadius:10, border:`1px solid ${C.bord}`,
-    background: isDark ? '#1E293B' : '#F9FAFB', color: isDark ? '#E2E8F0' : '#1F2937',
-    fontSize:14, boxSizing:'border-box', outline:'none', colorScheme: isDark ? 'dark' : 'light' }
+  const isDark = C.bg === '#0A0F1E'
+  const FI = { width:'100%', padding:'10px 14px', borderRadius:10,
+    border: `1.5px solid ${isDark ? '#334155' : '#D1D5DB'}`,
+    background: isDark ? '#1E293B' : '#F9FAFB',
+    color: isDark ? '#F1F5F9' : '#111827',
+    fontSize:14, boxSizing:'border-box', outline:'none',
+    colorScheme: isDark ? 'dark' : 'light' }
+  const LBL = { fontSize:13, fontWeight:700, color: isDark ? '#E2E8F0' : '#1F2937', display:'block', marginBottom:6 }
   const [tab, setTab] = useState('pendientes')
   const [pendientes, setPendientes] = useState(null)
   const [depositos, setDepositos] = useState([])
@@ -262,36 +266,36 @@ export default function Depositos() {
       {showCrear && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9000 }}
           onClick={() => setShowCrear(false)}>
-          <div style={{ background: C.sur, borderRadius: 16, padding: 28, width: 440, border: `1px solid ${C.bord}`, boxShadow: '0 20px 60px rgba(0,0,0,.5)', colorScheme: C.bg === '#F8FAFC' || C.bg === '#ffffff' ? 'light' : 'dark' }} onClick={e => e.stopPropagation()}>
-            <h3 style={{ marginBottom: 16, color: C.tx, fontSize: 18, fontWeight: 800 }}>Crear Deposito</h3>
-            <div style={{ background: `${C.blue}15`, padding: 16, borderRadius: 12, marginBottom: 20, border: `1px solid ${C.blue}30` }}>
-              <div style={{ fontSize: 13, color: C.hint, marginBottom: 4 }}>Total a depositar</div>
+          <div style={{ background: isDark ? '#0F172A' : '#FFFFFF', borderRadius: 16, padding: 28, width: 440, border: `1.5px solid ${isDark ? '#334155' : '#E2E8F0'}`, boxShadow: '0 20px 60px rgba(0,0,0,.6)' }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ marginBottom: 16, color: isDark ? '#F1F5F9' : '#0F172A', fontSize: 18, fontWeight: 800 }}>Crear Deposito</h3>
+            <div style={{ background: isDark ? '#1E293B' : '#EFF6FF', padding: 16, borderRadius: 12, marginBottom: 20, border: `1px solid ${isDark ? '#334155' : '#BFDBFE'}` }}>
+              <div style={{ fontSize: 13, color: isDark ? '#94A3B8' : '#64748B', marginBottom: 4 }}>Total a depositar</div>
               <div style={{ fontSize: 32, fontWeight: 900, color: C.blue }}>
                 {fmt$(pagosFiltrados.filter(p => selected.includes(p.id)).reduce((s, p) => s + Number(p.monto), 0))}
               </div>
-              <div style={{ fontSize: 12, color: C.hint }}>{selected.length} pagos seleccionados</div>
+              <div style={{ fontSize: 12, color: isDark ? '#94A3B8' : '#64748B' }}>{selected.length} pagos seleccionados</div>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
               <div>
-                <label style={{ fontSize: 13, fontWeight: 700, color: C.tx, display: 'block', marginBottom: 6 }}>Cuenta bancaria destino *</label>
+                <label style={LBL}>Cuenta bancaria destino *</label>
                 <select value={crearForm.cuenta_bancaria_id} onChange={e => setCrearForm(f => ({ ...f, cuenta_bancaria_id: parseInt(e.target.value) }))}
                   style={{...FI}}>
                   {cuentas.map(c => <option key={c.id} value={c.id} style={{background:C.sur,color:C.tx}}>{c.nombre} - {c.numero}</option>)}
                 </select>
               </div>
               <div>
-                <label style={{ fontSize: 13, fontWeight: 700, color: C.tx, display: 'block', marginBottom: 6 }}>Fecha del deposito</label>
+                <label style={LBL}>Fecha del deposito</label>
                 <input type="date" value={crearForm.fecha_deposito || new Date().toISOString().slice(0,10)}
                   onChange={e => setCrearForm(f => ({ ...f, fecha_deposito: e.target.value }))}
                   style={{...FI}} />
               </div>
               <div>
-                <label style={{ fontSize: 13, fontWeight: 700, color: C.tx, display: 'block', marginBottom: 6 }}>Referencia / Comprobante</label>
+                <label style={LBL}>Referencia / Comprobante</label>
                 <input value={crearForm.referencia} onChange={e => setCrearForm(f => ({ ...f, referencia: e.target.value }))}
                   placeholder="Numero de papeleta" style={{...FI}} />
               </div>
               <div>
-                <label style={{ fontSize: 13, fontWeight: 700, color: C.tx, display: 'block', marginBottom: 6 }}>Observaciones</label>
+                <label style={LBL}>Observaciones</label>
                 <textarea value={crearForm.observaciones} onChange={e => setCrearForm(f => ({ ...f, observaciones: e.target.value }))}
                   rows={2} placeholder="Notas adicionales (opcional)"
                   style={{...FI, resize:'vertical'}} />
@@ -299,7 +303,7 @@ export default function Depositos() {
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
               <button onClick={crearDeposito} style={{ flex: 1, padding: '12px', borderRadius: 10, border: 'none', background: C.blue, color: 'white', cursor: 'pointer', fontWeight: 700, fontSize: 15 }}>Crear deposito</button>
-              <button onClick={() => setShowCrear(false)} style={{ padding: '12px 24px', borderRadius: 10, border: `1px solid ${C.bord}`, background: C.bg, color: C.tx, cursor: 'pointer', fontWeight: 600 }}>Cancelar</button>
+              <button onClick={() => setShowCrear(false)} style={{ padding: '12px 24px', borderRadius: 10, border: `1.5px solid ${isDark ? '#475569' : '#D1D5DB'}`, background: isDark ? '#1E293B' : '#F3F4F6', color: isDark ? '#E2E8F0' : '#374151', cursor: 'pointer', fontWeight: 600 }}>Cancelar</button>
             </div>
           </div>
         </div>
