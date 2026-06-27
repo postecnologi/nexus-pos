@@ -149,15 +149,16 @@ def registrar_abono(cxc_id: int, a: AbonoIn, u=Depends(get_current_user)):
     # Generar movimiento bancario automatico
     if a.cuenta_bancaria_id and a.forma_pago != "EFECTIVO":
         try:
-            cxc_info = query_one("SELECT * FROM fin_cxc WHERE id=%s", (cxc_id,))
             insert("""
                 INSERT INTO fin_movimientos_bancarios
                     (cuenta_id, tipo, concepto, monto, fecha, referencia,
                      estado, usuario_id)
-                VALUES (%s,'TRANSFERENCIA_RECIBIDA',%s,%s,CURRENT_DATE,%s,'PENDIENTE',%s)
+                VALUES (%s,'TRANSFERENCIA_RECIBIDA',%s,%s,CURRENT_DATE,%s,'CONFIRMADO',%s)
             """, (a.cuenta_bancaria_id,
                   f"Abono CXC - {a.forma_pago}",
                   a.monto, a.referencia, u["id"]))
+            execute("UPDATE fin_cuentas_bancarias SET saldo_actual=saldo_actual+%s WHERE id=%s",
+                    (a.monto, a.cuenta_bancaria_id))
         except: pass
 
     # Actualizar saldo

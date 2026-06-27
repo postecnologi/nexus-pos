@@ -159,15 +159,24 @@ def confirmar_deposito(did: int, referencia_banco: str = "", u=Depends(get_curre
         WHERE id=%s
     """, (referencia_banco or dep.get("referencia", ""), did))
 
+    ref = referencia_banco or dep.get("referencia", "")
     try:
         insert("""
             INSERT INTO fin_movimientos_bancarios
-                (cuenta_id, tipo, concepto, monto, fecha, referencia, conciliado)
-            VALUES (%s, 'DEPOSITO', %s, %s, %s, %s, false)
+                (cuenta_id, tipo, concepto, monto, fecha, referencia, estado, usuario_id)
+            VALUES (%s, 'DEPOSITO', %s, %s, %s, %s, 'CONFIRMADO', %s)
         """, (dep["cuenta_bancaria_id"],
               f"Deposito #{did} - {dep.get('metodos_pago','')}",
-              dep["total"], dep["fecha"],
-              referencia_banco or dep.get("referencia", "")))
+              dep["total"], dep["fecha"], ref, u["id"]))
+    except Exception:
+        pass
+
+    # Update bank account balance
+    try:
+        execute("""
+            UPDATE fin_cuentas_bancarias SET saldo_actual = saldo_actual + %s
+            WHERE id = %s
+        """, (dep["total"], dep["cuenta_bancaria_id"]))
     except Exception:
         pass
 

@@ -212,12 +212,14 @@ def crear_factura(f: FacturaIn, u=Depends(get_current_user)):
         insert("""
             INSERT INTO ven_pagos
                 (factura_id, forma_pago, monto, referencia,
-                 banco_tarjeta, banco_origen, banco_destino, fecha, cuenta_bancaria_id)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,CURRENT_DATE,%s)
+                 banco_tarjeta, banco_origen, banco_destino, fecha, cuenta_bancaria_id,
+                 pendiente_deposito)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,CURRENT_DATE,%s,%s)
         """, (fac_id, pago["forma_pago"], pago["monto"],
               pago.get("referencia"), pago.get("banco_tarjeta"),
               pago.get("banco_origen"), pago.get("banco_destino"),
-              pago.get("cuenta_bancaria_id")))
+              pago.get("cuenta_bancaria_id"),
+              pago["forma_pago"] != "CREDITO"))
 
         # Movimiento bancario automatico si tiene cuenta y no es efectivo/credito
         cta_id_pago = pago.get("cuenta_bancaria_id")
@@ -229,10 +231,14 @@ def crear_factura(f: FacturaIn, u=Depends(get_current_user)):
                     INSERT INTO fin_movimientos_bancarios
                         (cuenta_id, tipo, concepto, monto, fecha, referencia,
                          estado, usuario_id)
-                    VALUES (%s,%s,%s,%s,CURRENT_DATE,%s,'PENDIENTE',%s)
+                    VALUES (%s,%s,%s,%s,CURRENT_DATE,%s,'CONFIRMADO',%s)
                 """, (cta_id_pago, tipo_mov,
-                      f"Factura - {forma_pago}",
+                      f"Factura {numero} - {forma_pago}",
                       float(pago["monto"]), pago.get("referencia"), u["id"]))
+                execute("UPDATE fin_cuentas_bancarias SET saldo_actual=saldo_actual+%s WHERE id=%s",
+                        (float(pago["monto"]), cta_id_pago))
+                execute("UPDATE ven_pagos SET pendiente_deposito=false WHERE factura_id=%s AND forma_pago=%s AND monto=%s",
+                        (fac_id, forma_pago, pago["monto"]))
             except: pass
 
         if pago["forma_pago"] == "CREDITO":
