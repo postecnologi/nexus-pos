@@ -201,7 +201,7 @@ export default function SuperAdmin() {
 
         {/* Tabs */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
-          {[{id:'empresas',label:'Empresas'},{id:'suscripciones',label:'Suscripciones'},{id:'planes',label:'Planes'}].map(t => (
+          {[{id:'solicitudes',label:'Solicitudes'},{id:'empresas',label:'Empresas'},{id:'suscripciones',label:'Suscripciones'},{id:'planes',label:'Planes'}].map(t => (
             <button key={t.id} onClick={() => setTab(t.id)} style={{
               padding: '8px 20px', borderRadius: 8, border: 'none', cursor: 'pointer',
               fontWeight: 600, fontSize: 13,
@@ -210,6 +210,9 @@ export default function SuperAdmin() {
             }}>{t.label}</button>
           ))}
         </div>
+
+        {/* Solicitudes tab */}
+        {tab === 'solicitudes' && <TabSolicitudes sa={sa} />}
 
         {createMsg && (
           <div style={{
@@ -779,6 +782,80 @@ function ModalEditEmpresa({ emp, sa, planes, onClose, onSaved }) {
           Cerrar
         </button>
       </div>
+    </div>
+  )
+}
+
+function TabSolicitudes({ sa }) {
+  const [data, setData] = useState([])
+  useEffect(() => { if (sa) sa.get('/superadmin/solicitudes').then(r => setData(r.data)).catch(() => {}) }, [])
+
+  const marcar = async (id, estado) => {
+    try {
+      const params = new URLSearchParams({ estado })
+      await sa.patch(`/superadmin/solicitudes/${id}?${params}`, {})
+      setData(d => d.map(s => s.id === id ? { ...s, estado } : s))
+    } catch {}
+  }
+
+  const colEstado = { NUEVA: '#3B82F6', CONTACTADA: '#F59E0B', CONVERTIDA: '#10B981', DESCARTADA: '#9CA3AF' }
+
+  return (
+    <div style={{ background: 'white', borderRadius: 12, overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,.08)' }}>
+      <div style={{ padding: '16px 20px', borderBottom: '1px solid #E5E7EB', fontWeight: 700, fontSize: 16, color: '#111827' }}>
+        Solicitudes de prueba gratuita ({data.length})
+      </div>
+      {data.length === 0 ? (
+        <div style={{ padding: 40, textAlign: 'center', color: '#9CA3AF' }}>No hay solicitudes todavia</div>
+      ) : (
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          <thead>
+            <tr style={{ background: '#F3F4F6', borderBottom: '2px solid #E5E7EB' }}>
+              {['Fecha', 'Empresa', 'Contacto', 'Email', 'Telefono', 'Giro', 'Ciudad', 'Estado', 'Acciones'].map(h => (
+                <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#374151' }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {data.map(s => (
+              <tr key={s.id} style={{ borderBottom: '1px solid #F1F5F9' }}>
+                <td style={{ padding: '10px 12px', fontSize: 12, color: '#374151' }}>{String(s.created_at).slice(0, 10)}</td>
+                <td style={{ padding: '10px 12px', fontWeight: 700, color: '#111827' }}>{s.empresa_nombre}</td>
+                <td style={{ padding: '10px 12px', color: '#1F2937' }}>{s.contacto_nombre}</td>
+                <td style={{ padding: '10px 12px', color: '#374151' }}>{s.email}</td>
+                <td style={{ padding: '10px 12px' }}>
+                  <a href={`https://wa.me/593${(s.telefono||'').replace(/^0/,'')}`} target="_blank" rel="noopener"
+                    style={{ color: '#25D366', fontWeight: 700, textDecoration: 'none' }}>{s.telefono}</a>
+                </td>
+                <td style={{ padding: '10px 12px', color: '#374151' }}>{s.giro_negocio || '-'}</td>
+                <td style={{ padding: '10px 12px', color: '#374151' }}>{s.ciudad || '-'}</td>
+                <td style={{ padding: '10px 12px' }}>
+                  <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700,
+                    background: `${colEstado[s.estado] || '#6B7280'}18`, color: colEstado[s.estado] || '#6B7280' }}>
+                    {s.estado}
+                  </span>
+                </td>
+                <td style={{ padding: '10px 12px' }}>
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    {s.estado === 'NUEVA' && (
+                      <button onClick={() => marcar(s.id, 'CONTACTADA')}
+                        style={{ padding: '3px 8px', borderRadius: 6, border: 'none', background: '#FEF3C7', color: '#92400E', cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>
+                        Contactada
+                      </button>
+                    )}
+                    {(s.estado === 'NUEVA' || s.estado === 'CONTACTADA') && (
+                      <button onClick={() => marcar(s.id, 'CONVERTIDA')}
+                        style={{ padding: '3px 8px', borderRadius: 6, border: 'none', background: '#D1FAE5', color: '#065F46', cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>
+                        Convertida
+                      </button>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </div>
   )
 }
