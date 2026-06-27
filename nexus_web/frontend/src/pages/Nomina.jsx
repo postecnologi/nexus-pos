@@ -423,7 +423,7 @@ function TabRoles({ sty, t }) {
   }
 
   const verPdf = (rid) => {
-    window.open(`http://localhost:8000/api/nomina/roles/${rid}/pdf`, '_blank')
+    window.open(`${import.meta.env.VITE_API_URL||'http://localhost:8000/api'}/nomina/roles/${rid}/pdf`, '_blank')
   }
 
   const totalIngresos = roles.reduce((s, r) => s + parseFloat(r.total_ingresos || 0), 0)
@@ -610,7 +610,7 @@ function RolDetalleModal({ sty, t, rol, onClose }) {
               <Check size={14} /> Aprobar
             </button>
           )}
-          <button onClick={() => window.open(`http://localhost:8000/api/nomina/roles/${r.id}/pdf`, '_blank')}
+          <button onClick={() => window.open(`${import.meta.env.VITE_API_URL||'http://localhost:8000/api'}/nomina/roles/${r.id}/pdf`, '_blank')}
             style={sty.btnOutline(t.blue)}>
             <FileText size={14} /> Ver PDF
           </button>

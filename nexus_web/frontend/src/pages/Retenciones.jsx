@@ -135,11 +135,11 @@ export default function Retenciones() {
   }
 
   function descargarPDF(id) {
-    window.open(`http://localhost:8000/api/retenciones/${id}/pdf?token=${localStorage.getItem('nexus_token')}`, '_blank')
+    window.open(`${import.meta.env.VITE_API_URL||'http://localhost:8000/api'}/retenciones/${id}/pdf?token=${localStorage.getItem('nexus_token')}`, '_blank')
   }
 
   function descargarXML(id) {
-    window.open(`http://localhost:8000/api/retenciones/${id}/xml?token=${localStorage.getItem('nexus_token')}`, '_blank')
+    window.open(`${import.meta.env.VITE_API_URL||'http://localhost:8000/api'}/retenciones/${id}/xml?token=${localStorage.getItem('nexus_token')}`, '_blank')
   }
 
   const fi = {

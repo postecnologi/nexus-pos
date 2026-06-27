@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import axios from 'axios'
 import { useTheme } from '../theme'
 
-const BASE = 'http://localhost:8000/api'
+const BASE = (import.meta.env.VITE_API_URL || 'http://localhost:8000/api')
 
 function getHeaders() {
   return { Authorization: 'Bearer ' + localStorage.getItem('nexus_token') }
