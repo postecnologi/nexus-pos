@@ -142,55 +142,72 @@ def create_tenant_database(codigo, nombre, ruc='', email='',
         if not conn.closed:
             conn.close()
 
-    # Create the database as a copy of the template (current DB)
-    conn = psycopg2.connect(
-        host=DB_HOST, port=DB_PORT, database="postgres",
-        user=DB_USER, password=DB_PASS
-    )
-    conn.autocommit = True
+    # Try to create a separate database (works on local PostgreSQL)
+    db_created = False
     try:
-        cur = conn.cursor()
-        # Terminate connections to template DB to allow copy
-        cur.execute("""
+        conn2 = psycopg2.connect(
+            host=DB_HOST, port=DB_PORT, database="postgres",
+            user=DB_USER, password=DB_PASS
+        )
+        conn2.autocommit = True
+        cur2 = conn2.cursor()
+        cur2.execute(f"""
             SELECT pg_terminate_backend(pid) FROM pg_stat_activity
             WHERE datname=%s AND pid <> pg_backend_pid()
         """, (MASTER_DB,))
-        cur.execute(f'CREATE DATABASE "{db_name}" TEMPLATE "{MASTER_DB}"')
-    except Exception as e:
-        # If copy fails, try creating empty DB
-        try:
-            cur.execute(f'CREATE DATABASE "{db_name}"')
-        except Exception:
-            pass
-        conn.close()
-        raise Exception(f"BD creada pero sin datos template: {e}")
-    finally:
-        if not conn.closed:
-            conn.close()
+        cur2.execute(f'CREATE DATABASE "{db_name}" TEMPLATE "{MASTER_DB}"')
+        conn2.close()
+        db_created = True
+    except Exception:
+        try: conn2.close()
+        except: pass
 
-    # Update company info in the new database
-    tenant_conn = get_tenant_connection(db_name)
-    try:
-        tcur = tenant_conn.cursor()
-        # Update empresa info if table exists
+    if db_created:
+        # Separate DB created — configure admin in tenant DB
+        tenant_conn = get_tenant_connection(db_name)
         try:
-            tcur.execute("""
-                UPDATE sys_empresas SET ruc=%s, razon_social=%s, email=%s WHERE activa=true
-            """, (ruc, nombre, email))
-        except Exception:
-            tenant_conn.rollback()
-        # Clean transactional data for fresh start
-        cleanup_tables = [
-            "ven_factura_detalles", "ven_facturas",
-            "com_compras", "crm_oportunidades",
-            "srv_ordenes", "nom_empleados",
-        ]
-        for table in cleanup_tables:
+            tcur = tenant_conn.cursor()
             try:
-                tcur.execute(f"DELETE FROM {table}")
+                tcur.execute("UPDATE sys_empresas SET ruc=%s, razon_social=%s, email=%s WHERE activa=true", (ruc, nombre, email))
             except Exception:
                 tenant_conn.rollback()
-        # Setup admin user for this company
+            for table in ["ven_factura_detalles","ven_facturas","com_compras","crm_oportunidades","srv_ordenes","nom_empleados"]:
+                try: tcur.execute(f"DELETE FROM {table}")
+                except: tenant_conn.rollback()
+            try:
+                from passlib.context import CryptContext
+                pwd_ctx = CryptContext(schemes=["bcrypt"])
+                a_username = admin_username.strip() if admin_username else 'admin'
+                a_password = admin_password if admin_password else 'admin123'
+                a_nombre = admin_nombre.strip() if admin_nombre else 'Administrador'
+                a_email = admin_email.strip() if admin_email else email
+                tcur.execute("UPDATE sys_usuarios SET activo=false")
+                tcur.execute("""
+                    UPDATE sys_usuarios SET username=%s, password_hash=%s, nombre=%s,
+                        email=%s, rol='admin', activo=true
+                    WHERE id=(SELECT MIN(id) FROM sys_usuarios)
+                """, (a_username, pwd_ctx.hash(a_password), a_nombre, a_email))
+            except Exception:
+                tenant_conn.rollback()
+            for mt_table in ["mt_empresas","mt_usuarios","mt_planes","mt_pagos","sys_solicitudes_demo"]:
+                try: tcur.execute(f"DROP TABLE IF EXISTS {mt_table} CASCADE")
+                except: tenant_conn.rollback()
+            tenant_conn.commit()
+        except Exception as e:
+            tenant_conn.rollback()
+        finally:
+            tenant_conn.close()
+    else:
+        # Cloud hosting (Render free, etc.) — use same DB, shared tables
+        # Store db_name = MASTER_DB so login connects to same DB
+        conn_upd = get_master_connection()
+        try:
+            cur_upd = conn_upd.cursor()
+            cur_upd.execute("UPDATE mt_empresas SET db_name=%s WHERE id=%s", (MASTER_DB, empresa_id))
+            conn_upd.commit()
+        finally:
+            conn_upd.close()
+        # Create admin user in the main DB for this company
         try:
             from passlib.context import CryptContext
             pwd_ctx = CryptContext(schemes=["bcrypt"])
@@ -198,28 +215,18 @@ def create_tenant_database(codigo, nombre, ruc='', email='',
             a_password = admin_password if admin_password else 'admin123'
             a_nombre = admin_nombre.strip() if admin_nombre else 'Administrador'
             a_email = admin_email.strip() if admin_email else email
-            # Deactivate all existing users
-            tcur.execute("UPDATE sys_usuarios SET activo=false")
-            # Update first admin user with new credentials
-            tcur.execute("""
-                UPDATE sys_usuarios SET username=%s, password_hash=%s, nombre=%s,
-                    email=%s, rol='admin', activo=true
-                WHERE id=(SELECT MIN(id) FROM sys_usuarios)
-            """, (a_username, pwd_ctx.hash(a_password), a_nombre, a_email))
-        except Exception:
-            tenant_conn.rollback()
-        # Remove master tenant tables from the copy
-        for mt_table in ["mt_empresas", "mt_usuarios", "mt_planes"]:
-            try:
-                tcur.execute(f"DROP TABLE IF EXISTS {mt_table} CASCADE")
-            except Exception:
-                tenant_conn.rollback()
-        tenant_conn.commit()
-    except Exception as e:
-        tenant_conn.rollback()
-        print(f"Warning setting up tenant: {e}")
-    finally:
-        tenant_conn.close()
+            main_conn = get_master_connection()
+            mcur = main_conn.cursor()
+            mcur.execute("SELECT id FROM sys_usuarios WHERE username=%s", (a_username,))
+            if not mcur.fetchone():
+                mcur.execute("""
+                    INSERT INTO sys_usuarios (username, password_hash, nombre, email, rol, activo, sucursal_id)
+                    VALUES (%s,%s,%s,%s,'admin',true,1)
+                """, (a_username, pwd_ctx.hash(a_password), a_nombre, a_email))
+            main_conn.commit()
+            main_conn.close()
+        except Exception as e:
+            print(f"Warning creating admin: {e}")
 
     return {
         "empresa_id": empresa_id,
