@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 const FEATURES = [
@@ -36,26 +37,41 @@ function Icon({ d, size = 24, color = 'currentColor' }) {
 
 export default function Landing() {
   const nav = useNavigate()
-  const scrollTo = id => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
+  const [menuOpen, setMenuOpen] = useState(false)
+  const scrollTo = id => { document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' }); setMenuOpen(false) }
 
   return (
     <div style={{ fontFamily: "'Inter','Segoe UI',sans-serif", color: '#1F2937', overflowX: 'hidden' }}>
       {/* Nav */}
+      <style>{`@media(max-width:768px){.nav-links{display:none!important}.nav-burger{display:flex!important}.nav-mobile{display:flex!important}}`}</style>
       <nav style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100, background: 'rgba(15,23,42,.95)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(255,255,255,.08)' }}>
         <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 64 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg,#7C3AED,#10B981)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 900, fontSize: 14 }}>N</div>
             <span style={{ color: 'white', fontSize: 20, fontWeight: 800 }}>NEXUS <span style={{ color: '#10B981' }}>IA</span></span>
           </div>
-          <div style={{ display: 'flex', gap: 28, alignItems: 'center' }}>
+          <div className="nav-links" style={{ display: 'flex', gap: 28, alignItems: 'center' }}>
             {['Caracteristicas', 'Sectores', 'Comparativa', 'Contacto'].map(s => (
-              <a key={s} onClick={() => scrollTo(s.toLowerCase())} style={{ color: '#CBD5E1', fontSize: 13, fontWeight: 500, cursor: 'pointer', textDecoration: 'none' }}
-                onMouseOver={e => e.target.style.color = 'white'} onMouseOut={e => e.target.style.color = '#CBD5E1'}>{s}</a>
+              <a key={s} onClick={() => scrollTo(s.toLowerCase())} style={{ color: '#CBD5E1', fontSize: 13, fontWeight: 500, cursor: 'pointer', textDecoration: 'none' }}>{s}</a>
             ))}
             <button onClick={() => nav('/login')} style={{ padding: '8px 18px', borderRadius: 8, border: '1px solid rgba(124,58,237,.4)', background: 'transparent', color: '#A78BFA', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Iniciar sesion</button>
             <button onClick={() => nav('/registro')} style={{ padding: '8px 18px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#7C3AED,#10B981)', color: 'white', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>Prueba gratis</button>
           </div>
+          <button className="nav-burger" onClick={() => setMenuOpen(!menuOpen)} style={{ display: 'none', background: 'none', border: 'none', cursor: 'pointer', padding: 8 }}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"><path d={menuOpen ? "M6 6l12 12M6 18L18 6" : "M4 6h16M4 12h16M4 18h16"} /></svg>
+          </button>
         </div>
+        {menuOpen && (
+          <div className="nav-mobile" style={{ display: 'none', flexDirection: 'column', padding: '16px 24px', gap: 12, background: 'rgba(15,23,42,.98)', borderTop: '1px solid rgba(255,255,255,.08)' }}>
+            {['Caracteristicas', 'Sectores', 'Comparativa', 'Contacto'].map(s => (
+              <a key={s} onClick={() => scrollTo(s.toLowerCase())} style={{ color: '#CBD5E1', fontSize: 15, fontWeight: 500, cursor: 'pointer', textDecoration: 'none', padding: '8px 0' }}>{s}</a>
+            ))}
+            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+              <button onClick={() => { nav('/login'); setMenuOpen(false) }} style={{ flex: 1, padding: '10px', borderRadius: 8, border: '1px solid rgba(124,58,237,.4)', background: 'transparent', color: '#A78BFA', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>Iniciar sesion</button>
+              <button onClick={() => { nav('/registro'); setMenuOpen(false) }} style={{ flex: 1, padding: '10px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#7C3AED,#10B981)', color: 'white', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>Prueba gratis</button>
+            </div>
+          </div>
+        )}
       </nav>
 
       {/* Hero */}
