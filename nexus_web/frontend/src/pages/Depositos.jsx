@@ -10,7 +10,7 @@ export default function Depositos() {
   const [cuentas, setCuentas] = useState([])
   const [selected, setSelected] = useState([])
   const [showCrear, setShowCrear] = useState(false)
-  const [crearForm, setCrearForm] = useState({ cuenta_bancaria_id: '', referencia: '', observaciones: '' })
+  const [crearForm, setCrearForm] = useState({ cuenta_bancaria_id: '', referencia: '', observaciones: '', fecha_deposito: new Date().toISOString().slice(0, 10) })
   const [detalle, setDetalle] = useState(null)
   const [filtroMetodo, setFiltroMetodo] = useState('')
 
@@ -256,39 +256,46 @@ export default function Depositos() {
 
       {/* Modal Crear Deposito */}
       {showCrear && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9000 }}
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9000 }}
           onClick={() => setShowCrear(false)}>
-          <div style={{ background: C.sur, borderRadius: 16, padding: 28, width: 420 }} onClick={e => e.stopPropagation()}>
-            <h3 style={{ marginBottom: 16, color: C.tx }}>Crear Deposito</h3>
-            <div style={{ background: `${C.blue}15`, padding: 14, borderRadius: 10, marginBottom: 16 }}>
-              <div style={{ fontSize: 13, color: C.hint }}>Total a depositar</div>
-              <div style={{ fontSize: 28, fontWeight: 800, color: C.blue }}>
+          <div style={{ background: C.sur, borderRadius: 16, padding: 28, width: 440, border: `1px solid ${C.bord}`, boxShadow: '0 20px 60px rgba(0,0,0,.5)' }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ marginBottom: 16, color: C.tx, fontSize: 18, fontWeight: 800 }}>Crear Deposito</h3>
+            <div style={{ background: `${C.blue}15`, padding: 16, borderRadius: 12, marginBottom: 20, border: `1px solid ${C.blue}30` }}>
+              <div style={{ fontSize: 13, color: C.hint, marginBottom: 4 }}>Total a depositar</div>
+              <div style={{ fontSize: 32, fontWeight: 900, color: C.blue }}>
                 {fmt$(pagosFiltrados.filter(p => selected.includes(p.id)).reduce((s, p) => s + Number(p.monto), 0))}
               </div>
               <div style={{ fontSize: 12, color: C.hint }}>{selected.length} pagos seleccionados</div>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
               <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: C.tx }}>Cuenta bancaria destino *</label>
+                <label style={{ fontSize: 12, fontWeight: 600, color: C.tx, display: 'block', marginBottom: 4 }}>Cuenta bancaria destino *</label>
                 <select value={crearForm.cuenta_bancaria_id} onChange={e => setCrearForm(f => ({ ...f, cuenta_bancaria_id: parseInt(e.target.value) }))}
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: `1px solid ${C.bord}`, background: C.sur, color: C.tx, fontSize: 13 }}>
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: `1px solid ${C.bord}`, background: C.bg, color: C.tx, fontSize: 14, boxSizing: 'border-box' }}>
                   {cuentas.map(c => <option key={c.id} value={c.id}>{c.nombre} - {c.numero}</option>)}
                 </select>
               </div>
               <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: C.tx }}>Referencia / Comprobante</label>
-                <input value={crearForm.referencia} onChange={e => setCrearForm(f => ({ ...f, referencia: e.target.value }))}
-                  placeholder="Numero de papeleta" style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: `1px solid ${C.bord}`, background: C.sur, color: C.tx, fontSize: 13, boxSizing: 'border-box' }} />
+                <label style={{ fontSize: 12, fontWeight: 600, color: C.tx, display: 'block', marginBottom: 4 }}>Fecha del deposito</label>
+                <input type="date" value={crearForm.fecha_deposito || new Date().toISOString().slice(0, 10)}
+                  onChange={e => setCrearForm(f => ({ ...f, fecha_deposito: e.target.value }))}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: `1px solid ${C.bord}`, background: C.bg, color: C.tx, fontSize: 14, boxSizing: 'border-box' }} />
               </div>
               <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: C.tx }}>Observaciones</label>
+                <label style={{ fontSize: 12, fontWeight: 600, color: C.tx, display: 'block', marginBottom: 4 }}>Referencia / Comprobante</label>
+                <input value={crearForm.referencia} onChange={e => setCrearForm(f => ({ ...f, referencia: e.target.value }))}
+                  placeholder="Numero de papeleta" style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: `1px solid ${C.bord}`, background: C.bg, color: C.tx, fontSize: 14, boxSizing: 'border-box' }} />
+              </div>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: C.tx, display: 'block', marginBottom: 4 }}>Observaciones</label>
                 <textarea value={crearForm.observaciones} onChange={e => setCrearForm(f => ({ ...f, observaciones: e.target.value }))}
-                  rows={2} style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: `1px solid ${C.bord}`, background: C.sur, color: C.tx, fontSize: 13, resize: 'vertical', boxSizing: 'border-box' }} />
+                  rows={2} placeholder="Notas adicionales (opcional)"
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: `1px solid ${C.bord}`, background: C.bg, color: C.tx, fontSize: 14, resize: 'vertical', boxSizing: 'border-box' }} />
               </div>
             </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={crearDeposito} style={{ flex: 1, padding: '10px', borderRadius: 8, border: 'none', background: C.blue, color: 'white', cursor: 'pointer', fontWeight: 700 }}>Crear deposito</button>
-              <button onClick={() => setShowCrear(false)} style={{ padding: '10px 20px', borderRadius: 8, border: `1px solid ${C.bord}`, background: 'transparent', color: C.tx, cursor: 'pointer' }}>Cancelar</button>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={crearDeposito} style={{ flex: 1, padding: '12px', borderRadius: 10, border: 'none', background: C.blue, color: 'white', cursor: 'pointer', fontWeight: 700, fontSize: 15 }}>Crear deposito</button>
+              <button onClick={() => setShowCrear(false)} style={{ padding: '12px 24px', borderRadius: 10, border: `1px solid ${C.bord}`, background: C.bg, color: C.tx, cursor: 'pointer', fontWeight: 600 }}>Cancelar</button>
             </div>
           </div>
         </div>
@@ -296,9 +303,9 @@ export default function Depositos() {
 
       {/* Modal Detalle */}
       {detalle && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9000 }}
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9000 }}
           onClick={() => setDetalle(null)}>
-          <div style={{ background: C.sur, borderRadius: 16, padding: 28, width: 560, maxHeight: '80vh', overflow: 'auto' }} onClick={e => e.stopPropagation()}>
+          <div style={{ background: C.sur, borderRadius: 16, padding: 28, width: 560, maxHeight: '80vh', overflow: 'auto', border: `1px solid ${C.bord}`, boxShadow: '0 20px 60px rgba(0,0,0,.5)' }} onClick={e => e.stopPropagation()}>
             <h3 style={{ color: C.tx, marginBottom: 16 }}>Deposito #{detalle.id}</h3>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
               <div><span style={{ fontSize: 12, color: C.hint }}>Cuenta</span><div style={{ fontWeight: 600, color: C.tx }}>{detalle.cuenta_nombre}</div></div>
