@@ -362,3 +362,19 @@ def historial_pagos_empresa(empresa_id: int):
         return [dict(r) for r in cur.fetchall()]
     finally:
         conn.close()
+
+
+# ══════════════════════════════════════════════════════════════
+#  SOLICITUDES DE DEMO
+# ══════════════════════════════════════════════════════════════
+
+@router.get("/solicitudes")
+def listar_solicitudes():
+    from database import query
+    return query("SELECT * FROM sys_solicitudes_demo ORDER BY created_at DESC LIMIT 100")
+
+@router.patch("/solicitudes/{sid}")
+def actualizar_solicitud(sid: int, estado: str = "CONTACTADA", notas: str = ""):
+    from database import execute
+    execute("UPDATE sys_solicitudes_demo SET estado=%s, notas=%s WHERE id=%s", (estado, notas, sid))
+    return {"msg": "Solicitud actualizada"}
