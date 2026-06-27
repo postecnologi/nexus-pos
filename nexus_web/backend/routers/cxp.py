@@ -80,10 +80,12 @@ def pagar_cxp(cxp_id: int, p: PagoProvIn, u=Depends(get_current_user)):
                 INSERT INTO fin_movimientos_bancarios
                     (cuenta_id, tipo, concepto, monto, fecha, referencia,
                      banco_origen, estado, usuario_id)
-                VALUES (%s,'PAGO_PROVEEDOR',%s,%s,CURRENT_DATE,%s,%s,'PENDIENTE',%s)
+                VALUES (%s,'PAGO_PROVEEDOR',%s,%s,CURRENT_DATE,%s,%s,'CONFIRMADO',%s)
             """, (p.cuenta_bancaria_id,
                   f"Pago CXP - {p.forma_pago}",
                   p.monto, p.referencia, p.banco_origen, u["id"]))
+            execute("UPDATE fin_cuentas_bancarias SET saldo_actual=saldo_actual-%s WHERE id=%s",
+                    (p.monto, p.cuenta_bancaria_id))
         except: pass
     execute("""
         UPDATE fin_cxp SET saldo=%s, valor_pagado=%s, estado=%s WHERE id=%s
