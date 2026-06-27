@@ -78,6 +78,28 @@ def detalle_empresa(eid: int):
     return emp
 
 
+@router.get("/empresas/{eid}/admin")
+def get_admin_empresa(eid: int):
+    """Get current admin user for a company."""
+    from multitenant import get_master_connection, get_tenant_connection
+    conn = get_master_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT db_name FROM mt_empresas WHERE id=%s", (eid,))
+        emp = cur.fetchone()
+        if not emp: raise HTTPException(404, "Empresa no encontrada")
+    finally:
+        conn.close()
+    try:
+        t_conn = get_tenant_connection(emp["db_name"])
+        tcur = t_conn.cursor()
+        tcur.execute("SELECT id, username, nombre, email FROM sys_usuarios WHERE rol='admin' AND activo=true LIMIT 1")
+        admin = tcur.fetchone()
+        t_conn.close()
+        return dict(admin) if admin else {"username": "", "nombre": "", "email": ""}
+    except Exception:
+        return {"username": "", "nombre": "", "email": ""}
+
 class EmpresaUpdate(BaseModel):
     nombre: Optional[str] = None
     ruc: Optional[str] = None
@@ -87,7 +109,7 @@ class EmpresaUpdate(BaseModel):
 class AdminReset(BaseModel):
     admin_nombre: str
     admin_username: str
-    admin_password: str
+    admin_password: str = ""
     admin_email: str = ""
 
 @router.put("/empresas/{eid}")
@@ -129,23 +151,28 @@ def reset_admin_empresa(eid: int, data: AdminReset):
     tenant_conn = get_tenant_connection(emp["db_name"])
     try:
         tcur = tenant_conn.cursor()
-        # Check if admin user exists
         tcur.execute("SELECT id FROM sys_usuarios WHERE rol='admin' AND activo=true LIMIT 1")
         admin = tcur.fetchone()
         if admin:
-            tcur.execute("""
-                UPDATE sys_usuarios SET username=%s, password_hash=%s, nombre=%s, email=%s
-                WHERE id=%s
-            """, (data.admin_username, pwd_ctx.hash(data.admin_password),
-                  data.admin_nombre, data.admin_email, admin["id"]))
+            if data.admin_password:
+                tcur.execute("""
+                    UPDATE sys_usuarios SET username=%s, password_hash=%s, nombre=%s, email=%s
+                    WHERE id=%s
+                """, (data.admin_username, pwd_ctx.hash(data.admin_password),
+                      data.admin_nombre, data.admin_email, admin["id"]))
+            else:
+                tcur.execute("""
+                    UPDATE sys_usuarios SET username=%s, nombre=%s, email=%s
+                    WHERE id=%s
+                """, (data.admin_username, data.admin_nombre, data.admin_email, admin["id"]))
         else:
+            pw = data.admin_password or 'admin123'
             tcur.execute("""
                 INSERT INTO sys_usuarios (username, password_hash, nombre, email, rol, activo, sucursal_id)
                 VALUES (%s, %s, %s, %s, 'admin', true, 1)
-            """, (data.admin_username, pwd_ctx.hash(data.admin_password),
-                  data.admin_nombre, data.admin_email))
+            """, (data.admin_username, pwd_ctx.hash(pw), data.admin_nombre, data.admin_email))
         tenant_conn.commit()
-        return {"msg": f"Admin '{data.admin_username}' configurado para la empresa"}
+        return {"msg": f"Admin '{data.admin_username}' configurado"}
     finally:
         tenant_conn.close()
 

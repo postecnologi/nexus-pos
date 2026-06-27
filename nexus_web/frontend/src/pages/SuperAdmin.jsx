@@ -670,7 +670,15 @@ function ModalEditEmpresa({ emp, sa, planes, onClose, onSaved }) {
   const [tab, setTab] = useState('datos')
   const [form, setForm] = useState({ nombre: emp.nombre || '', ruc: emp.ruc || '', email: emp.email || '', plan: emp.plan || 'BASICO' })
   const [adminForm, setAdminForm] = useState({ admin_nombre: '', admin_username: '', admin_password: '', admin_email: '' })
+  const [adminActual, setAdminActual] = useState(null)
   const [msg, setMsg] = useState('')
+
+  useEffect(() => {
+    if (sa) sa.get(`/superadmin/empresas/${emp.id}/admin`).then(r => {
+      setAdminActual(r.data)
+      setAdminForm(f => ({ ...f, admin_nombre: r.data.nombre || '', admin_username: r.data.username || '', admin_email: r.data.email || '' }))
+    }).catch(() => {})
+  }, [])
 
   const inputS = { width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #D1D5DB', fontSize: 13, boxSizing: 'border-box' }
   const labelS = { fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }
@@ -743,8 +751,17 @@ function ModalEditEmpresa({ emp, sa, planes, onClose, onSaved }) {
 
         {tab === 'admin' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {adminActual && adminActual.username && (
+              <div style={{ padding: 14, background: '#EDE9FE', borderRadius: 8, fontSize: 13 }}>
+                <div style={{ fontWeight: 700, color: '#5B21B6', marginBottom: 4 }}>Admin actual:</div>
+                <div style={{ color: '#374151' }}><strong>Usuario:</strong> {adminActual.username}</div>
+                <div style={{ color: '#374151' }}><strong>Nombre:</strong> {adminActual.nombre}</div>
+                <div style={{ color: '#374151' }}><strong>Email:</strong> {adminActual.email || '-'}</div>
+                <div style={{ color: '#9CA3AF', fontSize: 11, marginTop: 4 }}>La contrasena no se puede ver por seguridad</div>
+              </div>
+            )}
             <div style={{ padding: 12, background: '#FEF3C7', borderRadius: 8, fontSize: 12, color: '#92400E', fontWeight: 500 }}>
-              Esto cambiara las credenciales del administrador de esta empresa. El admin podra entrar con el nuevo usuario y contrasena.
+              Cambia las credenciales del admin. Deja la contrasena vacia para mantener la actual.
             </div>
             <div>
               <label style={labelS}>Nombre completo *</label>
