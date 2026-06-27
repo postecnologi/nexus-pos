@@ -11,7 +11,7 @@ export default function SuperAdmin() {
   const [showCreate, setShowCreate] = useState(false)
   const [creating, setCreating] = useState(false)
   const [createMsg, setCreateMsg] = useState('')
-  const [newEmp, setNewEmp] = useState({ codigo: '', nombre: '', ruc: '', email: '', plan: 'BASICO', admin_nombre: '', admin_username: '', admin_password: '', admin_email: '' })
+  const [newEmp, setNewEmp] = useState({ codigo: '', nombre: '', ruc: '', email: '', plan: 'BASICO', admin_nombre: '', admin_username: '', admin_password: '', admin_email: '', dias_prueba: 15 })
   const [editEmp, setEditEmp] = useState(null)
   const [saToken, setSaToken] = useState(localStorage.getItem('nexus_sa_token') || '')
 
@@ -263,6 +263,17 @@ export default function SuperAdmin() {
                       <select value={newEmp.plan} onChange={e => setNewEmp({...newEmp, plan: e.target.value})}
                         style={{...inputStyle, cursor: 'pointer'}}>
                         {planes.map(p => <option key={p.nombre} value={p.nombre}>{p.nombre} - ${p.precio_mensual}/mes</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>Dias de prueba</label>
+                      <select value={newEmp.dias_prueba} onChange={e => setNewEmp({...newEmp, dias_prueba: parseInt(e.target.value)})}
+                        style={{...inputStyle, cursor: 'pointer'}}>
+                        <option value={7}>7 dias</option>
+                        <option value={15}>15 dias</option>
+                        <option value={30}>30 dias</option>
+                        <option value={60}>60 dias</option>
+                        <option value={0}>Sin limite</option>
                       </select>
                     </div>
                   </div>
@@ -837,7 +848,7 @@ function ModalEditEmpresa({ emp, sa, planes, onClose, onSaved }) {
 function TabSolicitudes({ sa }) {
   const [data, setData] = useState([])
   const [crearPara, setCrearPara] = useState(null)
-  const [crearForm, setCrearForm] = useState({ admin_username: '', admin_password: '' })
+  const [crearForm, setCrearForm] = useState({ admin_username: '', admin_password: '', dias_prueba: 15 })
   const [crearMsg, setCrearMsg] = useState('')
   const [creando, setCreando] = useState(false)
 
@@ -863,7 +874,7 @@ function TabSolicitudes({ sa }) {
         nombre: s.empresa_nombre, ruc: s.ruc || '', email: s.email || '',
         plan: 'BASICO', admin_nombre: s.contacto_nombre,
         admin_username: crearForm.admin_username, admin_password: crearForm.admin_password,
-        admin_email: s.email || '',
+        admin_email: s.email || '', dias_prueba: crearForm.dias_prueba,
       }, { headers: { 'Content-Type': 'application/json' } })
       setCrearMsg(`Empresa creada! Codigo: ${r.codigo_empresa || r.empresa_id}. Enviale al cliente: Usuario: ${crearForm.admin_username} / Contrasena: ${crearForm.admin_password}`)
       marcar(s.id, 'CONVERTIDA')
@@ -959,6 +970,17 @@ function TabSolicitudes({ sa }) {
                 <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>Contrasena *</label>
                 <input value={crearForm.admin_password} onChange={e => setCrearForm(p => ({...p, admin_password: e.target.value}))}
                   placeholder="MiClave123" style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #D1D5DB', fontSize: 14, boxSizing: 'border-box' }} />
+              </div>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>Dias de prueba</label>
+                <select value={crearForm.dias_prueba} onChange={e => setCrearForm(p => ({...p, dias_prueba: parseInt(e.target.value)}))}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #D1D5DB', fontSize: 14, boxSizing: 'border-box', cursor: 'pointer' }}>
+                  <option value={7}>7 dias</option>
+                  <option value={15}>15 dias</option>
+                  <option value={30}>30 dias</option>
+                  <option value={60}>60 dias</option>
+                  <option value={0}>Sin limite</option>
+                </select>
               </div>
             </div>
 
