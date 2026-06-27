@@ -258,7 +258,7 @@ export default function Depositos() {
       {showCrear && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9000 }}
           onClick={() => setShowCrear(false)}>
-          <div style={{ background: C.sur, borderRadius: 16, padding: 28, width: 440, border: `1px solid ${C.bord}`, boxShadow: '0 20px 60px rgba(0,0,0,.5)' }} onClick={e => e.stopPropagation()}>
+          <div style={{ background: C.sur, borderRadius: 16, padding: 28, width: 440, border: `1px solid ${C.bord}`, boxShadow: '0 20px 60px rgba(0,0,0,.5)', colorScheme: C.bg === '#F8FAFC' || C.bg === '#ffffff' ? 'light' : 'dark' }} onClick={e => e.stopPropagation()}>
             <h3 style={{ marginBottom: 16, color: C.tx, fontSize: 18, fontWeight: 800 }}>Crear Deposito</h3>
             <div style={{ background: `${C.blue}15`, padding: 16, borderRadius: 12, marginBottom: 20, border: `1px solid ${C.blue}30` }}>
               <div style={{ fontSize: 13, color: C.hint, marginBottom: 4 }}>Total a depositar</div>
@@ -271,7 +271,7 @@ export default function Depositos() {
               <div>
                 <label style={{ fontSize: 12, fontWeight: 600, color: C.tx, display: 'block', marginBottom: 4 }}>Cuenta bancaria destino *</label>
                 <select value={crearForm.cuenta_bancaria_id} onChange={e => setCrearForm(f => ({ ...f, cuenta_bancaria_id: parseInt(e.target.value) }))}
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: `1px solid ${C.bord}`, background: C.bg, color: C.tx, fontSize: 14, boxSizing: 'border-box' }}>
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: `1px solid ${C.bord}`, background: C.sur, color: C.tx, fontSize: 14, boxSizing: 'border-box' }}>
                   {cuentas.map(c => <option key={c.id} value={c.id}>{c.nombre} - {c.numero}</option>)}
                 </select>
               </div>
@@ -279,12 +279,12 @@ export default function Depositos() {
                 <label style={{ fontSize: 12, fontWeight: 600, color: C.tx, display: 'block', marginBottom: 4 }}>Fecha del deposito</label>
                 <input type="date" value={crearForm.fecha_deposito || new Date().toISOString().slice(0, 10)}
                   onChange={e => setCrearForm(f => ({ ...f, fecha_deposito: e.target.value }))}
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: `1px solid ${C.bord}`, background: C.bg, color: C.tx, fontSize: 14, boxSizing: 'border-box' }} />
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: `1px solid ${C.bord}`, background: C.sur, color: C.tx, fontSize: 14, boxSizing: 'border-box', colorScheme: C.bg === '#0F172A' ? 'dark' : 'light' }} />
               </div>
               <div>
                 <label style={{ fontSize: 12, fontWeight: 600, color: C.tx, display: 'block', marginBottom: 4 }}>Referencia / Comprobante</label>
                 <input value={crearForm.referencia} onChange={e => setCrearForm(f => ({ ...f, referencia: e.target.value }))}
-                  placeholder="Numero de papeleta" style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: `1px solid ${C.bord}`, background: C.bg, color: C.tx, fontSize: 14, boxSizing: 'border-box' }} />
+                  placeholder="Numero de papeleta" style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: `1px solid ${C.bord}`, background: C.sur, color: C.tx, fontSize: 14, boxSizing: 'border-box' }} />
               </div>
               <div>
                 <label style={{ fontSize: 12, fontWeight: 600, color: C.tx, display: 'block', marginBottom: 4 }}>Observaciones</label>
