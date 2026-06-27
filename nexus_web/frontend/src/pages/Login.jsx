@@ -75,25 +75,17 @@ export default function Login() {
         <form onSubmit={handleSubmit}>
           {/* Toggle empresa field */}
           <div style={{ textAlign: 'right', marginBottom: 8 }}>
-            <button type="button" onClick={() => setShowEmpresa(!showEmpresa)}
-              style={{
-                background: 'none', border: 'none', color: '#6B7280',
-                fontSize: 11, cursor: 'pointer', textDecoration: 'underline',
-                padding: 0,
-              }}>
-              {showEmpresa ? 'Ocultar codigo empresa' : 'Acceso multi-empresa'}
-            </button>
           </div>
-          {showEmpresa && (
-            <div style={{ marginBottom: 18 }}>
-              <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 6 }}>
-                Codigo de empresa
-              </label>
-              <input
-                type="text"
-                placeholder="Ej: 001 (vacio = empresa principal)"
-                value={form.empresa_codigo}
-                onChange={e => setForm({...form, empresa_codigo: e.target.value})}
+          <div style={{ marginBottom: 18 }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 6 }}>
+              Codigo de empresa *
+            </label>
+            <input
+              type="text"
+              placeholder="Ingresa tu codigo de empresa"
+              required
+              value={form.empresa_codigo}
+              onChange={e => setForm({...form, empresa_codigo: e.target.value.toUpperCase()})}
                 style={{
                   fontSize: 14, padding: '11px 14px', borderRadius: 10,
                   border: '1.5px solid #E5E7EB', background: '#F9FAFB',
@@ -111,7 +103,6 @@ export default function Login() {
                 }}
               />
             </div>
-          )}
           <div style={{ marginBottom: 18 }}>
             <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 6 }}>
               Usuario
