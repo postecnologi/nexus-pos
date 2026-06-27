@@ -230,7 +230,7 @@ export default function Layout() {
   function logout() {
     localStorage.removeItem('nexus_token')
     localStorage.removeItem('nexus_user')
-    window.location.href = '/login'
+    window.location.href = '/'
   }
 
   const { toggle: toggleTheme, isDark } = useThemeToggle()
