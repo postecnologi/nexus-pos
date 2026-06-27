@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /dashboard
+Disallow: /superadmin
+Disallow: /api/
+
+Sitemap: https://pos-tecnologi.com/sitemap.xml
