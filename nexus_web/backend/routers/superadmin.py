@@ -19,6 +19,7 @@ class EmpresaCreate(BaseModel):
     admin_nombre: str = ""
     admin_username: str = ""
     admin_password: str = ""
+    dias_prueba: int = 15
     admin_email: str = ""
 
 
@@ -55,7 +56,8 @@ def listar_empresas():
 
 @router.post("/empresas")
 def crear_empresa(data: EmpresaCreate):
-    from multitenant import create_tenant_database
+    from multitenant import create_tenant_database, get_master_connection
+    from datetime import date, timedelta
     try:
         result = create_tenant_database(
             codigo=data.codigo, nombre=data.nombre,
@@ -65,6 +67,19 @@ def crear_empresa(data: EmpresaCreate):
             admin_password=data.admin_password,
             admin_email=data.admin_email,
         )
+        # Set expiration date
+        if data.dias_prueba > 0:
+            fecha_venc = date.today() + timedelta(days=data.dias_prueba)
+            conn = get_master_connection()
+            try:
+                cur = conn.cursor()
+                cur.execute("UPDATE mt_empresas SET fecha_vencimiento=%s, plan=%s WHERE id=%s",
+                            (fecha_venc, data.plan, result["empresa_id"]))
+                conn.commit()
+            finally:
+                conn.close()
+            result["fecha_vencimiento"] = str(fecha_venc)
+            result["dias_prueba"] = data.dias_prueba
         return result
     except Exception as e:
         raise HTTPException(400, str(e))
@@ -201,14 +216,13 @@ def eliminar_empresa(eid: int):
         conn.close()
 
     # Drop the tenant database if it's separate
-    if db_name and db_name != os.getenv("DB_NAME", "nexus_db"):
+    from multitenant import DB_HOST, DB_PORT, DB_USER, DB_PASS, MASTER_DB
+    if db_name and db_name != MASTER_DB:
         try:
             conn2 = psycopg2.connect(
-                host=os.getenv("DB_HOST", "localhost"),
-                port=int(os.getenv("DB_PORT", "5432")),
+                host=DB_HOST, port=DB_PORT,
                 database="postgres",
-                user=os.getenv("DB_USER", "postgres"),
-                password=os.getenv("DB_PASSWORD", "")
+                user=DB_USER, password=DB_PASS
             )
             conn2.autocommit = True
             cur2 = conn2.cursor()
