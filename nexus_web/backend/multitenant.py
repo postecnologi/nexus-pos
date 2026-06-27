@@ -153,25 +153,27 @@ def create_tenant_database(codigo, nombre, ruc='', email='',
         if not conn.closed:
             conn.close()
 
-    # Try to create a separate database (works on local PostgreSQL)
+    # Try to create a separate database (only works on local PostgreSQL)
     db_created = False
-    try:
-        conn2 = psycopg2.connect(
-            host=DB_HOST, port=DB_PORT, database="postgres",
-            user=DB_USER, password=DB_PASS
-        )
-        conn2.autocommit = True
-        cur2 = conn2.cursor()
-        cur2.execute(f"""
-            SELECT pg_terminate_backend(pid) FROM pg_stat_activity
-            WHERE datname=%s AND pid <> pg_backend_pid()
-        """, (MASTER_DB,))
-        cur2.execute(f'CREATE DATABASE "{db_name}" TEMPLATE "{MASTER_DB}"')
-        conn2.close()
-        db_created = True
-    except Exception:
-        try: conn2.close()
-        except: pass
+    is_cloud = bool(DATABASE_URL)
+    if not is_cloud:
+        try:
+            conn2 = psycopg2.connect(
+                host=DB_HOST, port=DB_PORT, database="postgres",
+                user=DB_USER, password=DB_PASS
+            )
+            conn2.autocommit = True
+            cur2 = conn2.cursor()
+            cur2.execute(f"""
+                SELECT pg_terminate_backend(pid) FROM pg_stat_activity
+                WHERE datname=%s AND pid <> pg_backend_pid()
+            """, (MASTER_DB,))
+            cur2.execute(f'CREATE DATABASE "{db_name}" TEMPLATE "{MASTER_DB}"')
+            conn2.close()
+            db_created = True
+        except Exception:
+            try: conn2.close()
+            except: pass
 
     if db_created:
         # Separate DB created — configure admin in tenant DB
