@@ -269,25 +269,25 @@ export default function Depositos() {
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
               <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: C.tx, display: 'block', marginBottom: 4 }}>Cuenta bancaria destino *</label>
+                <label style={{ fontSize: 13, fontWeight: 700, color: C.tx, display: 'block', marginBottom: 6 }}>Cuenta bancaria destino *</label>
                 <select value={crearForm.cuenta_bancaria_id} onChange={e => setCrearForm(f => ({ ...f, cuenta_bancaria_id: parseInt(e.target.value) }))}
                   style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: `1px solid ${C.bord}`, background: C.sur, color: C.tx, fontSize: 14, boxSizing: 'border-box' }}>
                   {cuentas.map(c => <option key={c.id} value={c.id}>{c.nombre} - {c.numero}</option>)}
                 </select>
               </div>
               <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: C.tx, display: 'block', marginBottom: 4 }}>Fecha del deposito</label>
+                <label style={{ fontSize: 13, fontWeight: 700, color: C.tx, display: 'block', marginBottom: 6 }}>Fecha del deposito</label>
                 <input type="date" value={crearForm.fecha_deposito || new Date().toISOString().slice(0, 10)}
                   onChange={e => setCrearForm(f => ({ ...f, fecha_deposito: e.target.value }))}
                   style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: `1px solid ${C.bord}`, background: C.sur, color: C.tx, fontSize: 14, boxSizing: 'border-box', colorScheme: C.bg === '#0F172A' ? 'dark' : 'light' }} />
               </div>
               <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: C.tx, display: 'block', marginBottom: 4 }}>Referencia / Comprobante</label>
+                <label style={{ fontSize: 13, fontWeight: 700, color: C.tx, display: 'block', marginBottom: 6 }}>Referencia / Comprobante</label>
                 <input value={crearForm.referencia} onChange={e => setCrearForm(f => ({ ...f, referencia: e.target.value }))}
                   placeholder="Numero de papeleta" style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: `1px solid ${C.bord}`, background: C.sur, color: C.tx, fontSize: 14, boxSizing: 'border-box' }} />
               </div>
               <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: C.tx, display: 'block', marginBottom: 4 }}>Observaciones</label>
+                <label style={{ fontSize: 13, fontWeight: 700, color: C.tx, display: 'block', marginBottom: 6 }}>Observaciones</label>
                 <textarea value={crearForm.observaciones} onChange={e => setCrearForm(f => ({ ...f, observaciones: e.target.value }))}
                   rows={2} placeholder="Notas adicionales (opcional)"
                   style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: `1px solid ${C.bord}`, background: C.bg, color: C.tx, fontSize: 14, resize: 'vertical', boxSizing: 'border-box' }} />
