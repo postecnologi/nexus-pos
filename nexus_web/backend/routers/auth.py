@@ -66,6 +66,31 @@ def me(u=Depends(get_current_user)):
     return u
 
 
+class SolicitudDemo(BaseModel):
+    empresa_nombre: str
+    ruc: str = ""
+    email: str
+    telefono: str
+    admin_nombre: str
+    giro_negocio: str = ""
+    ciudad: str = ""
+
+@router.post("/solicitar-demo")
+def solicitar_demo(data: SolicitudDemo):
+    """Public endpoint to request a demo. Saves lead info for follow-up."""
+    from database import execute, insert
+    try:
+        insert("""
+            INSERT INTO sys_solicitudes_demo
+                (empresa_nombre, ruc, email, telefono, contacto_nombre, giro_negocio, ciudad)
+            VALUES (%s,%s,%s,%s,%s,%s,%s)
+        """, (data.empresa_nombre, data.ruc, data.email, data.telefono,
+              data.admin_nombre, data.giro_negocio, data.ciudad))
+    except Exception:
+        pass
+    return {"msg": "Solicitud recibida"}
+
+
 class RegistroEmpresa(BaseModel):
     empresa_nombre: str
     ruc: str = ""

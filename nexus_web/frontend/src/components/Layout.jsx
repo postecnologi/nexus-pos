@@ -58,7 +58,7 @@ const grupos = [
     label: 'Principal',
     icon: LayoutDashboard,
     items: [
-      { to: '/',              icon: LayoutDashboard, label: 'Dashboard'       },
+      { to: '/dashboard',     icon: LayoutDashboard, label: 'Dashboard'       },
     ]
   },
   {
@@ -285,7 +285,7 @@ export default function Layout() {
             const GIcon = g.icon
             const abierto = open[g.label]
             const tieneActivo = g.items.some(i =>
-              i.to==='/' ? location.pathname==='/' : location.pathname.startsWith(i.to)
+              i.to==='/dashboard' ? location.pathname==='/' : location.pathname.startsWith(i.to)
             )
             return (
               <div key={g.label}>
@@ -327,7 +327,7 @@ export default function Layout() {
                   }}>
                     {g.items.map(item => {
                       const IIcon = item.icon
-                      const isActive = item.to==='/'
+                      const isActive = item.to==='/dashboard'
                         ? location.pathname==='/'
                         : location.pathname.startsWith(item.to)
                       const badgeCount = badges[item.to]
@@ -367,7 +367,7 @@ export default function Layout() {
                 {/* Collapsed: iconos individuales */}
                 {collapsed && g.items.map(item => {
                   const IIcon = item.icon
-                  const isActive = item.to==='/'
+                  const isActive = item.to==='/dashboard'
                     ? location.pathname==='/'
                     : location.pathname.startsWith(item.to)
                   return (

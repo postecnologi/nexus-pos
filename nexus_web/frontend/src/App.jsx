@@ -45,13 +45,13 @@ function useAuth() {
 
 function PrivateRoute({ children }) {
   const auth = useAuth()
-  if (!auth) return <Navigate to="/" replace />
+  if (!auth) return <Navigate to="/login" replace />
   return children
 }
 
 function PublicRoute({ children }) {
   const auth = useAuth()
-  if (auth) return <Navigate to="/app" replace />
+  if (auth) return <Navigate to="/dashboard" replace />
   return children
 }
 
@@ -61,56 +61,50 @@ export default function App() {
     <ToastProvider>
     <BrowserRouter>
       <Routes>
-        {/* Landing page - public home */}
+        {/* Public pages */}
         <Route path="/" element={<Landing />} />
         <Route path="/landing" element={<Landing />} />
         <Route path="/registro" element={<Registro />} />
-
-        <Route path="/login" element={
-          <PublicRoute><Login /></PublicRoute>
-        } />
-
-        {/* Super Admin panel - outside normal auth */}
+        <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
         <Route path="/superadmin" element={<SuperAdmin />} />
 
-        {/* Impresión: fuera del Layout */}
+        {/* Print - outside Layout */}
         <Route path="/facturas/:id/print" element={
           <PrivateRoute><PrintFactura /></PrivateRoute>
         } />
 
-        <Route path="/app" element={
-          <PrivateRoute><Layout /></PrivateRoute>
-        }>
-          <Route index element={<Dashboard />} />
-          <Route path="proveedores"  element={<Proveedores />} />
-          <Route path="vendedores"   element={<Vendedores />} />
-          <Route path="configuracion"element={<Configuracion />} />
-          <Route path="clientes"     element={<Clientes />} />
-          <Route path="facturas"     element={<Facturas />} />
-          <Route path="gestion-precios" element={<GestionPrecios />} />
-          <Route path="stock"        element={<Stock />} />
-          <Route path="reportes"     element={<Reportes />} />
-          <Route path="cxc"          element={<CXC />} />
-          <Route path="compras"       element={<Compras />} />
-          <Route path="cxp-pagar"      element={<CXP />} />
-          <Route path="devoluciones"    element={<Devoluciones />} />
-          <Route path="transferencias"  element={<Transferencias />} />
-          <Route path="caja"           element={<Caja />} />
-          <Route path="bancos"         element={<Bancos />} />
-          <Route path="conciliacion"    element={<Conciliacion />} />
-          <Route path="ajustes"         element={<Ajustes />} />
-          <Route path="etiquetas"       element={<Etiquetas />} />
-          <Route path="usuarios"        element={<Usuarios />} />
-          <Route path="kardex"          element={<Kardex />} />
-          <Route path="cotizaciones"   element={<Cotizaciones />} />
-          <Route path="toma-fisica"    element={<TomaFisica />} />
-          <Route path="servicio-tecnico" element={<ServicioTecnico />} />
-          <Route path="crm" element={<CRM />} />
-          <Route path="retenciones" element={<Retenciones />} />
-          <Route path="notas-debito" element={<NotasDebito />} />
-          <Route path="contabilidad" element={<Contabilidad />} />
-          <Route path="nomina" element={<Nomina />} />
-          <Route path="administracion" element={<Administracion />} />
+        {/* App routes - inside Layout */}
+        <Route element={<PrivateRoute><Layout /></PrivateRoute>}>
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/proveedores"  element={<Proveedores />} />
+          <Route path="/vendedores"   element={<Vendedores />} />
+          <Route path="/configuracion" element={<Configuracion />} />
+          <Route path="/clientes"     element={<Clientes />} />
+          <Route path="/facturas"     element={<Facturas />} />
+          <Route path="/gestion-precios" element={<GestionPrecios />} />
+          <Route path="/stock"        element={<Stock />} />
+          <Route path="/reportes"     element={<Reportes />} />
+          <Route path="/cxc"          element={<CXC />} />
+          <Route path="/compras"       element={<Compras />} />
+          <Route path="/cxp-pagar"      element={<CXP />} />
+          <Route path="/devoluciones"    element={<Devoluciones />} />
+          <Route path="/transferencias"  element={<Transferencias />} />
+          <Route path="/caja"           element={<Caja />} />
+          <Route path="/bancos"         element={<Bancos />} />
+          <Route path="/conciliacion"    element={<Conciliacion />} />
+          <Route path="/ajustes"         element={<Ajustes />} />
+          <Route path="/etiquetas"       element={<Etiquetas />} />
+          <Route path="/usuarios"        element={<Usuarios />} />
+          <Route path="/kardex"          element={<Kardex />} />
+          <Route path="/cotizaciones"   element={<Cotizaciones />} />
+          <Route path="/toma-fisica"    element={<TomaFisica />} />
+          <Route path="/servicio-tecnico" element={<ServicioTecnico />} />
+          <Route path="/crm" element={<CRM />} />
+          <Route path="/retenciones" element={<Retenciones />} />
+          <Route path="/notas-debito" element={<NotasDebito />} />
+          <Route path="/contabilidad" element={<Contabilidad />} />
+          <Route path="/nomina" element={<Nomina />} />
+          <Route path="/administracion" element={<Administracion />} />
         </Route>
         <Route path="*" element={<NotFound />} />
       </Routes>

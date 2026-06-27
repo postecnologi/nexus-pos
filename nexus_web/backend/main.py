@@ -393,6 +393,20 @@ def run_migrations():
         )""",
         "CREATE INDEX IF NOT EXISTS idx_audit_fecha ON sys_audit_log(created_at DESC)",
         "CREATE INDEX IF NOT EXISTS idx_audit_usuario ON sys_audit_log(usuario_id)",
+        # ── Solicitudes Demo ──
+        """CREATE TABLE IF NOT EXISTS sys_solicitudes_demo (
+            id SERIAL PRIMARY KEY,
+            empresa_nombre VARCHAR(300) NOT NULL,
+            ruc VARCHAR(13),
+            email VARCHAR(200),
+            telefono VARCHAR(50),
+            contacto_nombre VARCHAR(200),
+            giro_negocio VARCHAR(100),
+            ciudad VARCHAR(100),
+            estado VARCHAR(20) DEFAULT 'NUEVA',
+            notas TEXT,
+            created_at TIMESTAMP DEFAULT NOW()
+        )""",
         # ── WhatsApp ──
         """CREATE TABLE IF NOT EXISTS sys_whatsapp_config (
             id SERIAL PRIMARY KEY,
