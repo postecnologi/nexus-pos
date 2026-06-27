@@ -103,15 +103,17 @@ def get_conciliacion(cid: int, u=Depends(get_current_user)):
     """, (cid,))
 
     # Movimientos del sistema no incluidos aun (para agregar)
+    fecha_ini = c["periodo"] + "-01"
     mov_sistema = query("""
         SELECT m.* FROM fin_movimientos_bancarios m
-        WHERE m.cuenta_id=%s AND m.fecha>=%s AND m.fecha<=%s
+        WHERE m.cuenta_id=%s AND m.fecha >= %s::date
+          AND m.fecha < (%s::date + interval '1 month')
           AND m.id NOT IN (
               SELECT movimiento_id FROM fin_estado_cuenta
               WHERE conciliacion_id=%s AND movimiento_id IS NOT NULL
           )
         ORDER BY m.fecha, m.id
-    """, (c["cuenta_id"], c["fecha_ini"], c["fecha_fin"], cid))
+    """, (c["cuenta_id"], fecha_ini, fecha_ini, cid))
 
     # Calcular totales
     tot_cred_banco  = sum(float(l["credito"]) for l in lineas if l["movimiento_id"] is None)
