@@ -262,8 +262,8 @@ export default function Landing() {
             <span style={{ color:'#64748B', fontSize:12 }}>2026 NEXUS IA by POS-TECNOLOGI. Todos los derechos reservados.</span>
           </div>
           <div style={{ display:'flex', gap:20 }}>
-            {['Terminos','Privacidad','Soporte'].map(s => (
-              <a key={s} href="#" style={{ color:'#64748B', fontSize:12, textDecoration:'none' }}>{s}</a>
+            {[{l:'Terminos',h:'/legal/terminos'},{l:'Privacidad',h:'/legal/privacidad'},{l:'Soporte',h:'/legal/soporte'}].map(s => (
+              <a key={s.l} href={s.h} style={{ color:'#64748B', fontSize:12, textDecoration:'none' }}>{s.l}</a>
             ))}
           </div>
         </div>
