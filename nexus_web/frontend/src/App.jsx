@@ -39,6 +39,7 @@ import SuperAdmin from './pages/SuperAdmin'
 import Landing from './pages/Landing'
 import Registro from './pages/Registro'
 import Legal from './pages/Legal'
+import Manual from './pages/Manual'
 
 function useAuth() {
   return !!localStorage.getItem('nexus_token')
@@ -67,6 +68,7 @@ export default function App() {
         <Route path="/landing" element={<Landing />} />
         <Route path="/registro" element={<Registro />} />
         <Route path="/legal/:page" element={<Legal />} />
+        <Route path="/manual" element={<Manual />} />
         <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
         <Route path="/superadmin" element={<SuperAdmin />} />
 
