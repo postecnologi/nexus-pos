@@ -244,11 +244,31 @@ export default function Layout() {
     blue:'#2563EB', blueD:'rgba(37,99,235,.1)', active:'rgba(37,99,235,.15)',
   }
 
+  const [mobileMenu, setMobileMenu] = useState(false)
+
   return (
     <div style={{display:'flex', height:'100vh', overflow:'hidden', background:C.bg}}>
+      <style>{`@media(max-width:768px){.nexus-sidebar{display:none!important}.nexus-mobile-btn{display:flex!important}.nexus-sidebar-mobile{display:flex!important}}`}</style>
+
+      {/* Mobile menu button */}
+      <button className="nexus-mobile-btn" onClick={() => setMobileMenu(!mobileMenu)} style={{
+        display: 'none', position: 'fixed', top: 10, left: 10, zIndex: 999,
+        width: 40, height: 40, borderRadius: 10, border: 'none',
+        background: C.sur, color: C.tx, cursor: 'pointer', alignItems: 'center', justifyContent: 'center',
+        boxShadow: '0 2px 8px rgba(0,0,0,.2)',
+      }}>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d={mobileMenu ? "M6 6l12 12M6 18L18 6" : "M4 6h16M4 12h16M4 18h16"} /></svg>
+      </button>
+
+      {/* Mobile sidebar overlay */}
+      {mobileMenu && (
+        <div className="nexus-sidebar-mobile" onClick={() => setMobileMenu(false)} style={{
+          display: 'none', position: 'fixed', inset: 0, zIndex: 998, background: 'rgba(0,0,0,.5)',
+        }} />
+      )}
 
       {/* Sidebar */}
-      <aside style={{
+      <aside className={mobileMenu ? "nexus-sidebar-mobile" : "nexus-sidebar"} style={{
         width: collapsed ? 56 : 210,
         background: C.sur,
         display: 'flex',
@@ -257,6 +277,7 @@ export default function Layout() {
         flexShrink: 0,
         borderRight: `1px solid ${C.bord}`,
         overflow: 'hidden',
+        ...(mobileMenu ? { position: 'fixed', top: 0, left: 0, bottom: 0, zIndex: 999, width: 210, display: 'flex' } : {}),
       }}>
 
         {/* Logo + toggle */}
