@@ -120,7 +120,7 @@ def init_master_tables():
 
 
 def create_tenant_database(codigo, nombre, ruc='', email='',
-                            admin_nombre='', admin_username='', admin_password='', admin_email=''):
+                            admin_nombre='', admin_username='', admin_password='', admin_email='', admin_telefono=''):
     """Create a new company database or shared-mode tenant."""
     db_name = f"nexus_emp_{codigo.lower()}"
 
@@ -232,12 +232,13 @@ def create_tenant_database(codigo, nombre, ruc='', email='',
                 a_password = admin_password if admin_password else 'admin123'
                 a_nombre = admin_nombre.strip() if admin_nombre else 'Administrador'
                 a_email = admin_email.strip() if admin_email else email
+                a_telefono = admin_telefono.strip() if admin_telefono else ''
                 tcur.execute("UPDATE sys_usuarios SET activo=false")
                 tcur.execute("""
                     UPDATE sys_usuarios SET username=%s, password_hash=%s, nombre=%s,
-                        email=%s, rol='admin', activo=true
+                        email=%s, telefono=%s, rol='admin', activo=true
                     WHERE id=(SELECT MIN(id) FROM sys_usuarios)
-                """, (a_username, pwd_ctx.hash(a_password), a_nombre, a_email))
+                """, (a_username, pwd_ctx.hash(a_password), a_nombre, a_email, a_telefono))
             except Exception:
                 tenant_conn.rollback()
             for mt_table in ["mt_empresas","mt_usuarios","mt_planes","mt_pagos","sys_solicitudes_demo"]:
@@ -266,14 +267,15 @@ def create_tenant_database(codigo, nombre, ruc='', email='',
             a_password = admin_password if admin_password else 'admin123'
             a_nombre = admin_nombre.strip() if admin_nombre else 'Administrador'
             a_email = admin_email.strip() if admin_email else email
+            a_telefono = admin_telefono.strip() if admin_telefono else ''
             main_conn = get_master_connection()
             mcur = main_conn.cursor()
             mcur.execute("SELECT id FROM sys_usuarios WHERE username=%s", (a_username,))
             if not mcur.fetchone():
                 mcur.execute("""
-                    INSERT INTO sys_usuarios (username, password_hash, nombre, email, rol, activo, sucursal_id)
-                    VALUES (%s,%s,%s,%s,'admin',true,1)
-                """, (a_username, pwd_ctx.hash(a_password), a_nombre, a_email))
+                    INSERT INTO sys_usuarios (username, password_hash, nombre, email, telefono, rol, activo, sucursal_id)
+                    VALUES (%s,%s,%s,%s,%s,'admin',true,1)
+                """, (a_username, pwd_ctx.hash(a_password), a_nombre, a_email, a_telefono))
             main_conn.commit()
             main_conn.close()
         except Exception as e:
