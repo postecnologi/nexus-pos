@@ -155,6 +155,19 @@ def cambiar_password(uid: int, body: CambioPassIn, u=Depends(requiere_rol("admin
     return {"msg": "Contraseña actualizada"}
 
 
+@router.delete("/{uid}")
+def eliminar_usuario(uid: int, u=Depends(requiere_rol("admin"))):
+    user = query_one("SELECT id, username FROM sys_usuarios WHERE id=%s", (uid,))
+    if not user:
+        raise HTTPException(404, "Usuario no encontrado")
+    if user["username"] == "admin":
+        raise HTTPException(400, "No se puede eliminar el usuario administrador")
+    if uid == u["id"]:
+        raise HTTPException(400, "No puedes eliminarte a ti mismo")
+    execute("DELETE FROM sys_permisos_usuario WHERE usuario_id=%s", (uid,))
+    execute("DELETE FROM sys_usuarios WHERE id=%s", (uid,))
+    return {"msg": f"Usuario '{user['username']}' eliminado"}
+
 @router.patch("/{uid}/toggle")
 def toggle_usuario(uid: int, u=Depends(requiere_rol("admin"))):
     if uid == u["id"]:
