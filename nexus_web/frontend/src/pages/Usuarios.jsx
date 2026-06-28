@@ -294,7 +294,7 @@ const GRUPOS = [
   {nombre:'Sistema', modulos:['configuracion','usuarios','sri']},
 ]
 const MOD_NOMBRES = {
-  'dashboard':'Dashboard','facturas':'Facturación','clientes':'Clientes',
+  'dashboard':'Dashboard','facturas':'Facturación','notas-venta':'Notas de Venta','clientes':'Clientes',
   'cxc':'CXC','devoluciones':'Devoluciones','cotizaciones':'Cotizaciones',
   'crm':'CRM','notas-debito':'Notas de Débito','guias-remision':'Guías Remisión',
   'productos':'Productos','stock':'Stock','gestion-precios':'Precios',
