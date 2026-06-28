@@ -319,6 +319,7 @@ function ModalCrearRetencion({ C, fi, codigos, tipo, onClose, onCreada }) {
   const [fecha, setFecha] = useState(new Date().toISOString().slice(0, 10))
   const [numero, setNumero] = useState('')
   const [numeroRecibida, setNumeroRecibida] = useState('')
+  const [numAutorizacion, setNumAutorizacion] = useState('')
   const [observaciones, setObservaciones] = useState('')
   const [detalles, setDetalles] = useState([emptyDetalle()])
   const [saving, setSaving] = useState(false)
@@ -447,6 +448,7 @@ function ModalCrearRetencion({ C, fi, codigos, tipo, onClose, onCreada }) {
     const detsValid = detalles.filter(d => d.codigo_retencion && parseFloat(d.base_imponible) > 0)
     if (detsValid.length === 0) return setError('Agregue al menos un detalle de retencion valido')
     if (!esEmitida && !numeroRecibida) return setError('Ingrese el numero de la retencion del cliente')
+    if (!esEmitida && !numAutorizacion) return setError('El numero de autorizacion del SRI es obligatorio')
 
     setSaving(true)
     setError('')
@@ -468,6 +470,7 @@ function ModalCrearRetencion({ C, fi, codigos, tipo, onClose, onCreada }) {
       } else {
         body.cliente_id = selectedEntity.id
         body.numero = numeroRecibida
+        body.numero_autorizacion = numAutorizacion
         if (selectedFactura) body.factura_id = selectedFactura.id
         const { data: result } = await api.post('/retenciones/recibidas', body)
         if (result.cxc_msg) {
@@ -643,6 +646,12 @@ function ModalCrearRetencion({ C, fi, codigos, tipo, onClose, onCreada }) {
                 <label style={lbl(C)}>Numero del comprobante *</label>
                 <input value={numeroRecibida} onChange={e => setNumeroRecibida(e.target.value)}
                   placeholder="001-001-000000001"
+                  style={{ ...fi, width: '100%' }} />
+              </div>
+              <div>
+                <label style={lbl(C)}>Numero de autorizacion SRI *</label>
+                <input value={numAutorizacion} onChange={e => setNumAutorizacion(e.target.value)}
+                  placeholder="49 digitos - clave de acceso"
                   style={{ ...fi, width: '100%' }} />
               </div>
               <div>
