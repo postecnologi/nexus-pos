@@ -283,10 +283,10 @@ const ACCION_COLORS = {
 }
 const GRUPOS = [
   {nombre:'Principal', modulos:['dashboard']},
-  {nombre:'Ventas', modulos:['facturas','clientes','cxc','devoluciones','cotizaciones','crm','notas-debito','guias-remision']},
+  {nombre:'Ventas', modulos:['facturas','notas-venta','clientes','cxc','devoluciones','cotizaciones','crm','notas-debito','guias-remision']},
   {nombre:'Inventario', modulos:['productos','stock','gestion-precios','etiquetas','transferencias','ajustes','kardex','toma-fisica']},
   {nombre:'Compras', modulos:['compras','proveedores','retenciones','liquidaciones']},
-  {nombre:'Finanzas', modulos:['caja','bancos','conciliacion','cxp']},
+  {nombre:'Finanzas', modulos:['caja','bancos','depositos','conciliacion','cxp']},
   {nombre:'Contabilidad', modulos:['contabilidad']},
   {nombre:'Servicio', modulos:['servicio-tecnico']},
   {nombre:'RRHH', modulos:['vendedores','nomina']},
@@ -302,7 +302,7 @@ const MOD_NOMBRES = {
   'kardex':'Kardex','toma-fisica':'Toma Física',
   'compras':'Compras','proveedores':'Proveedores',
   'retenciones':'Retenciones','liquidaciones':'Liquidaciones',
-  'caja':'Caja','bancos':'Bancos','conciliacion':'Conciliación','cxp':'CXP',
+  'caja':'Caja','bancos':'Bancos','depositos':'Depósitos','conciliacion':'Conciliación','cxp':'CXP',
   'contabilidad':'Contabilidad',
   'servicio-tecnico':'Servicio Técnico',
   'vendedores':'Vendedores','nomina':'Nómina',
