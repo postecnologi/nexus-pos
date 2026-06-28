@@ -35,6 +35,7 @@ import Contabilidad from './pages/Contabilidad'
 import Nomina from './pages/Nomina'
 import Administracion from './pages/Administracion'
 import Depositos from './pages/Depositos'
+import OrdenesCompra from './pages/OrdenesCompra'
 import NotasVenta from './pages/NotasVenta'
 import Layout from './components/Layout'
 import PrintFactura from './pages/PrintFactura'
@@ -117,6 +118,7 @@ export default function App() {
           <Route path="/administracion" element={<Administracion />} />
           <Route path="/notas-venta" element={<NotasVenta />} />
           <Route path="/depositos" element={<Depositos />} />
+          <Route path="/ordenes-compra" element={<OrdenesCompra />} />
         </Route>
         <Route path="*" element={<NotFound />} />
       </Routes>

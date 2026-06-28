@@ -386,7 +386,8 @@ function BuscadorProducto({onAgregar}){
 // ════════════════════════════════════════════════════════════
 //  PÁGINA PRINCIPAL
 // ════════════════════════════════════════════════════════════
-export default function Compras(){
+export default function Compras({ modo = 'compra' }){
+  const esOrden = modo === 'orden'
   const C = useTheme()
   const FI={padding:'9px 12px',borderRadius:8,fontSize:13,border:`1px solid ${C.bord2}`,background:C.sur2,color:C.text,outline:'none',boxSizing:'border-box',width:'100%'}
   const user=JSON.parse(localStorage.getItem('nexus_user')||'{}')
@@ -428,7 +429,7 @@ export default function Compras(){
     setFechaVenc(venc.toISOString().slice(0,10))
     Promise.all([
       api.get('/bodegas',{params:{sucursal_id:user.sucursal_id||undefined}}).catch(()=>({data:[]})),
-      api.get('/compras/proximo-numero').catch(()=>({data:{numero:'C-001-001-000000001'}})),
+      api.get(esOrden ? '/ordenes-compra/proximo-numero' : '/compras/proximo-numero').catch(()=>({data:{numero:esOrden?'OC-000001':'C-001-001-000000001'}})),
       api.get('/config/sucursales').catch(()=>({data:[]})),
       api.get('/marcas').catch(()=>({data:[]})),
       api.get('/categorias').catch(()=>({data:[]})),
@@ -514,7 +515,7 @@ export default function Compras(){
     if(!bodegaId)          return setMsg('⚠️ Selecciona una bodega')
     setMsg('');setSaving(true)
     try{
-      const{data}=await api.post('/compras',{
+      const{data}=await api.post(esOrden ? '/ordenes-compra' : '/compras',{
         proveedor_id:         proveedor.id,
         sucursal_id:          user.sucursal_id||null,
         bodega_id:            bodegaId,
@@ -537,7 +538,7 @@ export default function Compras(){
       setUltimaComp({numero:data.numero_compra,total:data.total})
       limpiar()
       // Actualizar próximo número
-      api.get('/compras/proximo-numero').then(r=>setProxNum(r.data.numero)).catch(()=>{})
+      api.get(esOrden ? '/ordenes-compra/proximo-numero' : '/compras/proximo-numero').then(r=>setProxNum(r.data.numero)).catch(()=>{})
     }catch(e){setMsg('❌ '+(e.response?.data?.detail||e.message))}
     finally{setSaving(false)}
   }
@@ -559,7 +560,7 @@ export default function Compras(){
         <div style={{display:'flex',alignItems:'center',gap:16}}>
           <div style={{display:'flex',alignItems:'center',gap:8}}>
             <span style={{fontSize:20}}>📦</span>
-            <span style={{fontSize:14,fontWeight:800,color:C.text}}>Ingreso de compra</span>
+            <span style={{fontSize:14,fontWeight:800,color:C.text}}>{esOrden ? 'Orden de compra' : 'Ingreso de compra'}</span>
           </div>
           {/* Número compra */}
           <div style={{display:'flex',alignItems:'center',gap:6,padding:'4px 12px',
@@ -601,7 +602,7 @@ export default function Compras(){
               background:(saving||!proveedor||items.length===0)?C.sur3:C.amber,
               color:(saving||!proveedor||items.length===0)?C.hint:'#000',
               cursor:(saving||!proveedor||items.length===0)?'not-allowed':'pointer'}}>
-            {saving?'Ingresando...':'📥 Ingresar compra'}
+            {saving?'Guardando...':(esOrden ? '📋 Crear orden de compra' : '📥 Ingresar compra')}
           </button>
         </div>
       </div>
