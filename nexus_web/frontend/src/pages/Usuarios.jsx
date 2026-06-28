@@ -3,7 +3,7 @@
 //  Gestión de usuarios, roles y accesos del sistema
 // ============================================================
 import React, { useState, useEffect } from 'react'
-import { Users, Plus, Edit2, ToggleLeft, ToggleRight, Shield, Key, Search, RotateCcw, Save, X, Check } from 'lucide-react'
+import { Users, Plus, Edit2, ToggleLeft, ToggleRight, Shield, Key, Search, RotateCcw, Save, X, Check, Trash2 } from 'lucide-react'
 import api from '../api'
 import { useTheme } from '../theme'
 
@@ -814,6 +814,19 @@ export default function Usuarios() {
                             alignItems:'center',gap:4,fontSize:12}}>
                           <Shield size={13}/>
                         </button>
+                        {u.username !== 'admin' && (
+                          <button onClick={async()=>{
+                            if(!confirm(`Eliminar usuario "${u.username}"? Esta accion no se puede deshacer.`)) return
+                            try{ await api.delete(`/usuarios/${u.id}`); cargar() }
+                            catch(e){ alert(e.response?.data?.detail||'Error') }
+                          }} title="Eliminar usuario"
+                            style={{padding:'5px 9px',borderRadius:7,
+                              border:`1px solid rgba(239,68,68,.3)`,background:C.redD,
+                              color:C.red,cursor:'pointer',display:'inline-flex',
+                              alignItems:'center',gap:4,fontSize:12}}>
+                            <Trash2 size={13}/>
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
