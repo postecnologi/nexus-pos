@@ -55,6 +55,7 @@ class RetencionRecibidaIn(BaseModel):
     cliente_id: int
     factura_id: Optional[int] = None
     numero: str
+    numero_autorizacion: str
     fecha_emision: Optional[str] = None
     observaciones: Optional[str] = None
     detalles: list
@@ -307,6 +308,8 @@ def crear_emitida(body: RetencionEmitidaIn, u=Depends(get_current_user)):
 def crear_recibida(body: RetencionRecibidaIn, u=Depends(get_current_user)):
     if not body.detalles:
         raise HTTPException(400, "Debe agregar al menos un detalle de retención")
+    if not body.numero_autorizacion or len(body.numero_autorizacion.strip()) < 10:
+        raise HTTPException(400, "El numero de autorizacion del SRI es obligatorio")
 
     # Cliente
     cli = query_one("SELECT * FROM ven_clientes WHERE id=%s", (body.cliente_id,))
@@ -340,13 +343,14 @@ def crear_recibida(body: RetencionRecibidaIn, u=Depends(get_current_user)):
 
     rid = insert("""
         INSERT INTO sri_retenciones
-            (tipo, numero, factura_id, cliente_id, sucursal_id,
+            (tipo, numero, numero_autorizacion, factura_id, cliente_id, sucursal_id,
              usuario_id, fecha_emision, periodo_fiscal, estado,
              estado_sri, total_retenido, observaciones)
-        VALUES ('RECIBIDA', %s, %s, %s, %s, %s, %s, %s,
+        VALUES ('RECIBIDA', %s, %s, %s, %s, %s, %s, %s, %s,
                 'EMITIDA', 'N/A', %s, %s)
     """, (
-        body.numero, body.factura_id, body.cliente_id, suc_id,
+        body.numero, body.numero_autorizacion.strip(),
+        body.factura_id, body.cliente_id, suc_id,
         u["id"], fecha_emision, periodo_fiscal,
         total_retenido, body.observaciones,
     ))
