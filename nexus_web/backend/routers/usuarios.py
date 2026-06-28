@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from database import query, query_one, execute, insert
 from auth import get_current_user, hash_password
 from permisos import PLANTILLAS_ROL, MODULOS, ACCIONES, requiere_rol, get_permisos_usuario, get_permisos_efectivos
+from routers.admin import registrar_audit
 from typing import Optional
 from pydantic import BaseModel
 
@@ -119,6 +120,7 @@ def crear_usuario(usr: UsuarioIn, u=Depends(requiere_rol("admin"))):
         VALUES (%s,%s,%s,%s,%s,%s,%s,%s,NOW())
     """, (usr.username, usr.nombre, usr.email, usr.telefono,
           usr.sucursal_id, usr.rol, hash_password(usr.password), usr.activo))
+    registrar_audit(u["id"], u.get("nombre",""), "CREAR", "usuarios", f"Usuario creado: {usr.username} (rol: {usr.rol})")
     return {"id": uid, "msg": "Usuario creado"}
 
 
@@ -149,9 +151,11 @@ class CambioPassIn(BaseModel):
 def cambiar_password(uid: int, body: CambioPassIn, u=Depends(requiere_rol("admin"))):
     if len(body.password) < 4:
         raise HTTPException(400, "Mínimo 4 caracteres")
+    usr_info = query_one("SELECT username FROM sys_usuarios WHERE id=%s", (uid,))
     execute(
         "UPDATE sys_usuarios SET password_hash=%s WHERE id=%s",
         (hash_password(body.password), uid))
+    registrar_audit(u["id"], u.get("nombre",""), "EDITAR", "usuarios", f"Contrasena cambiada: {usr_info['username'] if usr_info else uid}")
     return {"msg": "Contraseña actualizada"}
 
 
@@ -166,6 +170,7 @@ def eliminar_usuario(uid: int, u=Depends(requiere_rol("admin"))):
         raise HTTPException(400, "No puedes eliminarte a ti mismo")
     execute("DELETE FROM sys_permisos_usuario WHERE usuario_id=%s", (uid,))
     execute("DELETE FROM sys_usuarios WHERE id=%s", (uid,))
+    registrar_audit(u["id"], u.get("nombre",""), "ELIMINAR", "usuarios", f"Usuario eliminado: {user['username']}")
     return {"msg": f"Usuario '{user['username']}' eliminado"}
 
 @router.patch("/{uid}/toggle")
@@ -175,8 +180,11 @@ def toggle_usuario(uid: int, u=Depends(requiere_rol("admin"))):
     user = query_one("SELECT activo FROM sys_usuarios WHERE id=%s", (uid,))
     if not user:
         raise HTTPException(404)
-    execute("UPDATE sys_usuarios SET activo=%s WHERE id=%s", (not user["activo"], uid))
-    return {"activo": not user["activo"]}
+    nuevo = not user["activo"]
+    execute("UPDATE sys_usuarios SET activo=%s WHERE id=%s", (nuevo, uid))
+    usr_info = query_one("SELECT username FROM sys_usuarios WHERE id=%s", (uid,))
+    registrar_audit(u["id"], u.get("nombre",""), "EDITAR", "usuarios", f"Usuario {usr_info['username'] if usr_info else uid} {'activado' if nuevo else 'desactivado'}")
+    return {"activo": nuevo}
 
 
 class MiPerfilIn(BaseModel):
@@ -263,6 +271,13 @@ def guardar_permisos(uid: int, body: PermisosIn, u=Depends(requiere_rol("admin")
                 count += 1
             except:
                 pass
+    usr_info = query_one("SELECT username FROM sys_usuarios WHERE id=%s", (uid,))
+    modulos_asignados = [m for m, a in body.permisos.items() if a]
+    modulos_quitados = [m["id"] for m in MODULOS if m["id"] not in modulos_asignados]
+    detalle = f"Permisos de {usr_info['username'] if usr_info else uid}: {count} modulos. "
+    if modulos_quitados:
+        detalle += f"Sin acceso: {', '.join(modulos_quitados[:10])}"
+    registrar_audit(u["id"], u.get("nombre",""), "EDITAR", "permisos", detalle)
     return {"msg": f"Permisos actualizados: {count} módulos"}
 
 
