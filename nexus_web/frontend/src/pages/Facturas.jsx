@@ -342,7 +342,7 @@ function BuscadorVendedor({value, onChange}){
 }
 
 // -- ModalReimprimir --
-function ModalReimprimir({onCerrar, onImprimir, onSRI, onRIDE, onXML, onEmail, onTicket, onDuplicar}){
+function ModalReimprimir({onCerrar, onImprimir, onSRI, onRIDE, onXML, onEmail, onTicket, onDuplicar, esNotaVenta}){
   const C = useTheme()
   const FI={padding:'9px 12px',borderRadius:8,fontSize:13,border:`1px solid ${C.bord2}`,background:C.sur2,color:C.text,outline:'none',boxSizing:'border-box',width:'100%'}
   const [q,setQ]=useState(''),[fecha,setFecha]=useState(''),[res,setRes]=useState([]),[loading,setLoading]=useState(false)
@@ -357,7 +357,7 @@ function ModalReimprimir({onCerrar, onImprimir, onSRI, onRIDE, onXML, onEmail, o
         display:'flex',flexDirection:'column',border:`1px solid ${C.bord2}`,boxShadow:'0 25px 60px rgba(0,0,0,.7)'}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:18}}>
           <div>
-            <div style={{fontSize:16,fontWeight:700,color:C.text}}>Reimprimir factura</div>
+            <div style={{fontSize:16,fontWeight:700,color:C.text}}>{esNotaVenta ? 'Reimprimir nota de venta' : 'Reimprimir factura'}</div>
             <div style={{fontSize:12,color:C.muted,marginTop:2}}>Busca por numero de factura, nombre o cedula/RUC del cliente</div>
           </div>
           <button onClick={onCerrar} style={{background:'none',border:'none',cursor:'pointer',color:C.hint,fontSize:22}}>x</button>
@@ -1853,7 +1853,7 @@ export default function Facturas({ modo = 'factura' }){
       {modalReimp&&<ModalReimprimir onCerrar={()=>setModalReimp(false)}
         onImprimir={abrirImpresion} onSRI={enviarSRI} onRIDE={descargarRIDE}
         onXML={descargarXML} onEmail={enviarEmail} onTicket={descargarTicket}
-        onDuplicar={id=>{duplicarFactura(id);setModalReimp(false)}}/>}
+        onDuplicar={id=>{duplicarFactura(id);setModalReimp(false)}} esNotaVenta={esNotaVenta}/>}
       {modalBorradores&&<ModalBorradores onCerrar={()=>setModalBorradores(false)}
         onCargar={cargarBorrador}
         onEmitir={data=>{setUltimaFact({id:data.id,numero:data.numero_factura,total:0});
