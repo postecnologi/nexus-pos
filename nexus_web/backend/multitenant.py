@@ -453,7 +453,7 @@ def verificar_limite(db_name, tipo):
             if actual and int(actual["n"]) >= limite:
                 return False, f"Limite de {limite} productos alcanzado (Plan {plan['plan']}). Contacte a soporte para cambiar de plan."
         elif tipo == 'facturas':
-            actual = qo("SELECT COUNT(*) as n FROM ven_facturas WHERE fecha >= date_trunc('month', CURRENT_DATE)")
+            actual = qo("SELECT COUNT(*) as n FROM ven_facturas WHERE fecha_emision >= date_trunc('month', CURRENT_DATE)")
             limite = plan.get("max_facturas_mes", 99999)
             if actual and int(actual["n"]) >= limite:
                 return False, f"Limite de {limite} facturas/mes alcanzado (Plan {plan['plan']}). Contacte a soporte para cambiar de plan."
@@ -470,7 +470,7 @@ def get_uso_empresa(db_name):
         from database import query_one as qo
         usuarios = qo("SELECT COUNT(*) as n FROM sys_usuarios WHERE activo=true")
         productos = qo("SELECT COUNT(*) as n FROM inv_productos WHERE activo=true")
-        facturas_mes = qo("SELECT COUNT(*) as n FROM ven_facturas WHERE fecha >= date_trunc('month', CURRENT_DATE)")
+        facturas_mes = qo("SELECT COUNT(*) as n FROM ven_facturas WHERE fecha_emision >= date_trunc('month', CURRENT_DATE)")
         return {
             "plan": plan["plan"],
             "precio": float(plan.get("precio_mensual", 0)),
