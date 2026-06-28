@@ -141,8 +141,10 @@ function ModalUsuario({ usuario, sucursales, roles, onClose, onSaved }) {
     try {
       const payload = {
         ...form,
+        nombre: form.nombre_completo,
         sucursal_id: form.sucursal_id ? Number(form.sucursal_id) : null,
       }
+      delete payload.nombre_completo
       // On edit, don't send empty password
       if (esEdit && !payload.password.trim()) delete payload.password
       if (esEdit) await api.put(`/usuarios/${usuario.id}`, payload)

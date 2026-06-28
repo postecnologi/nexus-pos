@@ -164,9 +164,11 @@ def get_permisos_usuario(usuario_id: int) -> dict | None:
 
 def get_permisos_efectivos(usuario_id: int, rol: str) -> dict:
     """Retorna los permisos efectivos: de la BD si existen, sino de la plantilla."""
+    permisos_db = get_permisos_usuario(usuario_id)
+    if permisos_db is not None:
+        return permisos_db
     if rol == "admin":
         return _todas_acciones()
-    permisos_db = get_permisos_usuario(usuario_id)
     if permisos_db is not None:
         return permisos_db
     plantilla = PLANTILLAS_ROL.get(rol, PLANTILLAS_ROL["vendedor"])
@@ -174,8 +176,6 @@ def get_permisos_efectivos(usuario_id: int, rol: str) -> dict:
 
 
 def tiene_acceso(usuario_id: int, rol: str, modulo: str, accion: str = "ver") -> bool:
-    if rol == "admin":
-        return True
     permisos = get_permisos_efectivos(usuario_id, rol)
     acciones_modulo = permisos.get(modulo, [])
     return accion in acciones_modulo
