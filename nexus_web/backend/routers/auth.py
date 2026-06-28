@@ -67,6 +67,15 @@ def login(form: OAuth2PasswordRequestForm = Depends(), empresa_codigo: str = For
 def me(u=Depends(get_current_user)):
     return u
 
+@router.get("/mi-plan")
+def mi_plan(u=Depends(get_current_user)):
+    from database import get_current_db
+    from multitenant import get_uso_empresa
+    uso = get_uso_empresa(get_current_db())
+    if not uso:
+        return {"plan": "Sin limite", "msg": "No aplica"}
+    return uso
+
 
 class SolicitudDemo(BaseModel):
     empresa_nombre: str

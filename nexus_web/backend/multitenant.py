@@ -414,3 +414,72 @@ def ensure_superadmin():
         print(f"Error creating superadmin: {e}")
     finally:
         conn.close()
+
+
+def get_plan_empresa(db_name):
+    if not MULTI_TENANT:
+        return None
+    try:
+        conn = get_master_connection()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT e.codigo, e.nombre, e.plan, e.activa, e.fecha_vencimiento,
+                   p.max_usuarios, p.max_productos, p.max_facturas_mes, p.precio_mensual
+            FROM mt_empresas e
+            LEFT JOIN mt_planes p ON p.nombre = e.plan
+            WHERE e.db_name = %s
+        """, (db_name,))
+        r = cur.fetchone()
+        conn.close()
+        return dict(r) if r else None
+    except Exception:
+        return None
+
+
+def verificar_limite(db_name, tipo):
+    plan = get_plan_empresa(db_name)
+    if not plan:
+        return True, ""
+    try:
+        from database import query_one as qo
+        if tipo == 'usuarios':
+            actual = qo("SELECT COUNT(*) as n FROM sys_usuarios WHERE activo=true")
+            limite = plan.get("max_usuarios", 999)
+            if actual and int(actual["n"]) >= limite:
+                return False, f"Limite de {limite} usuarios alcanzado (Plan {plan['plan']}). Contacte a soporte para cambiar de plan."
+        elif tipo == 'productos':
+            actual = qo("SELECT COUNT(*) as n FROM inv_productos WHERE activo=true")
+            limite = plan.get("max_productos", 99999)
+            if actual and int(actual["n"]) >= limite:
+                return False, f"Limite de {limite} productos alcanzado (Plan {plan['plan']}). Contacte a soporte para cambiar de plan."
+        elif tipo == 'facturas':
+            actual = qo("SELECT COUNT(*) as n FROM ven_facturas WHERE fecha >= date_trunc('month', CURRENT_DATE)")
+            limite = plan.get("max_facturas_mes", 99999)
+            if actual and int(actual["n"]) >= limite:
+                return False, f"Limite de {limite} facturas/mes alcanzado (Plan {plan['plan']}). Contacte a soporte para cambiar de plan."
+    except Exception:
+        pass
+    return True, ""
+
+
+def get_uso_empresa(db_name):
+    plan = get_plan_empresa(db_name)
+    if not plan:
+        return None
+    try:
+        from database import query_one as qo
+        usuarios = qo("SELECT COUNT(*) as n FROM sys_usuarios WHERE activo=true")
+        productos = qo("SELECT COUNT(*) as n FROM inv_productos WHERE activo=true")
+        facturas_mes = qo("SELECT COUNT(*) as n FROM ven_facturas WHERE fecha >= date_trunc('month', CURRENT_DATE)")
+        return {
+            "plan": plan["plan"],
+            "precio": float(plan.get("precio_mensual", 0)),
+            "usuarios": {"actual": int(usuarios["n"]) if usuarios else 0, "limite": plan.get("max_usuarios", 0)},
+            "productos": {"actual": int(productos["n"]) if productos else 0, "limite": plan.get("max_productos", 0)},
+            "facturas_mes": {"actual": int(facturas_mes["n"]) if facturas_mes else 0, "limite": plan.get("max_facturas_mes", 0)},
+            "empresa": plan.get("nombre", ""),
+            "codigo": plan.get("codigo", ""),
+            "vencimiento": str(plan.get("fecha_vencimiento", "")) if plan.get("fecha_vencimiento") else None,
+        }
+    except Exception:
+        return None

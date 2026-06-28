@@ -201,6 +201,11 @@ def get_producto(pid: int, u=Depends(get_current_user)):
 
 @router.post("/productos")
 def crear_producto(p: ProductoIn, u=Depends(get_current_user)):
+    from database import get_current_db
+    from multitenant import verificar_limite
+    ok, msg = verificar_limite(get_current_db(), 'productos')
+    if not ok:
+        raise HTTPException(403, msg)
     pid = insert("""
         INSERT INTO inv_productos
         (codigo, descripcion, marca_id, categoria_id,
