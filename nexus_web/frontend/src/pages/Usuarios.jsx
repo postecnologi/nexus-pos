@@ -604,6 +604,7 @@ function ModalPermisos({ usuario, roles, onClose }) {
 // ════════════════════════════════════════════════════════════════
 export default function Usuarios() {
   const C = useTheme()
+  const currentUser = JSON.parse(localStorage.getItem('nexus_user') || '{}')
   const [usuarios,   setUsuarios]   = useState([])
   const [sucursales, setSucursales] = useState([])
   const [roles,      setRoles]      = useState(ROLES_FALLBACK)
@@ -814,7 +815,7 @@ export default function Usuarios() {
                             alignItems:'center',gap:4,fontSize:12}}>
                           <Shield size={13}/>
                         </button>
-                        {u.id !== user.id && !(u.rol === 'admin' && usuarios.filter(x => x.rol === 'admin' && x.activo).length <= 1) && (
+                        {u.id !== currentUser.id && !(u.rol === 'admin' && usuarios.filter(x => x.rol === 'admin' && x.activo).length <= 1) && (
                           <button onClick={async()=>{
                             if(!confirm(`Eliminar usuario "${u.username}"? Esta accion no se puede deshacer.`)) return
                             try{ await api.delete(`/usuarios/${u.id}`); cargar() }
