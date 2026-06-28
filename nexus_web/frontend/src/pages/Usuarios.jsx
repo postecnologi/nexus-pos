@@ -295,7 +295,7 @@ const GRUPOS = [
   {nombre:'Servicio', modulos:['servicio-tecnico']},
   {nombre:'RRHH', modulos:['vendedores','nomina']},
   {nombre:'Reportes', modulos:['reportes']},
-  {nombre:'Sistema', modulos:['configuracion','usuarios','administracion','sri']},
+  {nombre:'Sistema', modulos:['configuracion','usuarios','admin','sri']},
 ]
 const MOD_NOMBRES = {
   'dashboard':'Dashboard','facturas':'Facturación','notas-venta':'Notas de Venta','clientes':'Clientes',
@@ -312,7 +312,7 @@ const MOD_NOMBRES = {
   'servicio-tecnico':'Servicio Técnico',
   'vendedores':'Vendedores','nomina':'Nómina',
   'reportes':'Reportes',
-  'configuracion':'Configuración','usuarios':'Usuarios','administracion':'Administración','sri':'Fact. Electrónica',
+  'configuracion':'Configuración','usuarios':'Usuarios','admin':'Administración','sri':'Fact. Electrónica',
 }
 const ALL_MODULOS = GRUPOS.flatMap(g => g.modulos)
 
