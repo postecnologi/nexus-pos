@@ -285,10 +285,12 @@ const ACCION_COLORS = {
 }
 const GRUPOS = [
   {nombre:'Principal', modulos:['dashboard']},
-  {nombre:'Ventas', modulos:['facturas','notas-venta','clientes','cxc','devoluciones','cotizaciones','crm','notas-debito','guias-remision']},
+  {nombre:'Ventas', modulos:['facturas','notas-venta','devoluciones','cotizaciones','crm','notas-debito','guias-remision']},
+  {nombre:'Clientes', modulos:['clientes','cxc']},
   {nombre:'Inventario', modulos:['productos','stock','gestion-precios','etiquetas','transferencias','ajustes','kardex','toma-fisica']},
-  {nombre:'Compras', modulos:['compras','proveedores','retenciones','liquidaciones']},
-  {nombre:'Finanzas', modulos:['caja','bancos','depositos','conciliacion','cxp']},
+  {nombre:'Compras', modulos:['compras','liquidaciones']},
+  {nombre:'Proveedores', modulos:['proveedores','cxp','retenciones']},
+  {nombre:'Finanzas', modulos:['caja','bancos','depositos','conciliacion']},
   {nombre:'Contabilidad', modulos:['contabilidad']},
   {nombre:'Servicio', modulos:['servicio-tecnico']},
   {nombre:'RRHH', modulos:['vendedores','nomina']},

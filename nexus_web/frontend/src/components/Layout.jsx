@@ -65,15 +65,21 @@ const grupos = [
     label: 'Ventas',
     icon: ShoppingCart,
     items: [
-      { to: '/caja',            icon: Landmark,    label: 'Caja'              },
-      { to: '/facturas',        icon: FileText,    label: 'Facturas'          },
-      { to: '/notas-venta',     icon: Receipt,     label: 'Notas de Venta'    },
-      { to: '/clientes',        icon: Users,       label: 'Clientes'          },
-      { to: '/cxc',             icon: CreditCard,  label: 'CXC'               },
-      { to: '/devoluciones',    icon: RotateCcw,   label: 'Devoluciones'      },
-      { to: '/cotizaciones',    icon: ClipboardList, label: 'Cotizaciones'    },
-      { to: '/crm',              icon: Target,        label: 'CRM'              },
-      { to: '/notas-debito',     icon: FileText,      label: 'Notas de Debito'  },
+      { to: '/caja',            icon: Landmark,      label: 'Caja'              },
+      { to: '/facturas',        icon: FileText,      label: 'Facturas'          },
+      { to: '/notas-venta',     icon: Receipt,       label: 'Notas de Venta'    },
+      { to: '/devoluciones',    icon: RotateCcw,     label: 'Devoluciones'      },
+      { to: '/cotizaciones',    icon: ClipboardList, label: 'Cotizaciones'      },
+      { to: '/crm',             icon: Target,        label: 'CRM'               },
+      { to: '/notas-debito',    icon: FileText,      label: 'Notas de Debito'   },
+    ]
+  },
+  {
+    label: 'Clientes',
+    icon: Users,
+    items: [
+      { to: '/clientes',        icon: Users,       label: 'Clientes'            },
+      { to: '/cxc',             icon: CreditCard,  label: 'Cuentas por Cobrar'  },
     ]
   },
   {
@@ -93,19 +99,25 @@ const grupos = [
     label: 'Compras',
     icon: Package,
     items: [
-      { to: '/compras',         icon: Package,    label: 'Compras'            },
-      { to: '/retenciones',     icon: FileCheck2, label: 'Retenciones'        },
-      { to: '/proveedores',     icon: Truck,      label: 'Proveedores'        },
-      { to: '/cxp-pagar',       icon: CreditCard, label: 'CXP'               },
+      { to: '/compras',         icon: Package,    label: 'Compras'              },
+    ]
+  },
+  {
+    label: 'Proveedores',
+    icon: Truck,
+    items: [
+      { to: '/proveedores',     icon: Truck,      label: 'Proveedores'          },
+      { to: '/cxp-pagar',       icon: CreditCard, label: 'Cuentas por Pagar'    },
+      { to: '/retenciones',     icon: FileCheck2, label: 'Retenciones'          },
     ]
   },
   {
     label: 'Finanzas',
     icon: DollarSign,
     items: [
-      { to: '/bancos',          icon: Building2,  label: 'Bancos'             },
-      { to: '/depositos',       icon: ArrowUpCircle, label: 'Depósitos'       },
-      { to: '/conciliacion',    icon: GitMerge,   label: 'Conciliación'       },
+      { to: '/bancos',          icon: Building2,     label: 'Bancos'            },
+      { to: '/depositos',       icon: ArrowUpCircle, label: 'Depósitos'         },
+      { to: '/conciliacion',    icon: GitMerge,      label: 'Conciliación'      },
     ]
   },
   {
