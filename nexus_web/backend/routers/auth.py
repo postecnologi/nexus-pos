@@ -71,7 +71,8 @@ def me(u=Depends(get_current_user)):
 def mi_plan(u=Depends(get_current_user)):
     from database import get_current_db
     from multitenant import get_uso_empresa
-    uso = get_uso_empresa(get_current_db())
+    db = u.get("empresa_db") or get_current_db()
+    uso = get_uso_empresa(db)
     if not uso:
         return {"plan": "Sin limite", "msg": "No aplica"}
     return uso

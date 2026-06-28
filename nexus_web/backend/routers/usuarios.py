@@ -104,9 +104,8 @@ class UsuarioIn(BaseModel):
 
 @router.post("")
 def crear_usuario(usr: UsuarioIn, u=Depends(requiere_rol("admin"))):
-    from database import get_current_db
     from multitenant import verificar_limite
-    ok, msg = verificar_limite(get_current_db(), 'usuarios')
+    ok, msg = verificar_limite(u.get("empresa_db", ""), 'usuarios')
     if not ok:
         raise HTTPException(403, msg)
     if not usr.password or len(usr.password) < 4:
