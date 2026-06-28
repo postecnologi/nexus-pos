@@ -160,7 +160,7 @@ function ModalUsuario({ usuario, sucursales, roles, onClose, onSaved }) {
   const lbl = { fontSize:11, fontWeight:600, color:C.muted, display:'block',
     marginBottom:4, textTransform:'uppercase', letterSpacing:'.05em' }
 
-  const rolActual = roles.find(r => r.nombre === form.rol)
+  const rolActual = roles.find(r => r.id === form.rol)
 
   return (
     <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.75)',display:'flex',
@@ -216,8 +216,8 @@ function ModalUsuario({ usuario, sucursales, roles, onClose, onSaved }) {
             <label style={lbl}>Rol <span style={{color:C.red}}>*</span></label>
             <select value={form.rol} onChange={e=>s('rol',e.target.value)} style={fi}>
               {roles.map(r=>(
-                <option key={r.nombre} value={r.nombre}>
-                  {r.nombre.charAt(0).toUpperCase()+r.nombre.slice(1)} — {r.descripcion}
+                <option key={r.id} value={r.id}>
+                  {r.nombre} — {r.descripcion}
                 </option>
               ))}
             </select>
