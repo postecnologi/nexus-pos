@@ -793,7 +793,8 @@ function ModalCobro({total,pagos,setPagos,onConfirmar,onCancelar,cuentasBanc=[]}
 // ════════════════════════════════════════════════════════════
 //  PÁGINA PRINCIPAL
 // ════════════════════════════════════════════════════════════
-export default function Facturas(){
+export default function Facturas({ modo = 'factura' }){
+  const esNotaVenta = modo === 'nota_venta'
   const C = useTheme()
   const FI={padding:'9px 12px',borderRadius:8,fontSize:13,border:`1px solid ${C.bord2}`,background:C.sur2,color:C.text,outline:'none',boxSizing:'border-box',width:'100%'}
   const user=JSON.parse(localStorage.getItem('nexus_user')||'{}')
@@ -823,7 +824,7 @@ export default function Facturas(){
     Promise.all([
       api.get('/vendedores').catch(()=>({data:[]})),
       api.get('/bodegas', {params:{sucursal_id:user.sucursal_id||undefined}}).catch(()=>({data:[]})),
-      api.get('/facturas-proximo-numero').catch(()=>({data:{numero:'001-001-000000001'}})),
+      api.get(esNotaVenta ? '/notas-venta/proximo-numero' : '/facturas-proximo-numero').catch(()=>({data:{numero: esNotaVenta ? 'NV-000001' : '001-001-000000001'}})),
       api.get('/config/sucursales').catch(()=>({data:[]})),
       api.get('/caja/verificar-abierta').catch(()=>({data:{abierta:false}})),
       api.get('/bancos/cuentas').catch(()=>({data:[]})),
@@ -1356,7 +1357,7 @@ export default function Facturas(){
     async function confirmarPago(){
     setSaving(true)
     try{
-      const{data}=await api.post('/facturas',{
+      const{data}=await api.post(esNotaVenta ? '/notas-venta' : '/facturas',{
         cliente_id:cliente.id,vendedor_id:vendedor?.id||null,
         sucursal_id:user.sucursal_id||null,observaciones:obs,
         descuento_global_pct:Number(descGlobal)||0,
@@ -1380,12 +1381,11 @@ export default function Facturas(){
           cuenta_bancaria_id:p.cuenta_bancaria_id||null})),
       })
       setModalCobro(false)
-      setUltimaFact({id:data.id,numero:data.numero_factura,total:data.total})
-      // Abrir impresión automáticamente
-      if(data.id) abrirImpresion(data.id)
+      setUltimaFact({id:data.id,numero:data.numero_factura||data.numero,total:data.total})
+      if(!esNotaVenta && data.id) abrirImpresion(data.id)
       setCliente(null);setItems([]);setVendedor(null)
       setObs('');setDescGlobal(0);setPagos([])
-      api.get('/facturas-proximo-numero').then(r=>setProxNum(r.data.numero)).catch(()=>{})
+      api.get(esNotaVenta ? '/notas-venta/proximo-numero' : '/facturas-proximo-numero').then(r=>setProxNum(r.data.numero)).catch(()=>{})
     }catch(e){setMsg('❌ '+(e.response?.data?.detail||e.message));setModalCobro(false)}
     finally{setSaving(false)}
   }
@@ -1409,7 +1409,7 @@ export default function Facturas(){
         <div style={{display:'flex',alignItems:'center',gap:16}}>
           <div style={{display:'flex',alignItems:'center',gap:8}}>
             <span style={{fontSize:20}}>🧾</span>
-            <span style={{fontSize:14,fontWeight:800,color:C.text}}>Nueva factura</span>
+            <span style={{fontSize:14,fontWeight:800,color:C.text}}>{esNotaVenta ? 'Nueva nota de venta' : 'Nueva factura'}</span>
           </div>
           {/* Sucursal y Bodega activa */}
           {sucursalNombre&&(
@@ -1481,24 +1481,24 @@ export default function Facturas(){
           )}
         </div>
         <div style={{display:'flex',gap:8}}>
-          <button onClick={()=>setModalBorradores(true)}
+          {!esNotaVenta && <button onClick={()=>setModalBorradores(true)}
             style={{padding:'8px 14px',borderRadius:8,border:`1px solid ${C.amber}44`,
               background:C.amberD,color:C.amber,cursor:'pointer',fontSize:12,
               display:'flex',alignItems:'center',gap:6,fontWeight:600}}>
             Borradores
-          </button>
-          <button onClick={()=>setModalRecurrentes(true)}
+          </button>}
+          {!esNotaVenta && <button onClick={()=>setModalRecurrentes(true)}
             style={{padding:'8px 14px',borderRadius:8,border:`1px solid ${C.cyan}44`,
               background:'rgba(6,182,212,.12)',color:C.cyan,cursor:'pointer',fontSize:12,
               display:'flex',alignItems:'center',gap:6,fontWeight:600}}>
             Recurrentes
-          </button>
-          <button onClick={()=>setModalReimp(true)}
+          </button>}
+          {!esNotaVenta && <button onClick={()=>setModalReimp(true)}
             style={{padding:'8px 14px',borderRadius:8,border:`1px solid ${C.bord2}`,
               background:C.sur2,color:C.muted,cursor:'pointer',fontSize:12,
               display:'flex',alignItems:'center',gap:6,fontWeight:600}}>
             Reimprimir
-          </button>
+          </button>}
           {(items.length>0||cliente)&&(
             <button onClick={limpiar}
               style={{padding:'8px 14px',borderRadius:8,
@@ -1507,20 +1507,20 @@ export default function Facturas(){
               Limpiar
             </button>
           )}
-          <button onClick={guardarBorrador} disabled={saving||!cliente||items.length===0}
+          {!esNotaVenta && <button onClick={guardarBorrador} disabled={saving||!cliente||items.length===0}
             style={{padding:'8px 16px',borderRadius:8,border:'none',fontSize:13,fontWeight:700,
               background:(saving||!cliente||items.length===0)?C.sur3:C.amber,
               color:(saving||!cliente||items.length===0)?C.hint:'white',
               cursor:(saving||!cliente||items.length===0)?'not-allowed':'pointer'}}>
             {saving?'Guardando...':'Borrador'}
-          </button>
+          </button>}
           <button onClick={emitir} disabled={saving||!cliente||items.length===0}
             style={{padding:'8px 20px',borderRadius:8,border:'none',fontSize:13,fontWeight:800,
               background:(saving||!cliente||items.length===0)?C.sur3:C.blue,
               color:(saving||!cliente||items.length===0)?C.hint:'white',
               cursor:(saving||!cliente||items.length===0)?'not-allowed':'pointer',
               boxShadow:(saving||!cliente||items.length===0)?'none':C.blueGlow.replace('.35','.5')}}>
-            {saving?'Emitiendo...':'Emitir factura'}
+            {saving?'Emitiendo...':(esNotaVenta ? 'Emitir nota de venta' : 'Emitir factura')}
           </button>
         </div>
       </div>

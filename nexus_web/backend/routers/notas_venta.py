@@ -22,6 +22,15 @@ class NotaVentaIn(BaseModel):
     pagos: list
 
 
+@router.get("/proximo-numero")
+def proximo_numero(u=Depends(get_current_user)):
+    suc_id = u.get("sucursal_id")
+    suc = query_one("SELECT secuencial_nota_venta FROM sys_sucursales WHERE id=%s", (suc_id,)) if suc_id else \
+          query_one("SELECT secuencial_nota_venta FROM sys_sucursales WHERE activa=true LIMIT 1")
+    sec = (suc.get("secuencial_nota_venta", 0) or 0) + 1 if suc else 1
+    return {"numero": f"NV-{sec:06d}"}
+
+
 @router.get("")
 def listar_notas(
     busqueda: str = "",
