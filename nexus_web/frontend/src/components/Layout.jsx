@@ -37,6 +37,8 @@ const pathToModule = {
   '/servicio-tecnico':'servicio-tecnico',
   '/crm':             'crm',
   '/retenciones':     'retenciones',
+  '/retenciones-emitidas': 'retenciones',
+  '/retenciones-recibidas': 'retenciones',
   '/notas-debito':    'notas-debito',
   '/contabilidad':    'contabilidad',
   '/nomina':          'nomina',
@@ -80,6 +82,7 @@ const grupos = [
     items: [
       { to: '/clientes',        icon: Users,       label: 'Clientes'            },
       { to: '/cxc',             icon: CreditCard,  label: 'Cuentas por Cobrar'  },
+      { to: '/retenciones-recibidas', icon: FileCheck2, label: 'Retenciones'    },
     ]
   },
   {
@@ -108,7 +111,7 @@ const grupos = [
     items: [
       { to: '/proveedores',     icon: Truck,      label: 'Proveedores'          },
       { to: '/cxp-pagar',       icon: CreditCard, label: 'Cuentas por Pagar'    },
-      { to: '/retenciones',     icon: FileCheck2, label: 'Retenciones'          },
+      { to: '/retenciones-emitidas', icon: FileCheck2, label: 'Retenciones'     },
     ]
   },
   {
