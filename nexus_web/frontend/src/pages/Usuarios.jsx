@@ -285,17 +285,17 @@ const ACCION_COLORS = {
 }
 const GRUPOS = [
   {nombre:'Principal', modulos:['dashboard']},
-  {nombre:'Ventas', modulos:['facturas','notas-venta','devoluciones','cotizaciones','crm','notas-debito','guias-remision']},
-  {nombre:'Clientes', modulos:['clientes','cxc']},
+  {nombre:'Ventas', modulos:['caja','facturas','notas-venta','devoluciones','cotizaciones','crm','notas-debito','guias-remision']},
+  {nombre:'Clientes', modulos:['clientes','cxc','retenciones-recibidas']},
   {nombre:'Inventario', modulos:['productos','stock','gestion-precios','etiquetas','transferencias','ajustes','kardex','toma-fisica']},
   {nombre:'Compras', modulos:['compras','ordenes-compra','liquidaciones']},
-  {nombre:'Proveedores', modulos:['proveedores','cxp','retenciones']},
-  {nombre:'Finanzas', modulos:['caja','bancos','depositos','conciliacion']},
+  {nombre:'Proveedores', modulos:['proveedores','cxp','retenciones-emitidas']},
+  {nombre:'Finanzas', modulos:['bancos','depositos','conciliacion']},
   {nombre:'Contabilidad', modulos:['contabilidad']},
   {nombre:'Servicio', modulos:['servicio-tecnico']},
   {nombre:'RRHH', modulos:['vendedores','nomina']},
   {nombre:'Reportes', modulos:['reportes']},
-  {nombre:'Sistema', modulos:['configuracion','usuarios','sri']},
+  {nombre:'Sistema', modulos:['configuracion','usuarios','administracion','sri']},
 ]
 const MOD_NOMBRES = {
   'dashboard':'Dashboard','facturas':'Facturación','notas-venta':'Notas de Venta','clientes':'Clientes',
@@ -305,13 +305,14 @@ const MOD_NOMBRES = {
   'etiquetas':'Etiquetas','transferencias':'Transferencias','ajustes':'Ajustes',
   'kardex':'Kardex','toma-fisica':'Toma Física',
   'compras':'Compras','ordenes-compra':'Ordenes de Compra','proveedores':'Proveedores',
-  'retenciones':'Retenciones','liquidaciones':'Liquidaciones',
+  'retenciones':'Retenciones','retenciones-emitidas':'Ret. Emitidas','retenciones-recibidas':'Ret. Recibidas',
+  'liquidaciones':'Liquidaciones',
   'caja':'Caja','bancos':'Bancos','depositos':'Depósitos','conciliacion':'Conciliación','cxp':'CXP',
   'contabilidad':'Contabilidad',
   'servicio-tecnico':'Servicio Técnico',
   'vendedores':'Vendedores','nomina':'Nómina',
   'reportes':'Reportes',
-  'configuracion':'Configuración','usuarios':'Usuarios','sri':'Facturación Electrónica',
+  'configuracion':'Configuración','usuarios':'Usuarios','administracion':'Administración','sri':'Fact. Electrónica',
 }
 const ALL_MODULOS = GRUPOS.flatMap(g => g.modulos)
 
