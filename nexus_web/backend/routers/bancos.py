@@ -183,11 +183,11 @@ def resumen_bancario(u=Depends(get_current_user)):
     return query_one("""
         SELECT
             (SELECT COUNT(*) FROM fin_cuentas_bancarias WHERE activa=true) as cuentas,
-            COALESCE(SUM(CASE WHEN m.tipo IN ('DEPOSITO_EFECTIVO','LOTE_TARJETA',
-                'TRANSFERENCIA_RECIBIDA') AND m.estado='CONCILIADO'
+            COALESCE(SUM(CASE WHEN m.tipo IN ('DEPOSITO','DEPOSITO_EFECTIVO','LOTE_TARJETA',
+                'TRANSFERENCIA_RECIBIDA')
                 THEN m.monto ELSE 0 END),0) as total_ingresos,
             COALESCE(SUM(CASE WHEN m.tipo IN ('PAGO_PROVEEDOR','OTRO')
-                AND m.estado='CONCILIADO' THEN m.monto ELSE 0 END),0) as total_egresos,
+                THEN m.monto ELSE 0 END),0) as total_egresos,
             COUNT(CASE WHEN m.estado='PENDIENTE' THEN 1 END) as pendientes
         FROM fin_movimientos_bancarios m
     """)
