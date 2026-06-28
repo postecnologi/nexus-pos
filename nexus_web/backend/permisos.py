@@ -44,6 +44,10 @@ MODULOS = [
     {"id": "usuarios",        "nombre": "Usuarios",               "grupo": "Sistema",    "icono": "Shield"},
     {"id": "sri",             "nombre": "Facturación Electrónica", "grupo": "Sistema",    "icono": "FileCheck"},
     {"id": "admin",           "nombre": "Administración",          "grupo": "Sistema",    "icono": "Server"},
+    {"id": "depositos",       "nombre": "Depósitos Bancarios",    "grupo": "Finanzas",   "icono": "ArrowUpCircle"},
+    {"id": "ordenes-compra",  "nombre": "Órdenes de Compra",      "grupo": "Compras",    "icono": "ClipboardList"},
+    {"id": "retenciones-emitidas",  "nombre": "Retenciones Emitidas",  "grupo": "Compras",   "icono": "FileCheck"},
+    {"id": "retenciones-recibidas", "nombre": "Retenciones Recibidas", "grupo": "Ventas",    "icono": "FileCheck"},
 ]
 
 def _todas_acciones():
