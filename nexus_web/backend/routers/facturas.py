@@ -43,9 +43,8 @@ def crear_factura(f: FacturaIn, u=Depends(get_current_user)):
     if not f.detalles:
         raise HTTPException(400, "La factura debe tener al menos un producto")
     # Validate plan limits
-    from database import get_current_db
     from multitenant import verificar_limite
-    ok, msg = verificar_limite(get_current_db(), 'facturas')
+    ok, msg = verificar_limite(u.get("empresa_db", ""), 'facturas')
     if not ok:
         raise HTTPException(403, msg)
     suc_id = f.sucursal_id or u.get("sucursal_id")
