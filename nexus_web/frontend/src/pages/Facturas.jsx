@@ -1493,12 +1493,12 @@ export default function Facturas({ modo = 'factura' }){
               display:'flex',alignItems:'center',gap:6,fontWeight:600}}>
             Recurrentes
           </button>}
-          {!esNotaVenta && <button onClick={()=>setModalReimp(true)}
+          <button onClick={()=>setModalReimp(true)}
             style={{padding:'8px 14px',borderRadius:8,border:`1px solid ${C.bord2}`,
               background:C.sur2,color:C.muted,cursor:'pointer',fontSize:12,
               display:'flex',alignItems:'center',gap:6,fontWeight:600}}>
             Reimprimir
-          </button>}
+          </button>
           {(items.length>0||cliente)&&(
             <button onClick={limpiar}
               style={{padding:'8px 14px',borderRadius:8,
