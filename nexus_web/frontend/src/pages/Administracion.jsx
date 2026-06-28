@@ -462,6 +462,65 @@ function TabAuditoria() {
 // ══════════════════════════════════════════════════════════════
 //  TAB: SISTEMA
 // ══════════════════════════════════════════════════════════════
+function PlanInfo() {
+  const C = useTheme()
+  const [plan, setPlan] = useState(null)
+  useEffect(() => {
+    api.get('/auth/mi-plan').then(r => { if (r.data && r.data.plan && r.data.plan !== 'Sin limite') setPlan(r.data) }).catch(() => {})
+  }, [])
+  if (!plan) return null
+
+  const barra = (actual, limite) => {
+    const pct = limite > 0 ? Math.min((actual / limite) * 100, 100) : 0
+    const color = pct >= 90 ? '#EF4444' : pct >= 70 ? '#F59E0B' : '#10B981'
+    return (
+      <div style={{ marginTop: 4 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: C.muted, marginBottom: 3 }}>
+          <span>{actual} / {limite >= 99999 ? 'Ilimitado' : limite.toLocaleString()}</span>
+          <span style={{ color, fontWeight: 700 }}>{limite >= 99999 ? '' : `${Math.round(pct)}%`}</span>
+        </div>
+        <div style={{ height: 6, borderRadius: 3, background: C.sur3 }}>
+          <div style={{ height: '100%', borderRadius: 3, background: color, width: `${pct}%`, transition: 'width .3s' }} />
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ background: C.sur2, borderRadius: 10, padding: 16, border: `1px solid ${C.bord2}`, marginTop: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 16 }}>📋</span>
+          <span style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Mi Plan</span>
+        </div>
+        <span style={{ padding: '3px 12px', borderRadius: 20, fontSize: 12, fontWeight: 700, background: '#7C3AED20', color: '#7C3AED' }}>{plan.plan}</span>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+        <div style={{ background: C.surface, borderRadius: 8, padding: 12, border: `1px solid ${C.border}` }}>
+          <div style={{ fontSize: 11, color: C.muted, fontWeight: 600 }}>Usuarios</div>
+          <div style={{ fontSize: 18, fontWeight: 800, color: C.text }}>{plan.usuarios.actual}</div>
+          {barra(plan.usuarios.actual, plan.usuarios.limite)}
+        </div>
+        <div style={{ background: C.surface, borderRadius: 8, padding: 12, border: `1px solid ${C.border}` }}>
+          <div style={{ fontSize: 11, color: C.muted, fontWeight: 600 }}>Productos</div>
+          <div style={{ fontSize: 18, fontWeight: 800, color: C.text }}>{plan.productos.actual}</div>
+          {barra(plan.productos.actual, plan.productos.limite)}
+        </div>
+        <div style={{ background: C.surface, borderRadius: 8, padding: 12, border: `1px solid ${C.border}` }}>
+          <div style={{ fontSize: 11, color: C.muted, fontWeight: 600 }}>Facturas / mes</div>
+          <div style={{ fontSize: 18, fontWeight: 800, color: C.text }}>{plan.facturas_mes.actual}</div>
+          {barra(plan.facturas_mes.actual, plan.facturas_mes.limite)}
+        </div>
+      </div>
+      {plan.vencimiento && (
+        <div style={{ marginTop: 10, fontSize: 12, color: C.muted, textAlign: 'center' }}>
+          Vencimiento: <strong style={{ color: C.text }}>{plan.vencimiento}</strong>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function TabSistema() {
   const C = useTheme()
   const [estado, setEstado] = useState(null)
@@ -617,6 +676,9 @@ function TabSistema() {
           </div>
         </div>
       )}
+
+      {/* Plan info */}
+      <PlanInfo />
 
       {/* Recent errors */}
       {errores.length > 0 && (
