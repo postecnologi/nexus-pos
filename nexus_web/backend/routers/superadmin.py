@@ -21,6 +21,7 @@ class EmpresaCreate(BaseModel):
     admin_password: str = ""
     dias_prueba: int = 15
     admin_email: str = ""
+    admin_telefono: str = ""
 
 
 # ── Login ──────────────────────────────────────────────────────
@@ -66,6 +67,7 @@ def crear_empresa(data: EmpresaCreate):
             admin_username=data.admin_username,
             admin_password=data.admin_password,
             admin_email=data.admin_email,
+            admin_telefono=data.admin_telefono,
         )
         # Set expiration date
         if data.dias_prueba > 0:

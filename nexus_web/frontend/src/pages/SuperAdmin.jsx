@@ -299,6 +299,11 @@ export default function SuperAdmin() {
                       <input value={newEmp.admin_email} onChange={e => setNewEmp({...newEmp, admin_email: e.target.value})}
                         placeholder="admin@empresa.com" type="email" style={inputStyle} />
                     </div>
+                    <div>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>Telefono admin</label>
+                      <input value={newEmp.admin_telefono||''} onChange={e => setNewEmp({...newEmp, admin_telefono: e.target.value})}
+                        placeholder="099 123 4567" style={inputStyle} />
+                    </div>
                   </div>
                   <button type="submit" disabled={creating} style={{
                     padding: '10px 24px', borderRadius: 8, border: 'none', cursor: 'pointer',

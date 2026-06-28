@@ -165,13 +165,15 @@ def cambiar_password(uid: int, body: CambioPassIn, u=Depends(requiere_rol("admin
 
 @router.delete("/{uid}")
 def eliminar_usuario(uid: int, u=Depends(requiere_rol("admin"))):
-    user = query_one("SELECT id, username FROM sys_usuarios WHERE id=%s", (uid,))
+    user = query_one("SELECT id, username, rol FROM sys_usuarios WHERE id=%s", (uid,))
     if not user:
         raise HTTPException(404, "Usuario no encontrado")
-    if user["username"] == "admin":
-        raise HTTPException(400, "No se puede eliminar el usuario administrador")
     if uid == u["id"]:
         raise HTTPException(400, "No puedes eliminarte a ti mismo")
+    if user.get("rol") == "admin":
+        otros_admin = query_one("SELECT COUNT(*) as n FROM sys_usuarios WHERE rol='admin' AND activo=true AND id!=%s", (uid,))
+        if not otros_admin or int(otros_admin["n"]) == 0:
+            raise HTTPException(400, "No se puede eliminar el unico administrador")
     execute("DELETE FROM sys_permisos_usuario WHERE usuario_id=%s", (uid,))
     execute("DELETE FROM sys_usuarios WHERE id=%s", (uid,))
     registrar_audit(u["id"], u.get("nombre",""), "ELIMINAR", "usuarios", f"Usuario eliminado: {user['username']}")
