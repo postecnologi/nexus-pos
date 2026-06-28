@@ -49,8 +49,6 @@ const pathToModule = {
 /* ── Permisos basados en modulos_permitidos del usuario ── */
 function canAccess(rol, path, modulosPermitidos) {
   const mod = pathToModule[path] || path.replace('/', '')
-  // Admin o sin lista de módulos → acceso total (backwards compatible)
-  if (rol === 'admin') return true
   if (!Array.isArray(modulosPermitidos)) return true
   return modulosPermitidos.includes(mod)
 }
