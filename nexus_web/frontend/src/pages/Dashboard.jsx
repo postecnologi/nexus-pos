@@ -206,9 +206,7 @@ export default function Dashboard() {
       <div style={{display:'flex',justifyContent:'space-between',
         alignItems:'flex-start',marginBottom:24}}>
         <div>
-          <h1 style={{margin:0,fontSize:26,fontWeight:900,
-            background:`linear-gradient(135deg,${C.blue},${C.purple})`,
-            WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>
+          <h1 style={{margin:0,fontSize:26,fontWeight:900,color:C.text}}>
             Dashboard
           </h1>
           <p style={{margin:'4px 0 0',color:C.muted,fontSize:13}}>
