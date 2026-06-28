@@ -42,9 +42,9 @@ function SriBadge({ estado }) {
   )
 }
 
-export default function Retenciones() {
+export default function Retenciones({ modo = 'ambas' }) {
   const C = useTheme()
-  const [tab, setTab] = useState('emitidas')
+  const [tab, setTab] = useState(modo === 'recibidas' ? 'recibidas' : 'emitidas')
   const [emitidas, setEmitidas] = useState([])
   const [recibidas, setRecibidas] = useState([])
   const [busqueda, setBusqueda] = useState('')
@@ -157,7 +157,7 @@ export default function Retenciones() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <FileCheck2 size={22} color={C.blue} />
-          <span style={{ fontSize: 20, fontWeight: 800, color: C.text }}>Retenciones SRI</span>
+          <span style={{ fontSize: 20, fontWeight: 800, color: C.text }}>{modo === 'emitidas' ? 'Retenciones Emitidas' : modo === 'recibidas' ? 'Retenciones Recibidas' : 'Retenciones SRI'}</span>
         </div>
         <button onClick={() => setShowModal(true)}
           style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 18px',
@@ -167,8 +167,8 @@ export default function Retenciones() {
         </button>
       </div>
 
-      {/* Tabs */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 16 }}>
+      {/* Tabs - only show if modo='ambas' */}
+      {modo === 'ambas' && <div style={{ display: 'flex', gap: 4, marginBottom: 16 }}>
         {['emitidas', 'recibidas'].map(t => (
           <button key={t} onClick={() => setTab(t)}
             style={{ padding: '8px 24px', borderRadius: '10px 10px 0 0', border: 'none',
@@ -180,7 +180,7 @@ export default function Retenciones() {
             {t === 'emitidas' ? 'Emitidas (a Proveedores)' : 'Recibidas (de Clientes)'}
           </button>
         ))}
-      </div>
+      </div>}
 
       {/* Filters */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>

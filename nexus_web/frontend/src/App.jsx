@@ -28,6 +28,8 @@ import TomaFisica from './pages/TomaFisica'
 import ServicioTecnico from './pages/ServicioTecnico'
 import CRM from './pages/CRM'
 import Retenciones from './pages/Retenciones'
+import RetencionesEmitidas from './pages/RetencionesEmitidas'
+import RetencionesRecibidas from './pages/RetencionesRecibidas'
 import NotasDebito from './pages/NotasDebito'
 import Contabilidad from './pages/Contabilidad'
 import Nomina from './pages/Nomina'
@@ -107,6 +109,8 @@ export default function App() {
           <Route path="/servicio-tecnico" element={<ServicioTecnico />} />
           <Route path="/crm" element={<CRM />} />
           <Route path="/retenciones" element={<Retenciones />} />
+          <Route path="/retenciones-emitidas" element={<RetencionesEmitidas />} />
+          <Route path="/retenciones-recibidas" element={<RetencionesRecibidas />} />
           <Route path="/notas-debito" element={<NotasDebito />} />
           <Route path="/contabilidad" element={<Contabilidad />} />
           <Route path="/nomina" element={<Nomina />} />
