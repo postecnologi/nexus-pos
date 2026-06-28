@@ -4,7 +4,7 @@ import {
   Landmark, Building2, GitMerge, ClipboardList, Tag, Warehouse, BarChart3,
   Truck, Award, Settings, LogOut, CreditCard, ChevronDown, ChevronRight,
   ShoppingCart, DollarSign, Box, ScrollText, ClipboardCheck, Sun, Moon, Wrench,
-  Target, FileCheck2, Calculator, ArrowUpCircle
+  Target, FileCheck2, Calculator, ArrowUpCircle, Receipt
 } from 'lucide-react'
 import { useState, useMemo, useEffect } from 'react'
 import { useThemeToggle } from '../theme'
@@ -15,6 +15,7 @@ const pathToModule = {
   '/':                'dashboard',
   '/caja':            'caja',
   '/facturas':        'facturas',
+  '/notas-venta':     'notas-venta',
   '/clientes':        'clientes',
   '/cxc':             'cxc',
   '/devoluciones':    'devoluciones',
@@ -68,6 +69,7 @@ const grupos = [
     items: [
       { to: '/caja',            icon: Landmark,    label: 'Caja'              },
       { to: '/facturas',        icon: FileText,    label: 'Facturas'          },
+      { to: '/notas-venta',     icon: Receipt,     label: 'Notas de Venta'    },
       { to: '/clientes',        icon: Users,       label: 'Clientes'          },
       { to: '/cxc',             icon: CreditCard,  label: 'CXC'               },
       { to: '/devoluciones',    icon: RotateCcw,   label: 'Devoluciones'      },

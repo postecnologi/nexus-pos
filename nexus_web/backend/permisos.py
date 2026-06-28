@@ -11,6 +11,7 @@ ACCIONES = ["ver", "crear", "editar", "eliminar"]
 MODULOS = [
     {"id": "dashboard",       "nombre": "Dashboard",              "grupo": "Principal",  "icono": "LayoutDashboard"},
     {"id": "facturas",        "nombre": "Facturación",            "grupo": "Ventas",     "icono": "FileText"},
+    {"id": "notas-venta",     "nombre": "Notas de Venta",         "grupo": "Ventas",     "icono": "Receipt"},
     {"id": "clientes",        "nombre": "Clientes",               "grupo": "Ventas",     "icono": "Users"},
     {"id": "cxc",             "nombre": "Cuentas por Cobrar",     "grupo": "Ventas",     "icono": "DollarSign"},
     {"id": "devoluciones",    "nombre": "Devoluciones",           "grupo": "Ventas",     "icono": "RotateCcw"},
