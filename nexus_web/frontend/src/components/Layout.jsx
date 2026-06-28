@@ -36,6 +36,7 @@ const pathToModule = {
   '/toma-fisica':     'toma-fisica',
   '/servicio-tecnico':'servicio-tecnico',
   '/crm':             'crm',
+  '/ordenes-compra':  'compras',
   '/retenciones':     'retenciones',
   '/retenciones-emitidas': 'retenciones',
   '/retenciones-recibidas': 'retenciones',
@@ -103,6 +104,7 @@ const grupos = [
     icon: Package,
     items: [
       { to: '/compras',         icon: Package,    label: 'Compras'              },
+      { to: '/ordenes-compra',  icon: ClipboardList, label: 'Ordenes de Compra'  },
     ]
   },
   {

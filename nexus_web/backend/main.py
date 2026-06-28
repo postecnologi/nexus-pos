@@ -13,7 +13,7 @@ from routers import (
     usuarios, reportes, kardex, cotizaciones, toma_fisica, servicio_tecnico,
     crm, retenciones, notas_debito, contabilidad,
     guias_remision, liquidaciones, nomina, admin, superadmin,
-    whatsapp, depositos, notas_venta,
+    whatsapp, depositos, notas_venta, ordenes_compra,
 )
 
 app = FastAPI(title="NEXUS POS API", version="2.0.0")
@@ -393,6 +393,40 @@ def run_migrations():
         )""",
         "CREATE INDEX IF NOT EXISTS idx_audit_fecha ON sys_audit_log(created_at DESC)",
         "CREATE INDEX IF NOT EXISTS idx_audit_usuario ON sys_audit_log(usuario_id)",
+        # ── Ordenes de Compra ──
+        """CREATE TABLE IF NOT EXISTS com_ordenes_compra (
+            id SERIAL PRIMARY KEY,
+            numero VARCHAR(30) NOT NULL,
+            proveedor_id INTEGER,
+            sucursal_id INTEGER,
+            bodega_id INTEGER,
+            fecha_emision DATE DEFAULT CURRENT_DATE,
+            fecha_vencimiento DATE,
+            plazo_dias INTEGER DEFAULT 30,
+            subtotal_0 NUMERIC(12,2) DEFAULT 0,
+            subtotal_iva NUMERIC(12,2) DEFAULT 0,
+            iva NUMERIC(12,2) DEFAULT 0,
+            total NUMERIC(12,2) DEFAULT 0,
+            descuento_global_pct NUMERIC(5,2) DEFAULT 0,
+            observaciones TEXT,
+            estado VARCHAR(20) DEFAULT 'PENDIENTE',
+            usuario_id INTEGER,
+            created_at TIMESTAMP DEFAULT NOW()
+        )""",
+        """CREATE TABLE IF NOT EXISTS com_orden_compra_detalles (
+            id SERIAL PRIMARY KEY,
+            orden_compra_id INTEGER REFERENCES com_ordenes_compra(id) ON DELETE CASCADE,
+            producto_id INTEGER,
+            descripcion TEXT,
+            cantidad NUMERIC(12,4),
+            precio_unitario NUMERIC(12,4),
+            descuento_pct NUMERIC(5,2) DEFAULT 0,
+            subtotal NUMERIC(12,2),
+            iva_porcentaje NUMERIC(5,2) DEFAULT 15,
+            iva_valor NUMERIC(12,2) DEFAULT 0,
+            total NUMERIC(12,2)
+        )""",
+        "ALTER TABLE sys_sucursales ADD COLUMN IF NOT EXISTS secuencial_orden_compra INTEGER DEFAULT 0",
         # ── Notas de Venta ──
         """CREATE TABLE IF NOT EXISTS ven_notas_venta (
             id SERIAL PRIMARY KEY,
@@ -545,6 +579,7 @@ app.include_router(admin.router)
 app.include_router(whatsapp.router)
 app.include_router(depositos.router)
 app.include_router(notas_venta.router)
+app.include_router(ordenes_compra.router)
 if MULTI_TENANT:
     app.include_router(superadmin.router)
 
