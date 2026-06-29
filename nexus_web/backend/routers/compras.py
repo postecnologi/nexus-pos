@@ -173,14 +173,16 @@ def crear_compra(f: CompraIn, u=Depends(get_current_user)):
         except Exception:
             costo_ant = 0.0
 
+        prod_info = query_one("SELECT descripcion FROM inv_productos WHERE id=%s", (det["producto_id"],))
+        desc_prod = prod_info["descripcion"] if prod_info else ""
         insert("""
             INSERT INTO com_compra_detalles
-                (compra_id, producto_id, cantidad, precio_unitario,
+                (compra_id, producto_id, descripcion, cantidad, precio_unitario,
                  descuento, subtotal, iva_porcentaje, iva_valor, total)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
         """, (
-            compra_id, det["producto_id"], cant, pu, dp,
-            linea, iv, iva_l, round(linea+iva_l, 2)
+            compra_id, det["producto_id"], det.get("descripcion", desc_prod),
+            cant, pu, dp, linea, iv, iva_l, round(linea+iva_l, 2)
         ))
 
         # Aumentar stock en bodega
