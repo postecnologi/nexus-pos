@@ -1750,6 +1750,27 @@ function TabReportes({ sty, t }) {
   const [periodo, setPeriodo] = useState(`${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`)
   const [reporte, setReporte] = useState(null)
   const [tipoReporte, setTipoReporte] = useState('')
+  const [utilAnio, setUtilAnio] = useState(hoy.getFullYear() - 1)
+  const [utilNeta, setUtilNeta] = useState('')
+  const [utilData, setUtilData] = useState(null)
+  const [utilCalc, setUtilCalc] = useState(false)
+
+  const calcularUtilidades = async () => {
+    if (!utilNeta || parseFloat(utilNeta) <= 0) { alert('Ingrese la utilidad neta'); return }
+    setUtilCalc(true)
+    try {
+      const r = await api.post(`/nomina/utilidades/calcular?anio=${utilAnio}&utilidad_neta=${parseFloat(utilNeta)}`)
+      setUtilData(r.data)
+    } catch (err) { alert(err.response?.data?.detail || 'Error') }
+    setUtilCalc(false)
+  }
+
+  const exportUtilPdf = async () => {
+    try {
+      const resp = await api.get(`/nomina/utilidades/pdf?anio=${utilAnio}&utilidad_neta=${parseFloat(utilNeta)}`, { responseType: 'blob' })
+      window.open(URL.createObjectURL(new Blob([resp.data], { type: resp.headers['content-type'] || 'text/html' })), '_blank')
+    } catch (e) { alert('Error al generar PDF') }
+  }
 
   const cargar = async (tipo) => {
     try {
@@ -1910,6 +1931,102 @@ function TabReportes({ sty, t }) {
             )}
           </table>
         </div>
+      )}
+
+      {/* ── UTILIDADES ── */}
+      <div style={{ ...sty.card, marginTop: 24 }}>
+        <h3 style={{ margin: '0 0 16px', fontSize: 14, fontWeight: 700, color: t.green }}>
+          <DollarSign size={16} style={{ verticalAlign: 'middle', marginRight: 6 }} />
+          Reparto de Utilidades (15%)
+        </h3>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+          <div>
+            <label style={sty.label}>Ano Fiscal</label>
+            <input type="number" value={utilAnio} onChange={e => setUtilAnio(parseInt(e.target.value))}
+              style={{ ...sty.input, width: 100 }} />
+          </div>
+          <div style={{ minWidth: 200 }}>
+            <label style={sty.label}>Utilidad Neta de la Empresa ($)</label>
+            <input type="number" value={utilNeta} onChange={e => setUtilNeta(e.target.value)}
+              style={sty.input} step="0.01" placeholder="Ej: 50000" />
+          </div>
+          <button onClick={calcularUtilidades} disabled={utilCalc} style={sty.btn(t.green)}>
+            <Calculator size={14} /> {utilCalc ? 'Calculando...' : 'Calcular'}
+          </button>
+          {utilData && (
+            <button onClick={exportUtilPdf} style={sty.btn(t.purple)}>
+              <Download size={14} /> PDF
+            </button>
+          )}
+        </div>
+        <p style={{ fontSize: 10, color: t.muted, marginTop: 8 }}>
+          Art. 97-100 Codigo del Trabajo: 10% por dias trabajados + 5% por cargas familiares
+        </p>
+      </div>
+
+      {utilData && (
+        <>
+          <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+            {[
+              { label: 'Utilidad Neta', value: fmtMoney(utilData.utilidad_neta), color: t.blue },
+              { label: '15% Total', value: fmtMoney(utilData.total_15_pct), color: t.green },
+              { label: '10% (dias)', value: fmtMoney(utilData.porcion_10_pct), color: t.purple },
+              { label: '5% (cargas)', value: fmtMoney(utilData.porcion_5_pct), color: t.amber },
+            ].map((s, i) => (
+              <div key={i} style={{
+                flex: 1, minWidth: 140, padding: '14px 20px', background: s.color + '15',
+                borderRadius: 10, border: `1px solid ${s.color}33`, textAlign: 'center',
+              }}>
+                <div style={{ fontSize: 11, color: t.muted, marginBottom: 4 }}>{s.label}</div>
+                <div style={{ fontSize: 20, fontWeight: 800, color: s.color }}>{s.value}</div>
+              </div>
+            ))}
+          </div>
+
+          <div style={sty.card}>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={sty.table}>
+                <thead>
+                  <tr>
+                    {['Empleado', 'Cedula', 'Cargo', 'Dias Trab.', 'Cargas', '10% Individual', '5% Individual', 'Total'].map(h =>
+                      <th key={h} style={sty.th}>{h}</th>
+                    )}
+                  </tr>
+                </thead>
+                <tbody>
+                  {utilData.empleados.map((e, i) => (
+                    <tr key={i}
+                      onMouseEnter={ev => ev.currentTarget.style.background = t.sur2}
+                      onMouseLeave={ev => ev.currentTarget.style.background = 'transparent'}>
+                      <td style={sty.td}><strong>{e.apellidos} {e.nombres}</strong></td>
+                      <td style={sty.td}>{e.cedula}</td>
+                      <td style={sty.td}>{e.cargo}</td>
+                      <td style={{ ...sty.td, textAlign: 'center' }}>{e.dias_trabajados}</td>
+                      <td style={{ ...sty.td, textAlign: 'center' }}>{e.cargas_familiares}</td>
+                      <td style={{ ...sty.td, textAlign: 'right' }}>{fmtMoney(e.utilidad_10)}</td>
+                      <td style={{ ...sty.td, textAlign: 'right' }}>{fmtMoney(e.utilidad_5)}</td>
+                      <td style={{ ...sty.td, textAlign: 'right', fontWeight: 700, color: t.green }}>{fmtMoney(e.utilidad_total)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr style={{ background: t.sur2 }}>
+                    <td colSpan={5} style={{ ...sty.td, fontWeight: 700, textAlign: 'right' }}>TOTAL REPARTIDO:</td>
+                    <td style={{ ...sty.td, fontWeight: 700, textAlign: 'right' }}>
+                      {fmtMoney(utilData.empleados.reduce((s, e) => s + e.utilidad_10, 0))}
+                    </td>
+                    <td style={{ ...sty.td, fontWeight: 700, textAlign: 'right' }}>
+                      {fmtMoney(utilData.empleados.reduce((s, e) => s + e.utilidad_5, 0))}
+                    </td>
+                    <td style={{ ...sty.td, fontWeight: 800, textAlign: 'right', color: t.green, fontSize: 14 }}>
+                      {fmtMoney(utilData.total_repartido)}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        </>
       )}
     </>
   )

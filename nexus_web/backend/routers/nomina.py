@@ -1779,6 +1779,178 @@ def get_horas_acumuladas(eid: int, u=Depends(get_current_user)):
 
 
 # ══════════════════════════════════════════════════════════════════
+#  UTILIDADES (15% reparto)
+# ══════════════════════════════════════════════════════════════════
+
+@router.post("/utilidades/calcular")
+def calcular_utilidades(anio: int, utilidad_neta: float, u=Depends(get_current_user)):
+    if utilidad_neta <= 0:
+        raise HTTPException(400, "La utilidad neta debe ser mayor a 0")
+
+    total_15 = round(utilidad_neta * 0.15, 2)
+    porcion_10 = round(utilidad_neta * 0.10, 2)
+    porcion_5 = round(utilidad_neta * 0.05, 2)
+
+    empleados = query("""
+        SELECT id, nombres, apellidos, cedula, cargo, departamento, salario_base,
+               fecha_ingreso, fecha_salida, activo, num_cargas_familiares
+        FROM nom_empleados
+        WHERE fecha_ingreso <= %s
+        AND (fecha_salida IS NULL OR fecha_salida >= %s)
+        ORDER BY apellidos, nombres
+    """, (f"{anio}-12-31", f"{anio}-01-01"))
+
+    if not empleados:
+        raise HTTPException(400, "No hay empleados para el periodo")
+
+    fecha_ini_anio = date(anio, 1, 1)
+    fecha_fin_anio = date(anio, 12, 31)
+
+    resultado = []
+    total_dias = 0
+    total_cargas = 0
+
+    for emp in empleados:
+        fi = emp["fecha_ingreso"]
+        if isinstance(fi, str):
+            fi = datetime.strptime(fi[:10], "%Y-%m-%d").date()
+        inicio = max(fi, fecha_ini_anio)
+
+        fs = emp.get("fecha_salida")
+        if fs:
+            if isinstance(fs, str):
+                fs = datetime.strptime(fs[:10], "%Y-%m-%d").date()
+            fin = min(fs, fecha_fin_anio)
+        else:
+            fin = fecha_fin_anio
+
+        dias = max(0, (fin - inicio).days + 1)
+        cargas = int(emp.get("num_cargas_familiares", 0) or 0)
+        cargas_calc = max(cargas, 1)
+
+        total_dias += dias
+        total_cargas += cargas_calc
+
+        resultado.append({
+            "empleado_id": emp["id"],
+            "nombres": emp["nombres"],
+            "apellidos": emp["apellidos"],
+            "cedula": emp["cedula"],
+            "cargo": emp.get("cargo", ""),
+            "departamento": emp.get("departamento", ""),
+            "salario_base": float(emp.get("salario_base", 0)),
+            "fecha_ingreso": str(emp["fecha_ingreso"])[:10],
+            "dias_trabajados": dias,
+            "cargas_familiares": cargas,
+            "cargas_calculo": cargas_calc,
+        })
+
+    for r in resultado:
+        r["utilidad_10"] = round((r["dias_trabajados"] / total_dias) * porcion_10, 2) if total_dias > 0 else 0
+        r["utilidad_5"] = round((r["cargas_calculo"] / total_cargas) * porcion_5, 2) if total_cargas > 0 else 0
+        r["utilidad_total"] = round(r["utilidad_10"] + r["utilidad_5"], 2)
+
+    return {
+        "anio": anio,
+        "utilidad_neta": utilidad_neta,
+        "total_15_pct": total_15,
+        "porcion_10_pct": porcion_10,
+        "porcion_5_pct": porcion_5,
+        "total_empleados": len(resultado),
+        "total_dias": total_dias,
+        "total_cargas": total_cargas,
+        "empleados": resultado,
+        "total_repartido": round(sum(r["utilidad_total"] for r in resultado), 2),
+    }
+
+
+@router.get("/utilidades/pdf")
+def utilidades_pdf(anio: int, utilidad_neta: float, u=Depends(get_current_user)):
+    data = calcular_utilidades(anio, utilidad_neta, u)
+    cfg = query_one("SELECT * FROM sys_empresas LIMIT 1") or {}
+    empresa = cfg.get("nombre_comercial", "") or cfg.get("razon_social", "EMPRESA")
+    ruc = cfg.get("ruc", "")
+
+    rows_html = ""
+    for r in data["empleados"]:
+        rows_html += f"""<tr>
+            <td>{r['apellidos']} {r['nombres']}</td>
+            <td>{r['cedula']}</td>
+            <td>{r['cargo']}</td>
+            <td style="text-align:center">{r['dias_trabajados']}</td>
+            <td style="text-align:center">{r['cargas_familiares']}</td>
+            <td style="text-align:right">${r['utilidad_10']:.2f}</td>
+            <td style="text-align:right">${r['utilidad_5']:.2f}</td>
+            <td style="text-align:right;font-weight:bold">${r['utilidad_total']:.2f}</td>
+        </tr>"""
+
+    html = f"""<!DOCTYPE html><html><head><meta charset="utf-8">
+    <title>Reparto de Utilidades {data['anio']}</title>
+    <style>
+        body {{ font-family: Arial, sans-serif; font-size: 11px; margin: 25px; color: #333; }}
+        h2 {{ text-align: center; margin-bottom: 2px; }}
+        h3 {{ text-align: center; color: #555; margin-top: 2px; }}
+        .resumen {{ display: flex; justify-content: space-between; margin: 16px 0; padding: 12px; background: #f0f4ff; border-radius: 6px; }}
+        .resumen div {{ text-align: center; }}
+        .resumen .val {{ font-size: 16px; font-weight: bold; color: #2563EB; }}
+        table {{ width: 100%; border-collapse: collapse; margin-top: 12px; }}
+        th {{ background: #1e40af; color: white; padding: 6px 8px; text-align: left; font-size: 10px; }}
+        td {{ padding: 5px 8px; border-bottom: 1px solid #ddd; font-size: 10px; }}
+        tr:nth-child(even) {{ background: #f8f9fa; }}
+        .totals td {{ font-weight: bold; border-top: 2px solid #333; background: #e8f0fe; }}
+        .firmas {{ margin-top: 50px; display: flex; justify-content: space-between; }}
+        .firma {{ text-align: center; width: 40%; }}
+        .firma .linea {{ border-top: 1px solid #333; padding-top: 6px; margin-top: 50px; }}
+        .footer {{ text-align: center; margin-top: 20px; font-size: 9px; color: #999; }}
+        .legal {{ font-size: 9px; color: #666; margin-top: 12px; }}
+    </style></head><body>
+    <h2>{empresa}</h2>
+    <h3>REPARTO DE UTILIDADES - ANO {data['anio']}</h3>
+    <p style="text-align:center; font-size:10px; color:#666;">RUC: {ruc} | Art. 97-100 Codigo del Trabajo</p>
+
+    <div class="resumen">
+        <div><div style="font-size:9px;color:#666">Utilidad Neta</div><div class="val">${data['utilidad_neta']:,.2f}</div></div>
+        <div><div style="font-size:9px;color:#666">15% Total</div><div class="val">${data['total_15_pct']:,.2f}</div></div>
+        <div><div style="font-size:9px;color:#666">10% (por dias)</div><div class="val">${data['porcion_10_pct']:,.2f}</div></div>
+        <div><div style="font-size:9px;color:#666">5% (por cargas)</div><div class="val">${data['porcion_5_pct']:,.2f}</div></div>
+        <div><div style="font-size:9px;color:#666">Empleados</div><div class="val">{data['total_empleados']}</div></div>
+    </div>
+
+    <table>
+    <thead><tr>
+        <th>Empleado</th><th>Cedula</th><th>Cargo</th>
+        <th>Dias Trab.</th><th>Cargas</th>
+        <th>10% Individual</th><th>5% Individual</th><th>Total</th>
+    </tr></thead>
+    <tbody>{rows_html}</tbody>
+    <tfoot><tr class="totals">
+        <td colspan="5" style="text-align:right">TOTAL REPARTIDO:</td>
+        <td style="text-align:right">${sum(r['utilidad_10'] for r in data['empleados']):.2f}</td>
+        <td style="text-align:right">${sum(r['utilidad_5'] for r in data['empleados']):.2f}</td>
+        <td style="text-align:right">${data['total_repartido']:,.2f}</td>
+    </tr></tfoot>
+    </table>
+
+    <p class="legal">
+        * El 10% se distribuye por igual segun dias trabajados en el periodo.
+        El 5% se distribuye segun cargas familiares (minimo 1 carga por empleado sin cargas registradas).
+        Base legal: Art. 97-100 del Codigo del Trabajo del Ecuador.
+    </p>
+
+    <div class="firmas">
+        <div class="firma"><div class="linea">REPRESENTANTE LEGAL<br/>Nombre: ___________________</div></div>
+        <div class="firma"><div class="linea">CONTADOR<br/>Nombre: ___________________</div></div>
+    </div>
+
+    <p class="footer">Documento generado por NEXUS IA - {datetime.now().strftime('%Y-%m-%d %H:%M')}</p>
+    </body></html>"""
+
+    buf = io.BytesIO(html.encode("utf-8"))
+    return StreamingResponse(buf, media_type="text/html",
+        headers={"Content-Disposition": f'inline; filename="utilidades_{data["anio"]}.html"'})
+
+
+# ══════════════════════════════════════════════════════════════════
 #  PORTAL DEL EMPLEADO
 # ══════════════════════════════════════════════════════════════════
 
