@@ -1815,6 +1815,9 @@ function TabReportes({ sty, t }) {
         <button onClick={() => cargar('provisiones')} style={sty.btn(t.amber)}>
           <FileText size={14} /> Provisiones
         </button>
+        <button onClick={() => { setTipoReporte('utilidades'); setReporte(null); cargarResumen(utilAnio) }} style={sty.btn(t.green)}>
+          <DollarSign size={14} /> Utilidades
+        </button>
       </div>
 
       {reporte && tipoReporte === 'planilla' && (
@@ -1947,45 +1950,44 @@ function TabReportes({ sty, t }) {
         </div>
       )}
 
-      {/* ── UTILIDADES ── */}
-      <div style={{ ...sty.card, marginTop: 24 }}>
-        <h3 style={{ margin: '0 0 16px', fontSize: 14, fontWeight: 700, color: t.green }}>
-          <DollarSign size={16} style={{ verticalAlign: 'middle', marginRight: 6 }} />
-          Reparto de Utilidades (15%)
-        </h3>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-          <div>
-            <label style={sty.label}>Ano Fiscal</label>
-            <input type="number" value={utilAnio} onChange={e => setUtilAnio(parseInt(e.target.value))}
-              style={{ ...sty.input, width: 100 }} />
-          </div>
-          <button onClick={() => cargarResumen(utilAnio)} disabled={loadingResumen}
-            style={sty.btn(t.blue)}>
-            <RefreshCw size={14} /> {loadingResumen ? 'Cargando...' : 'Calcular desde Sistema'}
-          </button>
-          <div style={{ minWidth: 200 }}>
-            <label style={sty.label}>Utilidad Neta ($)
-              {resumenFin && <span style={{ fontWeight: 400, color: t.muted }}> (auto-calculada)</span>}
-            </label>
-            <input type="number" value={utilNeta} onChange={e => setUtilNeta(e.target.value)}
-              style={sty.input} step="0.01" placeholder="Se calcula automaticamente" />
-          </div>
-          <button onClick={calcularUtilidades} disabled={utilCalc} style={sty.btn(t.green)}>
-            <Calculator size={14} /> {utilCalc ? 'Calculando...' : 'Repartir'}
-          </button>
-          {utilData && (
-            <button onClick={exportUtilPdf} style={sty.btn(t.purple)}>
-              <Download size={14} /> PDF
+      {tipoReporte === 'utilidades' && (
+        <>
+        <div style={sty.card}>
+          <h3 style={{ margin: '0 0 16px', fontSize: 14, fontWeight: 700, color: t.green }}>
+            <DollarSign size={16} style={{ verticalAlign: 'middle', marginRight: 6 }} />
+            Reparto de Utilidades (15%) - Art. 97-100 Codigo del Trabajo
+          </h3>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+            <div>
+              <label style={sty.label}>Ano Fiscal</label>
+              <input type="number" value={utilAnio} onChange={e => { setUtilAnio(parseInt(e.target.value)); setResumenFin(null); setUtilData(null) }}
+                style={{ ...sty.input, width: 100 }} />
+            </div>
+            <button onClick={() => cargarResumen(utilAnio)} disabled={loadingResumen}
+              style={sty.btn(t.blue)}>
+              <RefreshCw size={14} /> {loadingResumen ? 'Cargando...' : 'Calcular desde Contabilidad'}
             </button>
-          )}
+            <div style={{ minWidth: 200 }}>
+              <label style={sty.label}>Utilidad Neta ($)
+                {resumenFin && resumenFin.tiene_datos && <span style={{ fontWeight: 400, color: t.green }}> (desde contabilidad)</span>}
+              </label>
+              <input type="number" value={utilNeta} onChange={e => setUtilNeta(e.target.value)}
+                style={sty.input} step="0.01" placeholder="Presione Calcular" />
+            </div>
+            <button onClick={calcularUtilidades} disabled={utilCalc || !utilNeta} style={sty.btn(t.green)}>
+              <Calculator size={14} /> {utilCalc ? 'Calculando...' : 'Repartir a Empleados'}
+            </button>
+            {utilData && (
+              <button onClick={exportUtilPdf} style={sty.btn(t.purple)}>
+                <Download size={14} /> PDF
+              </button>
+            )}
+          </div>
         </div>
-        <p style={{ fontSize: 10, color: t.muted, marginTop: 8 }}>
-          Art. 97-100 Codigo del Trabajo: 10% por dias trabajados + 5% por cargas familiares.
-          Presione "Calcular desde Sistema" para obtener la utilidad neta automaticamente.
-        </p>
-      </div>
+        </>
+      )}
 
-      {resumenFin && !resumenFin.tiene_datos && (
+      {tipoReporte === 'utilidades' && resumenFin && !resumenFin.tiene_datos && (
         <div style={{ ...sty.card, background: t.amberD, border: `1px solid ${t.amber}44` }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: t.amber }}>
             <AlertTriangle size={20} />
@@ -2000,7 +2002,7 @@ function TabReportes({ sty, t }) {
         </div>
       )}
 
-      {resumenFin && resumenFin.tiene_datos && (
+      {tipoReporte === 'utilidades' && resumenFin && resumenFin.tiene_datos && (
         <div style={sty.card}>
           <div style={{ fontSize: 13, fontWeight: 700, color: t.blue, marginBottom: 4 }}>
             Estado de Resultados {resumenFin.anio}
@@ -2079,7 +2081,7 @@ function TabReportes({ sty, t }) {
         </div>
       )}
 
-      {utilData && (
+      {tipoReporte === 'utilidades' && utilData && (
         <>
           <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
             {[
