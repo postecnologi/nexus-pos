@@ -857,6 +857,8 @@ function TabSolicitudes({ sa }) {
   const [crearMsg, setCrearMsg] = useState('')
   const [creando, setCreando] = useState(false)
 
+  const [filtroEstado, setFiltroEstado] = useState('activas')
+
   useEffect(() => { if (sa) sa.get('/superadmin/solicitudes').then(r => setData(r.data)).catch(() => {}) }, [])
 
   const marcar = async (id, estado) => {
@@ -866,6 +868,19 @@ function TabSolicitudes({ sa }) {
       setData(d => d.map(s => s.id === id ? { ...s, estado } : s))
     } catch {}
   }
+
+  const eliminar = async (id) => {
+    if (!confirm('Eliminar esta solicitud?')) return
+    try {
+      await sa.delete(`/superadmin/solicitudes/${id}`)
+      setData(d => d.filter(s => s.id !== id))
+    } catch {}
+  }
+
+  const filtered = filtroEstado === 'activas'
+    ? data.filter(s => s.estado !== 'DESCARTADA' && s.estado !== 'CONVERTIDA')
+    : filtroEstado === 'todas' ? data
+    : data.filter(s => s.estado === filtroEstado)
 
   const crearEmpresa = async () => {
     if (!crearForm.admin_username || !crearForm.admin_password) {
@@ -891,10 +906,21 @@ function TabSolicitudes({ sa }) {
 
   return (
     <div style={{ background: 'white', borderRadius: 12, overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,.08)' }}>
-      <div style={{ padding: '16px 20px', borderBottom: '1px solid #E5E7EB', fontWeight: 700, fontSize: 16, color: '#111827' }}>
-        Solicitudes de prueba gratuita ({data.length})
+      <div style={{ padding: '16px 20px', borderBottom: '1px solid #E5E7EB', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span style={{ fontWeight: 700, fontSize: 16, color: '#111827' }}>
+          Solicitudes ({filtered.length} de {data.length})
+        </span>
+        <select value={filtroEstado} onChange={e => setFiltroEstado(e.target.value)}
+          style={{ padding: '5px 10px', borderRadius: 6, border: '1px solid #D1D5DB', fontSize: 12 }}>
+          <option value="activas">Activas (nuevas + contactadas)</option>
+          <option value="NUEVA">Solo Nuevas</option>
+          <option value="CONTACTADA">Solo Contactadas</option>
+          <option value="CONVERTIDA">Convertidas</option>
+          <option value="DESCARTADA">Descartadas</option>
+          <option value="todas">Todas</option>
+        </select>
       </div>
-      {data.length === 0 ? (
+      {filtered.length === 0 ? (
         <div style={{ padding: 40, textAlign: 'center', color: '#9CA3AF' }}>No hay solicitudes todavia</div>
       ) : (
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
@@ -906,7 +932,7 @@ function TabSolicitudes({ sa }) {
             </tr>
           </thead>
           <tbody>
-            {data.map(s => (
+            {filtered.map(s => (
               <tr key={s.id} style={{ borderBottom: '1px solid #F1F5F9' }}>
                 <td style={{ padding: '10px 12px', fontSize: 12, color: '#374151' }}>{String(s.created_at).slice(0, 10)}</td>
                 <td style={{ padding: '10px 12px', fontWeight: 700, color: '#111827' }}>{s.empresa_nombre}</td>
@@ -932,12 +958,22 @@ function TabSolicitudes({ sa }) {
                         Contactada
                       </button>
                     )}
-                    {s.estado !== 'CONVERTIDA' && (
+                    {s.estado !== 'CONVERTIDA' && s.estado !== 'DESCARTADA' && (
                       <button onClick={() => { setCrearPara(s); setCrearForm({ admin_username: '', admin_password: '' }); setCrearMsg('') }}
                         style={{ padding: '3px 8px', borderRadius: 6, border: 'none', background: '#7C3AED', color: 'white', cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>
                         Crear Empresa
                       </button>
                     )}
+                    {s.estado !== 'CONVERTIDA' && s.estado !== 'DESCARTADA' && (
+                      <button onClick={() => marcar(s.id, 'DESCARTADA')}
+                        style={{ padding: '3px 8px', borderRadius: 6, border: 'none', background: '#F3F4F6', color: '#6B7280', cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>
+                        Descartar
+                      </button>
+                    )}
+                    <button onClick={() => eliminar(s.id)}
+                      style={{ padding: '3px 8px', borderRadius: 6, border: 'none', background: '#FEE2E2', color: '#991B1B', cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>
+                      Eliminar
+                    </button>
                   </div>
                 </td>
               </tr>
