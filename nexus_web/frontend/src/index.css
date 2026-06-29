@@ -263,3 +263,72 @@ select { cursor: pointer; }
     padding: 8px !important;
   }
 }
+
+/* ── Facturacion mobile fixes ── */
+@media (max-width: 768px) {
+  /* Topbar: wrap buttons */
+  [style*="height:56px"], [style*="height: 56px"] {
+    height: auto !important;
+    min-height: 56px;
+    flex-wrap: wrap !important;
+    padding: 8px 12px !important;
+    gap: 6px !important;
+  }
+
+  /* Factura two-column layout (products + summary): stack */
+  [style*="flex:1"][style*="overflow"] {
+    min-width: 0 !important;
+  }
+
+  /* Resumen panel on right side: full width below */
+  [style*="width:320px"], [style*="width: 320px"],
+  [style*="width:340px"], [style*="width: 340px"],
+  [style*="width:300px"], [style*="width: 300px"] {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* Product search and detail table scroll */
+  [style*="overflow:hidden"] {
+    overflow: auto !important;
+  }
+
+  /* Modal tabs: scroll horizontally */
+  [style*="display:'flex'"][style*="gap:4"],
+  [style*="display: 'flex'"][style*="gap: 4"],
+  [style*="display:'flex'"][style*="gap:6"],
+  [style*="display: 'flex'"][style*="gap: 6"] {
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  /* Modal content: scrollable */
+  [style*="maxHeight:'85vh'"], [style*="maxHeight: '85vh'"],
+  [style*="max-height: 85vh"], [style*="maxHeight:'80vh'"],
+  [style*="max-height: 80vh"] {
+    max-height: 85vh !important;
+    overflow-y: auto !important;
+  }
+
+  /* Factura body: stack on mobile */
+  .factura-body {
+    grid-template-columns: 1fr !important;
+    grid-template-rows: auto auto !important;
+  }
+
+  /* Compras body same */
+  [style*="gridTemplateColumns:'1fr 280px'"],
+  [style*="grid-template-columns: 1fr 280px"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Table fixed layout: auto on mobile */
+  table[style*="tableLayout:'fixed'"],
+  table[style*="table-layout: fixed"] {
+    table-layout: auto !important;
+    display: block !important;
+    overflow-x: auto !important;
+  }
+}

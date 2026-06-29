@@ -1575,7 +1575,7 @@ export default function Facturas({ modo = 'factura' }){
       )}
 
       {/* ── CUERPO ── */}
-      <div style={{flex:1,display:'grid',gridTemplateColumns:'1fr 280px',gap:12,padding:12,minHeight:0}}>
+      <div className="factura-body" style={{flex:1,display:'grid',gridTemplateColumns:'1fr 280px',gap:12,padding:12,minHeight:0}}>
 
         {/* Tabla */}
         <div style={{background:C.surface,borderRadius:12,border:`1px solid ${C.bord2}`,
