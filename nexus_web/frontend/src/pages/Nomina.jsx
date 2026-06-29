@@ -869,7 +869,7 @@ function TabPermisos({ sty, t }) {
   const [permisos, setPermisos] = useState([])
   const [empleados, setEmpleados] = useState([])
   const [tiposPermiso, setTiposPermiso] = useState([])
-  const [filtroEmp, setFiltroEmp] = useState('')
+  const [busqueda, setBusqueda] = useState('')
   const [filtroEstado, setFiltroEstado] = useState('')
   const [fechaIni, setFechaIni] = useState('')
   const [fechaFin, setFechaFin] = useState('')
@@ -877,12 +877,11 @@ function TabPermisos({ sty, t }) {
 
   const load = useCallback(() => {
     const params = {}
-    if (filtroEmp) params.empleado_id = filtroEmp
     if (filtroEstado) params.estado = filtroEstado
     if (fechaIni) params.fecha_ini = fechaIni
     if (fechaFin) params.fecha_fin = fechaFin
     api.get('/nomina/permisos', { params }).then(r => setPermisos(r.data)).catch(() => {})
-  }, [filtroEmp, filtroEstado, fechaIni, fechaFin])
+  }, [filtroEstado, fechaIni, fechaFin])
 
   useEffect(() => { load() }, [load])
   useEffect(() => {
@@ -907,22 +906,38 @@ function TabPermisos({ sty, t }) {
     } catch (err) { alert(err.response?.data?.detail || 'Error') }
   }
 
-  const solicitados = permisos.filter(p => p.estado === 'SOLICITADO').length
-  const aprobados = permisos.filter(p => p.estado === 'APROBADO').length
-  const rechazados = permisos.filter(p => p.estado === 'RECHAZADO').length
+  const filtered = busqueda
+    ? permisos.filter(p => `${p.apellidos} ${p.nombres} ${p.cedula} ${p.tipo} ${p.motivo}`.toLowerCase().includes(busqueda.toLowerCase()))
+    : permisos
+
+  const solicitados = filtered.filter(p => p.estado === 'SOLICITADO').length
+  const aprobados = filtered.filter(p => p.estado === 'APROBADO').length
+  const rechazados = filtered.filter(p => p.estado === 'RECHAZADO').length
+
+  const exportPdf = async () => {
+    try {
+      const params = {}
+      if (filtroEstado) params.estado = filtroEstado
+      if (fechaIni) params.fecha_ini = fechaIni
+      if (fechaFin) params.fecha_fin = fechaFin
+      const resp = await api.get('/nomina/permisos/reporte-pdf', { params, responseType: 'blob' })
+      const ct = resp.headers['content-type'] || 'text/html'
+      window.open(URL.createObjectURL(new Blob([resp.data], { type: ct })), '_blank')
+    } catch (e) { alert('Error al generar reporte') }
+  }
 
   return (
     <>
       {/* Filter bar */}
       <div style={{ ...sty.card, display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-        <div style={{ minWidth: 180 }}>
-          <label style={sty.label}>Empleado</label>
-          <select value={filtroEmp} onChange={e => setFiltroEmp(e.target.value)} style={sty.select}>
-            <option value="">Todos</option>
-            {empleados.map(e => <option key={e.id} value={e.id}>{e.apellidos} {e.nombres}</option>)}
-          </select>
+        <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
+          <label style={sty.label}>Buscar</label>
+          <Search size={14} style={{ position: 'absolute', left: 10, top: 28, color: t.muted }} />
+          <input placeholder="Buscar por nombre, cedula, tipo, motivo..."
+            value={busqueda} onChange={e => setBusqueda(e.target.value)}
+            style={{ ...sty.input, paddingLeft: 32 }} />
         </div>
-        <div style={{ minWidth: 140 }}>
+        <div style={{ minWidth: 130 }}>
           <label style={sty.label}>Estado</label>
           <select value={filtroEstado} onChange={e => setFiltroEstado(e.target.value)} style={sty.select}>
             <option value="">Todos</option>
@@ -931,27 +946,16 @@ function TabPermisos({ sty, t }) {
             <option value="RECHAZADO">Rechazados</option>
           </select>
         </div>
-        <div style={{ minWidth: 140 }}>
+        <div style={{ minWidth: 130 }}>
           <label style={sty.label}>Desde</label>
           <input type="date" value={fechaIni} onChange={e => setFechaIni(e.target.value)} style={sty.input} />
         </div>
-        <div style={{ minWidth: 140 }}>
+        <div style={{ minWidth: 130 }}>
           <label style={sty.label}>Hasta</label>
           <input type="date" value={fechaFin} onChange={e => setFechaFin(e.target.value)} style={sty.input} />
         </div>
-        <button onClick={async () => {
-          try {
-            const params = {}
-            if (filtroEmp) params.empleado_id = filtroEmp
-            if (filtroEstado) params.estado = filtroEstado
-            if (fechaIni) params.fecha_ini = fechaIni
-            if (fechaFin) params.fecha_fin = fechaFin
-            const resp = await api.get('/nomina/permisos/reporte-pdf', { params, responseType: 'blob' })
-            const ct = resp.headers['content-type'] || 'text/html'
-            window.open(URL.createObjectURL(new Blob([resp.data], { type: ct })), '_blank')
-          } catch (e) { alert('Error al generar reporte') }
-        }} style={sty.btn(t.purple)}>
-          <Download size={14} /> Exportar PDF
+        <button onClick={exportPdf} style={sty.btn(t.purple)}>
+          <Download size={14} /> PDF
         </button>
         <button onClick={() => setModal(true)} style={sty.btn()}>
           <Plus size={14} /> Solicitar Permiso
@@ -986,7 +990,7 @@ function TabPermisos({ sty, t }) {
             </tr>
           </thead>
           <tbody>
-            {permisos.map(p => (
+            {filtered.map(p => (
               <tr key={p.id}
                 onMouseEnter={ev => ev.currentTarget.style.background = t.sur2}
                 onMouseLeave={ev => ev.currentTarget.style.background = 'transparent'}>
@@ -1027,7 +1031,7 @@ function TabPermisos({ sty, t }) {
                 </td>
               </tr>
             ))}
-            {!permisos.length && (
+            {!filtered.length && (
               <tr><td colSpan={8} style={{ ...sty.td, textAlign: 'center', color: t.muted, padding: 30 }}>
                 No hay permisos registrados
               </td></tr>
