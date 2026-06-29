@@ -1960,7 +1960,7 @@ function TabReportes({ sty, t }) {
           <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
             <div>
               <label style={sty.label}>Ano Fiscal</label>
-              <input type="number" value={utilAnio} onChange={e => { setUtilAnio(parseInt(e.target.value)); setResumenFin(null); setUtilData(null) }}
+              <input type="number" value={utilAnio} onChange={e => { setUtilAnio(parseInt(e.target.value)); setResumenFin(null); setUtilData(null); setUtilNeta('') }}
                 style={{ ...sty.input, width: 100 }} />
             </div>
             <button onClick={() => cargarResumen(utilAnio)} disabled={loadingResumen}
