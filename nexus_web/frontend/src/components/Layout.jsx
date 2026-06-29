@@ -1,4 +1,4 @@
-import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
+import { Outlet, NavLink, useNavigate, useLocation, Navigate } from 'react-router-dom'
 import {
   LayoutDashboard, Package, Users, FileText, RotateCcw, ArrowLeftRight,
   Landmark, Building2, GitMerge, ClipboardList, Tag, Warehouse, BarChart3,
@@ -173,6 +173,8 @@ export default function Layout() {
   const user              = JSON.parse(localStorage.getItem('nexus_user') || '{}')
   const rol               = (user.rol || 'admin').toLowerCase()
   const modulosPermitidos = user.modulos_permitidos
+
+  if (rol === 'empleado') return <Navigate to="/portal-empleado" replace />
 
   // Filtrar sidebar según modulos_permitidos del usuario
   const gruposFiltrados = useMemo(() => {

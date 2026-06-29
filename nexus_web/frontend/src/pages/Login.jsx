@@ -19,7 +19,8 @@ export default function Login() {
       const { data } = await api.post('/auth/login', body)
       localStorage.setItem('nexus_token', data.access_token)
       localStorage.setItem('nexus_user',  JSON.stringify(data.user))
-      window.location.href = '/dashboard'
+      const rol = (data.user?.rol || '').toLowerCase()
+      window.location.href = rol === 'empleado' ? '/portal-empleado' : '/dashboard'
     } catch (err) {
       setError(err.response?.data?.detail || 'Error de conexion')
     } finally {

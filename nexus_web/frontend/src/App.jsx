@@ -45,6 +45,7 @@ import Landing from './pages/Landing'
 import Registro from './pages/Registro'
 import Legal from './pages/Legal'
 import Manual from './pages/Manual'
+import PortalEmpleado from './pages/PortalEmpleado'
 
 function useAuth() {
   return !!localStorage.getItem('nexus_token')
@@ -58,7 +59,11 @@ function PrivateRoute({ children }) {
 
 function PublicRoute({ children }) {
   const auth = useAuth()
-  if (auth) return <Navigate to="/dashboard" replace />
+  if (auth) {
+    const user = JSON.parse(localStorage.getItem('nexus_user') || '{}')
+    const rol = (user.rol || '').toLowerCase()
+    return <Navigate to={rol === 'empleado' ? '/portal-empleado' : '/dashboard'} replace />
+  }
   return children
 }
 
@@ -76,6 +81,11 @@ export default function App() {
         <Route path="/manual" element={<Manual />} />
         <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
         <Route path="/superadmin" element={<SuperAdmin />} />
+
+        {/* Portal Empleado - outside Layout */}
+        <Route path="/portal-empleado" element={
+          <PrivateRoute><PortalEmpleado /></PrivateRoute>
+        } />
 
         {/* Print - outside Layout */}
         <Route path="/facturas/:id/print" element={

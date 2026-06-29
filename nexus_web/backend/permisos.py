@@ -148,6 +148,13 @@ PLANTILLAS_ROL = {
             "clientes": ["ver", "crear"],
         },
     },
+    "empleado": {
+        "nombre": "Empleado",
+        "descripcion": "Portal de empleado: roles de pago, vacaciones y permisos",
+        "permisos": {
+            "portal-empleado": ["ver", "crear"],
+        },
+    },
 }
 
 

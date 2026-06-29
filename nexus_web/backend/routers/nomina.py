@@ -1616,3 +1616,114 @@ def get_horas_acumuladas(eid: int, u=Depends(get_current_user)):
         "dias_descontados": acum['dias_descontados'],
         "horas_para_proximo_dia": round(8 - horas, 2) if horas < 8 else 0,
     }
+
+
+# ══════════════════════════════════════════════════════════════════
+#  PORTAL DEL EMPLEADO
+# ══════════════════════════════════════════════════════════════════
+
+def _get_empleado_by_user(user_id):
+    emp = query_one("SELECT * FROM nom_empleados WHERE usuario_id=%s AND activo=true", (user_id,))
+    if not emp:
+        raise HTTPException(404, "No tiene un perfil de empleado vinculado")
+    return emp
+
+@router.get("/portal/mi-perfil")
+def portal_mi_perfil(u=Depends(get_current_user)):
+    emp = _get_empleado_by_user(u["id"])
+    years = _years_worked(emp["fecha_ingreso"])
+    vac_days = _vacation_days(years)
+    taken = query_one(
+        "SELECT COALESCE(SUM(dias_tomados),0) as total FROM nom_vacaciones WHERE empleado_id=%s AND estado='APROBADA'",
+        (emp["id"],))
+    total_taken = _float(taken["total"]) if taken else 0
+    total_derecho = vac_days * max(1, int(years)) if years >= 1 else 0
+    permisos_desc = query_one("SELECT COALESCE(dias_descontados,0) as d FROM nom_horas_acumuladas WHERE empleado_id=%s", (emp["id"],))
+    dias_permisos = int(permisos_desc['d']) if permisos_desc else 0
+    disponibles = max(0, total_derecho - total_taken - dias_permisos)
+
+    return {
+        **{k: v for k, v in emp.items() if k != 'password_hash'},
+        "anos_servicio": round(years, 2),
+        "dias_vacaciones_disponibles": disponibles,
+        "dias_vacaciones_tomados": total_taken,
+        "dias_por_permisos": dias_permisos,
+    }
+
+@router.get("/portal/mis-roles")
+def portal_mis_roles(u=Depends(get_current_user)):
+    emp = _get_empleado_by_user(u["id"])
+    return query("""
+        SELECT * FROM nom_roles_pago
+        WHERE empleado_id=%s AND estado='APROBADO'
+        ORDER BY periodo DESC
+    """, (emp["id"],))
+
+@router.get("/portal/mis-roles/{rid}/pdf")
+def portal_mi_rol_pdf(rid: int, u=Depends(get_current_user)):
+    emp = _get_empleado_by_user(u["id"])
+    rol = query_one("SELECT * FROM nom_roles_pago WHERE id=%s AND empleado_id=%s", (rid, emp["id"]))
+    if not rol:
+        raise HTTPException(404, "Rol no encontrado")
+    from starlette.responses import RedirectResponse
+    return rol_pdf(rid, u)
+
+@router.get("/portal/mis-vacaciones")
+def portal_mis_vacaciones(u=Depends(get_current_user)):
+    emp = _get_empleado_by_user(u["id"])
+    return query("""
+        SELECT * FROM nom_vacaciones
+        WHERE empleado_id=%s ORDER BY fecha_inicio DESC
+    """, (emp["id"],))
+
+@router.post("/portal/solicitar-vacacion")
+def portal_solicitar_vacacion(vac: VacacionIn, u=Depends(get_current_user)):
+    emp = _get_empleado_by_user(u["id"])
+    vac.empleado_id = emp["id"]
+    return crear_vacacion(vac, u)
+
+@router.get("/portal/mis-permisos")
+def portal_mis_permisos(u=Depends(get_current_user)):
+    emp = _get_empleado_by_user(u["id"])
+    return query("""
+        SELECT p.*, u.nombre as aprobado_por_nombre
+        FROM nom_permisos p
+        LEFT JOIN sys_usuarios u ON u.id=p.aprobado_por
+        WHERE p.empleado_id=%s ORDER BY p.fecha DESC
+    """, (emp["id"],))
+
+@router.post("/portal/solicitar-permiso")
+def portal_solicitar_permiso(tipo: str, modalidad: str, fecha: str,
+                              motivo: str, horas: float = 0, dias: float = 0,
+                              hora_salida: str = None, hora_regreso: str = None,
+                              u=Depends(get_current_user)):
+    emp = _get_empleado_by_user(u["id"])
+    return solicitar_permiso(emp["id"], tipo, modalidad, fecha, motivo, horas, dias, hora_salida, hora_regreso, u)
+
+@router.post("/empleados/{eid}/crear-acceso")
+def crear_acceso_empleado(eid: int, password: str = "123456", u=Depends(get_current_user)):
+    from auth import hash_password
+    emp = query_one("SELECT * FROM nom_empleados WHERE id=%s", (eid,))
+    if not emp:
+        raise HTTPException(404, "Empleado no encontrado")
+
+    if emp.get("usuario_id"):
+        user = query_one("SELECT id, username FROM sys_usuarios WHERE id=%s", (emp["usuario_id"],))
+        if user:
+            return {"msg": f"El empleado ya tiene acceso (usuario: {user['username']})", "usuario_id": user["id"]}
+
+    username = emp["cedula"]
+    existe = query_one("SELECT id FROM sys_usuarios WHERE username=%s", (username,))
+    if existe:
+        execute("UPDATE nom_empleados SET usuario_id=%s WHERE id=%s", (existe["id"], eid))
+        return {"msg": f"Vinculado a usuario existente: {username}", "usuario_id": existe["id"]}
+
+    uid = insert("""
+        INSERT INTO sys_usuarios (username, nombre, email, telefono, sucursal_id, rol, password_hash, activo, created_at)
+        VALUES (%s,%s,%s,%s,%s,'empleado',%s,true,NOW())
+    """, (username, f"{emp['nombres']} {emp['apellidos']}", emp.get("email", ""),
+          emp.get("telefono", ""), emp.get("sucursal_id") or 1, hash_password(password)))
+
+    execute("UPDATE nom_empleados SET usuario_id=%s WHERE id=%s", (uid, eid))
+
+    return {"msg": f"Acceso creado. Usuario: {username} / Contraseña: {password}", "usuario_id": uid}
