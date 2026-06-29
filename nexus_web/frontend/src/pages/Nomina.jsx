@@ -461,7 +461,7 @@ function TabRoles({ sty, t }) {
               <select
                 onChange={e => {
                   if (e.target.value) {
-                    descargarDoc(`/nomina/roles/archivo-bancario?periodo=${periodo}&banco=${e.target.value}`)
+                    descargarDoc(`/nomina/archivo-bancario?periodo=${periodo}&banco=${e.target.value}`)
                     e.target.value = ''
                   }
                 }}
@@ -475,7 +475,7 @@ function TabRoles({ sty, t }) {
                 <option value="GENERAL">General CSV</option>
               </select>
             </div>
-            <button onClick={() => descargarDoc(`/nomina/roles/archivo-iess?periodo=${periodo}`)}
+            <button onClick={() => descargarDoc(`/nomina/archivo-iess?periodo=${periodo}`)}
               style={sty.btn(t.purple)}>
               <Download size={14} /> Archivo IESS
             </button>

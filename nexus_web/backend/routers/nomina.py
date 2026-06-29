@@ -1046,7 +1046,7 @@ def reporte_provisiones(periodo: str, u=Depends(get_current_user)):
 #  ARCHIVO BANCARIO
 # ══════════════════════════════════════════════════════════════════
 
-@router.get("/roles/archivo-bancario")
+@router.get("/archivo-bancario")
 def generar_archivo_bancario(periodo: str, banco: str = 'PICHINCHA', u=Depends(get_current_user)):
     """Generate bank file for mass payment. Format depends on bank."""
     roles = query("""
@@ -1090,7 +1090,7 @@ def generar_archivo_bancario(periodo: str, banco: str = 'PICHINCHA', u=Depends(g
 #  ARCHIVO IESS
 # ══════════════════════════════════════════════════════════════════
 
-@router.get("/roles/archivo-iess")
+@router.get("/archivo-iess")
 def generar_archivo_iess(periodo: str, u=Depends(get_current_user)):
     """Generate IESS declaration file."""
     config = _get_config()
