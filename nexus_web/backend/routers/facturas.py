@@ -253,12 +253,13 @@ def crear_factura(f: FacturaIn, u=Depends(get_current_user)):
                 insert("""
                     INSERT INTO fin_cxc
                         (factura_id, cliente_id, fecha_emision,
-                         fecha_vencimiento, monto, saldo, estado)
+                         fecha_vencimiento, valor_total, valor_pagado, saldo, estado)
                     VALUES (%s,%s,CURRENT_DATE,
                             CURRENT_DATE + (%s || ' days')::INTERVAL,
-                            %s,%s,'PENDIENTE')
+                            %s,0,%s,'PENDIENTE')
                 """, (fac_id, f.cliente_id, plazo, pago["monto"], pago["monto"]))
-            except: pass
+            except Exception as e:
+                print(f"Error creando CXC: {e}")
 
     return {"id": fac_id, "numero_factura": num_factura, "total": total,
             "msg": "Factura emitida correctamente"}
