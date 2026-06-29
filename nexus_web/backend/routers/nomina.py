@@ -1784,106 +1784,71 @@ def get_horas_acumuladas(eid: int, u=Depends(get_current_user)):
 
 @router.get("/utilidades/resumen-financiero")
 def resumen_financiero(anio: int, u=Depends(get_current_user)):
+    """Calcula utilidad neta desde el Estado de Resultados (Contabilidad).
+    Solo usa asientos contables aprobados — fuente oficial y exacta."""
     fi = f"{anio}-01-01"
     ff = f"{anio}-12-31"
 
-    ventas = query_one("""
-        SELECT COALESCE(SUM(total), 0) as total,
-               COALESCE(SUM(subtotal_0 + subtotal_iva), 0) as subtotal,
-               COALESCE(SUM(iva), 0) as iva,
-               COUNT(*) as cantidad
-        FROM ven_facturas
-        WHERE estado IN ('EMITIDA','PAGADA') AND fecha_emision >= %s AND fecha_emision <= %s
+    total_asientos = query_one(
+        "SELECT COUNT(*) as n FROM cont_asientos WHERE estado='APROBADO' AND fecha >= %s AND fecha <= %s",
+        (fi, ff))
+    num_asientos = int(total_asientos["n"]) if total_asientos else 0
+
+    rows = query("""
+        SELECT c.id, c.codigo, c.nombre, c.tipo, c.naturaleza,
+               COALESCE(SUM(d.debe), 0) AS total_debe,
+               COALESCE(SUM(d.haber), 0) AS total_haber
+        FROM cont_plan_cuentas c
+        LEFT JOIN cont_asiento_detalles d ON d.cuenta_id = c.id
+        LEFT JOIN cont_asientos a ON a.id = d.asiento_id
+            AND a.estado = 'APROBADO'
+            AND a.fecha >= %s AND a.fecha <= %s
+        WHERE c.tipo IN ('INGRESO', 'COSTO', 'GASTO')
+          AND c.es_movimiento = true AND c.activa = true
+        GROUP BY c.id, c.codigo, c.nombre, c.tipo, c.naturaleza
+        HAVING COALESCE(SUM(d.debe), 0) != 0 OR COALESCE(SUM(d.haber), 0) != 0
+        ORDER BY c.codigo
     """, (fi, ff))
 
-    compras = query_one("""
-        SELECT COALESCE(SUM(total), 0) as total,
-               COALESCE(SUM(subtotal_0 + subtotal_iva), 0) as subtotal,
-               COALESCE(SUM(iva), 0) as iva,
-               COUNT(*) as cantidad
-        FROM com_compras
-        WHERE estado='CONFIRMADA' AND fecha >= %s AND fecha <= %s
-    """, (fi, ff))
+    ingresos = []
+    costos = []
+    gastos = []
+    total_ingresos = 0.0
+    total_costos = 0.0
+    total_gastos = 0.0
 
-    gastos_nomina = query_one("""
-        SELECT COALESCE(SUM(total_ingresos), 0) as costo_bruto,
-               COALESCE(SUM(aporte_iess_patronal), 0) as iess_patronal,
-               COALESCE(SUM(decimo_tercero), 0) as d13,
-               COALESCE(SUM(decimo_cuarto), 0) as d14,
-               COALESCE(SUM(fondos_reserva), 0) as fr,
-               COALESCE(SUM(vacaciones_provision), 0) as vacaciones
-        FROM nom_roles_pago
-        WHERE estado='APROBADO' AND periodo >= %s AND periodo <= %s
-    """, (f"{anio}-01", f"{anio}-12"))
+    for r in rows:
+        debe = float(r["total_debe"])
+        haber = float(r["total_haber"])
+        saldo = (haber - debe) if r["naturaleza"] == "ACREEDORA" else (debe - haber)
+        item = {"codigo": r["codigo"], "nombre": r["nombre"], "saldo": round(saldo, 2)}
 
-    nomina_total = float(gastos_nomina["costo_bruto"]) + float(gastos_nomina["iess_patronal"]) + \
-                   float(gastos_nomina["d13"]) + float(gastos_nomina["d14"]) + \
-                   float(gastos_nomina["fr"]) + float(gastos_nomina["vacaciones"])
+        if r["tipo"] == "INGRESO":
+            ingresos.append(item)
+            total_ingresos += saldo
+        elif r["tipo"] == "COSTO":
+            costos.append(item)
+            total_costos += saldo
+        else:
+            gastos.append(item)
+            total_gastos += saldo
 
-    contabilidad = None
-    try:
-        gastos_cont = query_one("""
-            SELECT COALESCE(SUM(CASE WHEN c.naturaleza='DEUDORA' THEN d.debe - d.haber ELSE d.haber - d.debe END), 0) as total
-            FROM cont_asiento_detalles d
-            JOIN cont_asientos a ON a.id = d.asiento_id
-            JOIN cont_plan_cuentas c ON c.id = d.cuenta_id
-            WHERE a.estado='APROBADO' AND a.fecha >= %s AND a.fecha <= %s
-            AND c.tipo = 'GASTO' AND c.es_movimiento = true
-        """, (fi, ff))
-        ingresos_cont = query_one("""
-            SELECT COALESCE(SUM(CASE WHEN c.naturaleza='ACREEDORA' THEN d.haber - d.debe ELSE d.debe - d.haber END), 0) as total
-            FROM cont_asiento_detalles d
-            JOIN cont_asientos a ON a.id = d.asiento_id
-            JOIN cont_plan_cuentas c ON c.id = d.cuenta_id
-            WHERE a.estado='APROBADO' AND a.fecha >= %s AND a.fecha <= %s
-            AND c.tipo = 'INGRESO' AND c.es_movimiento = true
-        """, (fi, ff))
-        costos_cont = query_one("""
-            SELECT COALESCE(SUM(CASE WHEN c.naturaleza='DEUDORA' THEN d.debe - d.haber ELSE d.haber - d.debe END), 0) as total
-            FROM cont_asiento_detalles d
-            JOIN cont_asientos a ON a.id = d.asiento_id
-            JOIN cont_plan_cuentas c ON c.id = d.cuenta_id
-            WHERE a.estado='APROBADO' AND a.fecha >= %s AND a.fecha <= %s
-            AND c.tipo = 'COSTO' AND c.es_movimiento = true
-        """, (fi, ff))
-        contabilidad = {
-            "ingresos": round(float(ingresos_cont["total"]), 2),
-            "costos": round(float(costos_cont["total"]), 2),
-            "gastos": round(float(gastos_cont["total"]), 2),
-        }
-    except:
-        pass
-
-    ingresos_total = float(ventas["subtotal"])
-    costos_total = float(compras["subtotal"])
-    gastos_total = round(nomina_total, 2)
-
-    if contabilidad and contabilidad["ingresos"] > 0:
-        ingresos_total = contabilidad["ingresos"]
-        costos_total = contabilidad["costos"]
-        gastos_total = contabilidad["gastos"]
-
-    utilidad_bruta = round(ingresos_total - costos_total, 2)
-    utilidad_neta = round(utilidad_bruta - gastos_total, 2)
+    utilidad_bruta = round(total_ingresos - total_costos, 2)
+    utilidad_neta = round(utilidad_bruta - total_gastos, 2)
+    tiene_datos = num_asientos > 0
 
     return {
         "anio": anio,
-        "ventas": {"total": round(float(ventas["total"]), 2), "subtotal": round(float(ventas["subtotal"]), 2), "cantidad": ventas["cantidad"]},
-        "compras": {"total": round(float(compras["total"]), 2), "subtotal": round(float(compras["subtotal"]), 2), "cantidad": compras["cantidad"]},
-        "nomina": {
-            "sueldos": round(float(gastos_nomina["costo_bruto"]), 2),
-            "iess_patronal": round(float(gastos_nomina["iess_patronal"]), 2),
-            "provisiones": round(float(gastos_nomina["d13"]) + float(gastos_nomina["d14"]) + float(gastos_nomina["fr"]) + float(gastos_nomina["vacaciones"]), 2),
-            "total": round(nomina_total, 2),
-        },
-        "contabilidad": contabilidad,
-        "fuente": "contabilidad" if contabilidad and contabilidad["ingresos"] > 0 else "modulos",
-        "ingresos": round(ingresos_total, 2),
-        "costos": round(costos_total, 2),
-        "gastos": round(gastos_total, 2),
+        "tiene_datos": tiene_datos,
+        "asientos_aprobados": num_asientos,
+        "ingresos": {"cuentas": ingresos, "total": round(total_ingresos, 2)},
+        "costos": {"cuentas": costos, "total": round(total_costos, 2)},
+        "gastos": {"cuentas": gastos, "total": round(total_gastos, 2)},
         "utilidad_bruta": utilidad_bruta,
         "utilidad_neta": utilidad_neta,
         "utilidad_15_pct": round(max(0, utilidad_neta) * 0.15, 2),
+        "participacion_trabajadores": round(max(0, utilidad_neta) * 0.15, 2),
+        "impuesto_renta_base": round(max(0, utilidad_neta - max(0, utilidad_neta) * 0.15), 2),
     }
 
 

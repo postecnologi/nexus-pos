@@ -1764,12 +1764,13 @@ function TabReportes({ sty, t }) {
       setResumenFin(r.data)
       if (r.data.utilidad_neta > 0) setUtilNeta(r.data.utilidad_neta.toString())
       else setUtilNeta('')
+      setUtilData(null)
     } catch { setResumenFin(null) }
     setLoadingResumen(false)
   }
 
   const calcularUtilidades = async () => {
-    if (!utilNeta || parseFloat(utilNeta) <= 0) { alert('La utilidad neta debe ser mayor a 0'); return }
+    if (!utilNeta || parseFloat(utilNeta) <= 0) { alert('La utilidad neta debe ser mayor a 0. Verifique que contabilidad tenga asientos aprobados.'); return }
     setUtilCalc(true)
     try {
       const r = await api.post(`/nomina/utilidades/calcular?anio=${utilAnio}&utilidad_neta=${parseFloat(utilNeta)}`)
@@ -1984,40 +1985,95 @@ function TabReportes({ sty, t }) {
         </p>
       </div>
 
-      {resumenFin && (
-        <div style={sty.card}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: t.blue, marginBottom: 12 }}>
-            Resumen Financiero {resumenFin.anio}
-            <span style={{ fontWeight: 400, color: t.muted, marginLeft: 8, fontSize: 10 }}>
-              Fuente: {resumenFin.fuente === 'contabilidad' ? 'Modulo Contabilidad' : 'Ventas + Compras + Nomina'}
-            </span>
+      {resumenFin && !resumenFin.tiene_datos && (
+        <div style={{ ...sty.card, background: t.amberD, border: `1px solid ${t.amber}44` }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: t.amber }}>
+            <AlertTriangle size={20} />
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 13 }}>No hay asientos contables aprobados para {resumenFin.anio}</div>
+              <div style={{ fontSize: 11, marginTop: 4 }}>
+                Para calcular utilidades correctamente, el contador debe registrar y aprobar los asientos contables del periodo
+                en el modulo de <strong>Contabilidad</strong> (ingresos, costos y gastos).
+              </div>
+            </div>
           </div>
+        </div>
+      )}
+
+      {resumenFin && resumenFin.tiene_datos && (
+        <div style={sty.card}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: t.blue, marginBottom: 4 }}>
+            Estado de Resultados {resumenFin.anio}
+          </div>
+          <div style={{ fontSize: 10, color: t.muted, marginBottom: 16 }}>
+            Fuente: Modulo de Contabilidad ({resumenFin.asientos_aprobados} asientos aprobados)
+          </div>
+
+          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 16 }}>
+            {/* Ingresos */}
+            <div style={{ flex: 1, minWidth: 250 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: t.green, marginBottom: 6, textTransform: 'uppercase' }}>Ingresos</div>
+              {resumenFin.ingresos.cuentas.map((c, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, padding: '3px 0', borderBottom: `1px solid ${t.border}` }}>
+                  <span style={{ color: t.muted }}>{c.codigo} {c.nombre}</span>
+                  <span style={{ fontWeight: 600 }}>{fmtMoney(c.saldo)}</span>
+                </div>
+              ))}
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 700, padding: '6px 0', color: t.green }}>
+                <span>Total Ingresos</span><span>{fmtMoney(resumenFin.ingresos.total)}</span>
+              </div>
+            </div>
+            {/* Costos */}
+            <div style={{ flex: 1, minWidth: 250 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: t.red, marginBottom: 6, textTransform: 'uppercase' }}>Costos</div>
+              {resumenFin.costos.cuentas.map((c, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, padding: '3px 0', borderBottom: `1px solid ${t.border}` }}>
+                  <span style={{ color: t.muted }}>{c.codigo} {c.nombre}</span>
+                  <span style={{ fontWeight: 600 }}>{fmtMoney(c.saldo)}</span>
+                </div>
+              ))}
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 700, padding: '6px 0', color: t.red }}>
+                <span>Total Costos</span><span>{fmtMoney(resumenFin.costos.total)}</span>
+              </div>
+            </div>
+            {/* Gastos */}
+            <div style={{ flex: 1, minWidth: 250 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: t.amber, marginBottom: 6, textTransform: 'uppercase' }}>Gastos</div>
+              {resumenFin.gastos.cuentas.map((c, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, padding: '3px 0', borderBottom: `1px solid ${t.border}` }}>
+                  <span style={{ color: t.muted }}>{c.codigo} {c.nombre}</span>
+                  <span style={{ fontWeight: 600 }}>{fmtMoney(c.saldo)}</span>
+                </div>
+              ))}
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 700, padding: '6px 0', color: t.amber }}>
+                <span>Total Gastos</span><span>{fmtMoney(resumenFin.gastos.total)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Resultado */}
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
             {[
-              { label: `Ingresos (${resumenFin.ventas.cantidad} facturas)`, value: fmtMoney(resumenFin.ingresos), color: t.green },
-              { label: `Costos (${resumenFin.compras.cantidad} compras)`, value: fmtMoney(resumenFin.costos), color: t.red },
-              { label: 'Gastos (nomina + otros)', value: fmtMoney(resumenFin.gastos), color: t.amber },
-              { label: 'Utilidad Bruta', value: fmtMoney(resumenFin.utilidad_bruta), color: t.blue },
-              { label: 'Utilidad Neta', value: fmtMoney(resumenFin.utilidad_neta), color: resumenFin.utilidad_neta > 0 ? t.green : t.red },
-              { label: '15% a Repartir', value: fmtMoney(resumenFin.utilidad_15_pct), color: t.purple },
+              { label: 'Utilidad Bruta', sub: 'Ingresos - Costos', value: fmtMoney(resumenFin.utilidad_bruta), color: t.blue },
+              { label: 'Utilidad Neta', sub: 'U.Bruta - Gastos', value: fmtMoney(resumenFin.utilidad_neta), color: resumenFin.utilidad_neta > 0 ? t.green : t.red },
+              { label: '15% Trabajadores', sub: 'Art. 97 C.Trabajo', value: fmtMoney(resumenFin.participacion_trabajadores), color: t.purple },
+              { label: 'Base Imp. Renta', sub: 'U.Neta - 15%', value: fmtMoney(resumenFin.impuesto_renta_base), color: t.amber },
             ].map((s, i) => (
               <div key={i} style={{
-                flex: '1 1 140px', padding: '10px 14px', background: s.color + '12',
+                flex: 1, minWidth: 160, padding: '12px 16px', background: s.color + '12',
                 borderRadius: 8, border: `1px solid ${s.color}30`, textAlign: 'center',
               }}>
-                <div style={{ fontSize: 10, color: t.muted, marginBottom: 2 }}>{s.label}</div>
-                <div style={{ fontSize: 16, fontWeight: 800, color: s.color }}>{s.value}</div>
+                <div style={{ fontSize: 10, color: t.muted }}>{s.label}</div>
+                <div style={{ fontSize: 20, fontWeight: 800, color: s.color }}>{s.value}</div>
+                <div style={{ fontSize: 9, color: t.muted }}>{s.sub}</div>
               </div>
             ))}
           </div>
-          {resumenFin.nomina.total > 0 && (
-            <div style={{ fontSize: 10, color: t.muted, marginTop: 8 }}>
-              Nomina: Sueldos {fmtMoney(resumenFin.nomina.sueldos)} + IESS Patronal {fmtMoney(resumenFin.nomina.iess_patronal)} + Provisiones {fmtMoney(resumenFin.nomina.provisiones)}
-            </div>
-          )}
+
           {resumenFin.utilidad_neta <= 0 && (
-            <div style={{ marginTop: 8, padding: 8, background: t.redD, borderRadius: 6, border: `1px solid ${t.red}33`, fontSize: 11, color: t.red }}>
-              No hay utilidades para repartir (la empresa tiene perdida o utilidad $0).
+            <div style={{ marginTop: 12, padding: 10, background: t.redD, borderRadius: 6, border: `1px solid ${t.red}33`, fontSize: 11, color: t.red, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <AlertTriangle size={16} />
+              No hay utilidades para repartir. La empresa presenta perdida de {fmtMoney(Math.abs(resumenFin.utilidad_neta))}.
             </div>
           )}
         </div>
