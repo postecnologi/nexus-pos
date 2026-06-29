@@ -16,8 +16,8 @@ class AjusteDetalleIn(BaseModel):
     estado_serie: str            = "DISPONIBLE"
 
 class AjusteIn(BaseModel):
-    tipo:         str   # CARGO, DESCARGO
-    motivo:       str
+    tipo:         str   # CARGO, DESCARGO, ENTRADA, SALIDA
+    motivo:       str = "Ajuste de inventario"
     bodega_id:    int
     observaciones:Optional[str] = None
     detalles:     list
