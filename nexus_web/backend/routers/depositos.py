@@ -74,7 +74,8 @@ def crear_deposito(data: CrearDeposito, u=Depends(get_current_user)):
 
     total = sum(float(p["monto"]) for p in pagos)
     metodos = list(set(p["forma_pago"] for p in pagos))
-    fecha_dep = data.fecha_deposito or str(date.today())
+    from fecha_validator import validar_fecha
+    fecha_dep = validar_fecha(data.fecha_deposito, "fecha de deposito")
 
     dep_id = insert("""
         INSERT INTO fin_depositos

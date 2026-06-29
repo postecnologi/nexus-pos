@@ -598,6 +598,22 @@ def run_migrations():
             pass
 
 
+# ── Fecha/hora del servidor (no manipulable) ─────────────────
+from fastapi.responses import JSONResponse
+@app.get("/api/server-time")
+def server_time():
+    from datetime import datetime, timezone, timedelta
+    now = datetime.now(timezone(timedelta(hours=-5)))
+    return JSONResponse({
+        "datetime": now.isoformat(),
+        "date": now.strftime("%Y-%m-%d"),
+        "time": now.strftime("%H:%M:%S"),
+        "year": now.year,
+        "month": now.month,
+        "day": now.day,
+    })
+
+
 # ── Registrar routers ─────────────────────────────────────────
 app.include_router(auth.router)
 app.include_router(dashboard.router)
