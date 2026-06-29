@@ -562,11 +562,11 @@ export default function ModalProducto({ open, onClose, producto, marcas, categor
         </div>
 
         {/* Tabs */}
-        <div style={{ display: 'flex', borderBottom: '1px solid #374151', padding: '0 20px', background: '#111827' }}>
+        <div style={{ display: 'flex', borderBottom: '1px solid #374151', padding: '0 20px', background: '#111827', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
           {TABS.map((t, i) => (
             <button key={i} onClick={() => setTab(i)} style={{
               padding: '10px 14px', border: 'none', cursor: 'pointer',
-              fontSize: 12, fontWeight: 600, background: 'transparent',
+              fontSize: 12, fontWeight: 600, background: 'transparent', whiteSpace: 'nowrap',
               borderBottom: tab === i ? '2px solid #8B5CF6' : '2px solid transparent',
               color: tab === i ? '#A78BFA' : '#6B7280',
               transition: 'all 0.15s',
