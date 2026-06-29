@@ -311,7 +311,7 @@ function TabMisVacaciones({ sty, t, perfil }) {
         <table style={sty.table}>
           <thead>
             <tr>
-              {['Inicio', 'Fin', 'Días', 'Valor', 'Estado', 'Observaciones'].map(h =>
+              {['Inicio', 'Fin', 'Días', 'Valor', 'Estado', 'Observaciones', ''].map(h =>
                 <th key={h} style={sty.th}>{h}</th>
               )}
             </tr>
@@ -325,10 +325,22 @@ function TabMisVacaciones({ sty, t, perfil }) {
                 <td style={sty.td}>{fmtMoney(v.valor)}</td>
                 <td style={sty.td}><span style={sty.badge(ESTADO_COLORS[v.estado] || t.green)}>{v.estado}</span></td>
                 <td style={sty.td}>{v.observaciones || '-'}</td>
+                <td style={sty.td}>
+                  {v.estado === 'APROBADA' && (
+                    <button onClick={async () => {
+                      try {
+                        const resp = await api.get(`/nomina/vacaciones/${v.id}/pdf`, { responseType: 'blob' })
+                        window.open(URL.createObjectURL(new Blob([resp.data], { type: resp.headers['content-type'] || 'text/html' })), '_blank')
+                      } catch (e) { alert('Error') }
+                    }} style={{ ...sty.btn(), padding: '4px 10px', fontSize: 11 }}>
+                      <Download size={12} /> PDF
+                    </button>
+                  )}
+                </td>
               </tr>
             ))}
             {!vacaciones.length && (
-              <tr><td colSpan={6} style={{ ...sty.td, textAlign: 'center', color: t.muted, padding: 30 }}>
+              <tr><td colSpan={7} style={{ ...sty.td, textAlign: 'center', color: t.muted, padding: 30 }}>
                 No hay registros de vacaciones
               </td></tr>
             )}
@@ -467,7 +479,7 @@ function TabMisPermisos({ sty, t }) {
         <table style={sty.table}>
           <thead>
             <tr>
-              {['Fecha', 'Tipo', 'Modalidad', 'Duración', 'Motivo', 'Estado'].map(h =>
+              {['Fecha', 'Tipo', 'Modalidad', 'Duración', 'Motivo', 'Estado', ''].map(h =>
                 <th key={h} style={sty.th}>{h}</th>
               )}
             </tr>
@@ -491,10 +503,22 @@ function TabMisPermisos({ sty, t }) {
                   <span style={sty.badge(ESTADO_COLORS[p.estado] || t.muted)}>{p.estado}</span>
                   {p.vacacion_descontada && <span style={{ fontSize: 10, color: t.amber, display: 'block', marginTop: 2 }}>Vac. descontada</span>}
                 </td>
+                <td style={sty.td}>
+                  {p.estado === 'APROBADO' && (
+                    <button onClick={async () => {
+                      try {
+                        const resp = await api.get(`/nomina/permisos/${p.id}/pdf`, { responseType: 'blob' })
+                        window.open(URL.createObjectURL(new Blob([resp.data], { type: resp.headers['content-type'] || 'text/html' })), '_blank')
+                      } catch (e) { alert('Error') }
+                    }} style={{ ...sty.btn(), padding: '4px 10px', fontSize: 11 }}>
+                      <Download size={12} /> PDF
+                    </button>
+                  )}
+                </td>
               </tr>
             ))}
             {!permisos.length && (
-              <tr><td colSpan={6} style={{ ...sty.td, textAlign: 'center', color: t.muted, padding: 30 }}>
+              <tr><td colSpan={7} style={{ ...sty.td, textAlign: 'center', color: t.muted, padding: 30 }}>
                 No tiene permisos registrados
               </td></tr>
             )}

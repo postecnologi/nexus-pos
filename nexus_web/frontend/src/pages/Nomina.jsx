@@ -790,6 +790,16 @@ function TabVacaciones({ sty, t }) {
                       </button>
                     </>
                   )}
+                  {v.estado === 'APROBADA' && (
+                    <button onClick={async () => {
+                      try {
+                        const resp = await api.get(`/nomina/vacaciones/${v.id}/pdf`, { responseType: 'blob' })
+                        window.open(URL.createObjectURL(new Blob([resp.data], { type: resp.headers['content-type'] || 'text/html' })), '_blank')
+                      } catch (e) { alert('Error al generar PDF') }
+                    }} style={{ ...sty.btnOutline(t.blue), padding: '4px 10px', fontSize: 11 }}>
+                      <FileText size={12} /> Imprimir
+                    </button>
+                  )}
                 </td>
               </tr>
               )
@@ -1083,8 +1093,18 @@ function TabPermisos({ sty, t }) {
                       </button>
                     </>
                   )}
+                  {p.estado === 'APROBADO' && (
+                    <button onClick={async () => {
+                      try {
+                        const resp = await api.get(`/nomina/permisos/${p.id}/pdf`, { responseType: 'blob' })
+                        window.open(URL.createObjectURL(new Blob([resp.data], { type: resp.headers['content-type'] || 'text/html' })), '_blank')
+                      } catch (e) { alert('Error al generar PDF') }
+                    }} style={{ ...sty.btnOutline(t.blue), padding: '4px 10px', fontSize: 11, marginLeft: 4 }}>
+                      <FileText size={12} /> Imprimir
+                    </button>
+                  )}
                   {p.estado !== 'SOLICITADO' && p.aprobado_por_nombre && (
-                    <span style={{ fontSize: 11, color: t.muted }}>{p.aprobado_por_nombre}</span>
+                    <span style={{ fontSize: 11, color: t.muted, marginLeft: 4 }}>{p.aprobado_por_nombre}</span>
                   )}
                 </td>
               </tr>
