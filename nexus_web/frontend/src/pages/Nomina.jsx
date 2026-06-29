@@ -638,21 +638,78 @@ function RolDetalleModal({ sty, t, rol, onClose }) {
 function TabVacaciones({ sty, t }) {
   const [vacaciones, setVacaciones] = useState([])
   const [empleados, setEmpleados] = useState([])
+  const [filtroEmp, setFiltroEmp] = useState('')
+  const [busqueda, setBusqueda] = useState('')
   const [modal, setModal] = useState(false)
 
-  const load = () => {
-    api.get('/nomina/vacaciones').then(r => setVacaciones(r.data)).catch(() => {})
+  const load = useCallback(() => {
+    const params = {}
+    if (filtroEmp) params.empleado_id = filtroEmp
+    api.get('/nomina/vacaciones', { params }).then(r => setVacaciones(r.data)).catch(() => {})
+  }, [filtroEmp])
+
+  useEffect(() => { load() }, [load])
+  useEffect(() => {
     api.get('/nomina/empleados', { params: { activo: 'true' } }).then(r => setEmpleados(r.data)).catch(() => {})
+  }, [])
+
+  const exportPdf = async () => {
+    try {
+      const params = {}
+      if (filtroEmp) params.empleado_id = filtroEmp
+      const resp = await api.get('/nomina/vacaciones/reporte-pdf', { params, responseType: 'blob' })
+      const ct = resp.headers['content-type'] || 'text/html'
+      window.open(URL.createObjectURL(new Blob([resp.data], { type: ct })), '_blank')
+    } catch (e) { alert('Error al generar reporte') }
   }
-  useEffect(() => { load() }, [])
+
+  const filtered = busqueda
+    ? vacaciones.filter(v => `${v.apellidos} ${v.nombres} ${v.cedula}`.toLowerCase().includes(busqueda.toLowerCase()))
+    : vacaciones
+
+  const totalDias = filtered.reduce((s, v) => s + (parseInt(v.dias_tomados) || 0), 0)
+  const totalValor = filtered.reduce((s, v) => s + (parseFloat(v.valor) || 0), 0)
 
   return (
     <>
-      <div style={{ ...sty.card, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700 }}>Registro de Vacaciones</h3>
+      <div style={{ ...sty.card, display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+        <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
+          <label style={sty.label}>Buscar</label>
+          <Search size={14} style={{ position: 'absolute', left: 10, top: 28, color: t.muted }} />
+          <input placeholder="Buscar por nombre, cedula..."
+            value={busqueda} onChange={e => setBusqueda(e.target.value)}
+            style={{ ...sty.input, paddingLeft: 32 }} />
+        </div>
+        <div style={{ minWidth: 180 }}>
+          <label style={sty.label}>Empleado</label>
+          <select value={filtroEmp} onChange={e => setFiltroEmp(e.target.value)} style={sty.select}>
+            <option value="">Todos</option>
+            {empleados.map(e => <option key={e.id} value={e.id}>{e.apellidos} {e.nombres}</option>)}
+          </select>
+        </div>
+        <button onClick={exportPdf} style={sty.btn(t.purple)}>
+          <Download size={14} /> Exportar PDF
+        </button>
         <button onClick={() => setModal(true)} style={sty.btn()}>
           <Plus size={14} /> Solicitar Vacaciones
         </button>
+      </div>
+
+      {/* Stats */}
+      <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+        {[
+          { label: 'Registros', value: filtered.length, color: t.blue },
+          { label: 'Total Dias', value: totalDias, color: t.amber },
+          { label: 'Total Valor', value: fmtMoney(totalValor), color: t.green },
+        ].map((s, i) => (
+          <div key={i} style={{
+            flex: 1, minWidth: 140, padding: '14px 20px', background: s.color + '15',
+            borderRadius: 10, border: `1px solid ${s.color}33`, textAlign: 'center',
+          }}>
+            <div style={{ fontSize: 11, color: t.muted, marginBottom: 4 }}>{s.label}</div>
+            <div style={{ fontSize: 24, fontWeight: 800, color: s.color }}>{s.value}</div>
+          </div>
+        ))}
       </div>
 
       <div style={sty.card}>
@@ -665,9 +722,11 @@ function TabVacaciones({ sty, t }) {
             </tr>
           </thead>
           <tbody>
-            {vacaciones.map(v => (
-              <tr key={v.id}>
-                <td style={sty.td}><strong>{v.apellidos} {v.nombres}</strong></td>
+            {filtered.map(v => (
+              <tr key={v.id}
+                onMouseEnter={ev => ev.currentTarget.style.background = t.sur2}
+                onMouseLeave={ev => ev.currentTarget.style.background = 'transparent'}>
+                <td style={sty.td}><strong>{v.apellidos} {v.nombres}</strong><br/><span style={{ color: t.muted, fontSize: 11 }}>{v.cedula}</span></td>
                 <td style={sty.td}>{v.fecha_inicio?.substring(0, 10)}</td>
                 <td style={sty.td}>{v.fecha_fin?.substring(0, 10)}</td>
                 <td style={sty.td}>{v.dias_tomados}</td>
@@ -677,7 +736,7 @@ function TabVacaciones({ sty, t }) {
                 <td style={sty.td}>{v.observaciones || '-'}</td>
               </tr>
             ))}
-            {!vacaciones.length && (
+            {!filtered.length && (
               <tr><td colSpan={8} style={{ ...sty.td, textAlign: 'center', color: t.muted, padding: 30 }}>
                 No hay registros de vacaciones
               </td></tr>
@@ -880,6 +939,20 @@ function TabPermisos({ sty, t }) {
           <label style={sty.label}>Hasta</label>
           <input type="date" value={fechaFin} onChange={e => setFechaFin(e.target.value)} style={sty.input} />
         </div>
+        <button onClick={async () => {
+          try {
+            const params = {}
+            if (filtroEmp) params.empleado_id = filtroEmp
+            if (filtroEstado) params.estado = filtroEstado
+            if (fechaIni) params.fecha_ini = fechaIni
+            if (fechaFin) params.fecha_fin = fechaFin
+            const resp = await api.get('/nomina/permisos/reporte-pdf', { params, responseType: 'blob' })
+            const ct = resp.headers['content-type'] || 'text/html'
+            window.open(URL.createObjectURL(new Blob([resp.data], { type: ct })), '_blank')
+          } catch (e) { alert('Error al generar reporte') }
+        }} style={sty.btn(t.purple)}>
+          <Download size={14} /> Exportar PDF
+        </button>
         <button onClick={() => setModal(true)} style={sty.btn()}>
           <Plus size={14} /> Solicitar Permiso
         </button>

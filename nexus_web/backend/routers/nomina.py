@@ -771,6 +771,151 @@ def vacaciones_disponibles(eid: int, u=Depends(get_current_user)):
     }
 
 
+@router.get("/vacaciones/reporte-pdf")
+def reporte_vacaciones_pdf(empleado_id: Optional[int] = None, u=Depends(get_current_user)):
+    conds = []; params = []
+    if empleado_id:
+        conds.append("v.empleado_id=%s"); params.append(empleado_id)
+    where = "WHERE " + " AND ".join(conds) if conds else ""
+    rows = query(f"""
+        SELECT v.*, e.nombres, e.apellidos, e.cedula, e.cargo, e.departamento, e.fecha_ingreso
+        FROM nom_vacaciones v
+        JOIN nom_empleados e ON e.id = v.empleado_id
+        {where} ORDER BY v.fecha_inicio DESC
+    """, params)
+
+    cfg = query_one("SELECT * FROM sys_empresas LIMIT 1") or {}
+    empresa = cfg.get("nombre_comercial", "") or cfg.get("razon_social", "EMPRESA")
+
+    emp_filter = ""
+    if empleado_id and rows:
+        emp_filter = f" - {rows[0]['apellidos']} {rows[0]['nombres']}"
+
+    rows_html = ""
+    total_dias = 0
+    total_valor = 0
+    for r in rows:
+        total_dias += int(r.get("dias_tomados", 0))
+        total_valor += float(r.get("valor", 0))
+        rows_html += f"""<tr>
+            <td>{r['apellidos']} {r['nombres']}</td><td>{r['cedula']}</td>
+            <td>{r.get('cargo','')}</td>
+            <td>{str(r['fecha_inicio'])[:10]}</td><td>{str(r['fecha_fin'])[:10]}</td>
+            <td style="text-align:center">{r['dias_tomados']}</td>
+            <td style="text-align:right">${float(r.get('valor',0)):.2f}</td>
+            <td>{r.get('estado','')}</td>
+            <td>{r.get('observaciones','') or ''}</td>
+        </tr>"""
+
+    html = f"""<!DOCTYPE html><html><head><meta charset="utf-8">
+    <title>Reporte Vacaciones</title>
+    <style>
+        body {{ font-family: Arial, sans-serif; font-size: 11px; margin: 20px; color: #333; }}
+        h2 {{ text-align: center; margin-bottom: 4px; }}
+        h4 {{ text-align: center; color: #666; margin-top: 2px; }}
+        table {{ width: 100%; border-collapse: collapse; margin-top: 12px; }}
+        th {{ background: #2563EB; color: white; padding: 6px 8px; text-align: left; font-size: 10px; }}
+        td {{ padding: 5px 8px; border-bottom: 1px solid #ddd; font-size: 10px; }}
+        tr:nth-child(even) {{ background: #f8f9fa; }}
+        .totals td {{ font-weight: bold; border-top: 2px solid #333; background: #e8f0fe; }}
+        .footer {{ text-align: center; margin-top: 20px; font-size: 9px; color: #999; }}
+    </style></head><body>
+    <h2>{empresa}</h2>
+    <h4>Reporte de Vacaciones{emp_filter}</h4>
+    <p style="text-align:center; font-size:10px; color:#666;">Generado: {datetime.now().strftime('%Y-%m-%d %H:%M')}</p>
+    <table>
+    <thead><tr><th>Empleado</th><th>Cedula</th><th>Cargo</th><th>Inicio</th><th>Fin</th><th>Dias</th><th>Valor</th><th>Estado</th><th>Observaciones</th></tr></thead>
+    <tbody>{rows_html}</tbody>
+    <tfoot><tr class="totals"><td colspan="5" style="text-align:right">TOTALES:</td>
+        <td style="text-align:center">{total_dias}</td><td style="text-align:right">${total_valor:.2f}</td>
+        <td colspan="2"></td></tr></tfoot>
+    </table>
+    <p class="footer">NEXUS IA - Sistema de Gestion Empresarial</p>
+    </body></html>"""
+
+    buf = io.BytesIO(html.encode("utf-8"))
+    return StreamingResponse(buf, media_type="text/html",
+        headers={"Content-Disposition": 'inline; filename="reporte_vacaciones.html"'})
+
+
+@router.get("/permisos/reporte-pdf")
+def reporte_permisos_pdf(empleado_id: Optional[int] = None, estado: Optional[str] = None,
+                          fecha_ini: Optional[str] = None, fecha_fin: Optional[str] = None,
+                          u=Depends(get_current_user)):
+    conds = ["1=1"]; params = []
+    if empleado_id: conds.append("p.empleado_id=%s"); params.append(empleado_id)
+    if estado: conds.append("p.estado=%s"); params.append(estado)
+    if fecha_ini: conds.append("p.fecha>=%s"); params.append(fecha_ini)
+    if fecha_fin: conds.append("p.fecha<=%s"); params.append(fecha_fin)
+    where = "WHERE " + " AND ".join(conds)
+    rows = query(f"""
+        SELECT p.*, e.nombres, e.apellidos, e.cedula, e.cargo
+        FROM nom_permisos p
+        JOIN nom_empleados e ON e.id=p.empleado_id
+        {where} ORDER BY p.fecha DESC
+    """, params)
+
+    cfg = query_one("SELECT * FROM sys_empresas LIMIT 1") or {}
+    empresa = cfg.get("nombre_comercial", "") or cfg.get("razon_social", "EMPRESA")
+
+    emp_filter = ""
+    if empleado_id and rows:
+        emp_filter = f" - {rows[0]['apellidos']} {rows[0]['nombres']}"
+
+    rows_html = ""
+    total_horas = 0
+    total_dias = 0
+    for r in rows:
+        h = float(r.get("horas", 0))
+        d = float(r.get("dias", 0))
+        total_horas += h
+        total_dias += d
+        duracion = f"{h}h" if r['modalidad'] == 'HORAS' else f"{int(d)} dia(s)"
+        horario = ""
+        if r.get('hora_salida') and r.get('hora_regreso'):
+            horario = f" ({str(r['hora_salida'])[:5]}-{str(r['hora_regreso'])[:5]})"
+        vac = " *" if r.get('vacacion_descontada') else ""
+        rows_html += f"""<tr>
+            <td>{str(r['fecha'])[:10]}</td>
+            <td>{r['apellidos']} {r['nombres']}</td><td>{r['cedula']}</td>
+            <td>{r['tipo']}</td><td>{duracion}{horario}</td>
+            <td>{r.get('motivo','')}</td>
+            <td>{r['estado']}{vac}</td>
+        </tr>"""
+
+    html = f"""<!DOCTYPE html><html><head><meta charset="utf-8">
+    <title>Reporte Permisos</title>
+    <style>
+        body {{ font-family: Arial, sans-serif; font-size: 11px; margin: 20px; color: #333; }}
+        h2 {{ text-align: center; margin-bottom: 4px; }}
+        h4 {{ text-align: center; color: #666; margin-top: 2px; }}
+        table {{ width: 100%; border-collapse: collapse; margin-top: 12px; }}
+        th {{ background: #7C3AED; color: white; padding: 6px 8px; text-align: left; font-size: 10px; }}
+        td {{ padding: 5px 8px; border-bottom: 1px solid #ddd; font-size: 10px; }}
+        tr:nth-child(even) {{ background: #f8f9fa; }}
+        .totals td {{ font-weight: bold; border-top: 2px solid #333; background: #f3e8ff; }}
+        .footer {{ text-align: center; margin-top: 20px; font-size: 9px; color: #999; }}
+        .note {{ font-size: 9px; color: #666; margin-top: 8px; }}
+    </style></head><body>
+    <h2>{empresa}</h2>
+    <h4>Reporte de Permisos{emp_filter}</h4>
+    <p style="text-align:center; font-size:10px; color:#666;">Generado: {datetime.now().strftime('%Y-%m-%d %H:%M')}</p>
+    <table>
+    <thead><tr><th>Fecha</th><th>Empleado</th><th>Cedula</th><th>Tipo</th><th>Duracion</th><th>Motivo</th><th>Estado</th></tr></thead>
+    <tbody>{rows_html}</tbody>
+    <tfoot><tr class="totals"><td colspan="4" style="text-align:right">TOTALES:</td>
+        <td>{total_horas}h / {int(total_dias)} dia(s)</td>
+        <td colspan="2"></td></tr></tfoot>
+    </table>
+    <p class="note">* = Descontado de vacaciones</p>
+    <p class="footer">NEXUS IA - Sistema de Gestion Empresarial</p>
+    </body></html>"""
+
+    buf = io.BytesIO(html.encode("utf-8"))
+    return StreamingResponse(buf, media_type="text/html",
+        headers={"Content-Disposition": 'inline; filename="reporte_permisos.html"'})
+
+
 # ══════════════════════════════════════════════════════════════════
 #  LIQUIDACIÓN
 # ══════════════════════════════════════════════════════════════════
