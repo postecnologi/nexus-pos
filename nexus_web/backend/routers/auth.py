@@ -43,6 +43,14 @@ def login(form: OAuth2PasswordRequestForm = Depends(), empresa_codigo: str = For
         rol = user.get("rol") or "admin"
         permisos = get_permisos_efectivos(user["id"], rol)
         modulos_permitidos = [m for m, acc in permisos.items() if "ver" in acc]
+
+        try:
+            from routers.admin import registrar_audit
+            registrar_audit(user["id"], user.get("nombre", ""), "LOGIN", "auth",
+                          f"Login: {user['username']} (rol: {rol})")
+        except Exception:
+            pass
+
         return {
             "access_token": token,
             "token_type": "bearer",
