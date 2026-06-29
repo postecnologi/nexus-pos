@@ -755,6 +755,124 @@ def rechazar_vacacion(vid: int, observaciones: str = '', u=Depends(get_current_u
     return {"msg": "Vacaciones rechazadas"}
 
 
+@router.get("/vacaciones/{vid}/pdf")
+def vacacion_pdf(vid: int, u=Depends(get_current_user)):
+    vac = query_one("""
+        SELECT v.*, e.nombres, e.apellidos, e.cedula, e.cargo, e.departamento, e.fecha_ingreso, e.salario_base
+        FROM nom_vacaciones v JOIN nom_empleados e ON e.id=v.empleado_id WHERE v.id=%s
+    """, (vid,))
+    if not vac: raise HTTPException(404)
+    cfg = query_one("SELECT * FROM sys_empresas LIMIT 1") or {}
+    empresa = cfg.get("nombre_comercial", "") or cfg.get("razon_social", "EMPRESA")
+    html = f"""<!DOCTYPE html><html><head><meta charset="utf-8">
+    <title>Solicitud de Vacaciones</title>
+    <style>
+        body {{ font-family: Arial, sans-serif; font-size: 12px; margin: 30px; color: #333; }}
+        h2 {{ text-align: center; margin-bottom: 2px; }}
+        h3 {{ text-align: center; color: #555; margin-top: 2px; font-size: 14px; }}
+        .info {{ margin: 20px 0; }}
+        .info table {{ width: 100%; border-collapse: collapse; }}
+        .info td {{ padding: 6px 10px; border: 1px solid #ccc; }}
+        .info .label {{ font-weight: bold; background: #f0f4ff; width: 35%; }}
+        .firmas {{ display: flex; justify-content: space-between; margin-top: 60px; }}
+        .firma {{ text-align: center; width: 40%; }}
+        .firma .linea {{ border-top: 1px solid #333; padding-top: 6px; margin-top: 50px; }}
+        .footer {{ text-align: center; margin-top: 30px; font-size: 9px; color: #999; }}
+        .estado {{ display: inline-block; padding: 4px 16px; border-radius: 12px; font-weight: bold; font-size: 13px; }}
+        .aprobada {{ background: #d1fae5; color: #065f46; }}
+        .solicitada {{ background: #fef3c7; color: #92400e; }}
+        .rechazada {{ background: #fee2e2; color: #991b1b; }}
+    </style></head><body>
+    <h2>{empresa}</h2>
+    <h3>SOLICITUD DE VACACIONES</h3>
+    <p style="text-align:center"><span class="estado {vac['estado'].lower()}">{vac['estado']}</span></p>
+    <div class="info"><table>
+        <tr><td class="label">Empleado</td><td>{vac['apellidos']} {vac['nombres']}</td></tr>
+        <tr><td class="label">Cedula</td><td>{vac['cedula']}</td></tr>
+        <tr><td class="label">Cargo</td><td>{vac.get('cargo','')}</td></tr>
+        <tr><td class="label">Departamento</td><td>{vac.get('departamento','')}</td></tr>
+        <tr><td class="label">Fecha Ingreso</td><td>{str(vac.get('fecha_ingreso',''))[:10]}</td></tr>
+        <tr><td class="label">Salario</td><td>${float(vac.get('salario_base',0)):.2f}</td></tr>
+    </table></div>
+    <div class="info"><table>
+        <tr><td class="label">Fecha Inicio</td><td>{str(vac['fecha_inicio'])[:10]}</td></tr>
+        <tr><td class="label">Fecha Fin</td><td>{str(vac['fecha_fin'])[:10]}</td></tr>
+        <tr><td class="label">Dias Solicitados</td><td>{vac['dias_tomados']}</td></tr>
+        <tr><td class="label">Valor Vacaciones</td><td>${float(vac.get('valor',0)):.2f}</td></tr>
+        <tr><td class="label">Observaciones</td><td>{vac.get('observaciones','') or '-'}</td></tr>
+    </table></div>
+    <div class="firmas">
+        <div class="firma"><div class="linea">EMPLEADO<br/>{vac['apellidos']} {vac['nombres']}<br/>C.I. {vac['cedula']}</div></div>
+        <div class="firma"><div class="linea">JEFE INMEDIATO / RRHH<br/>Nombre: ___________________<br/>Cargo: ____________________</div></div>
+    </div>
+    <p class="footer">Documento generado por NEXUS IA - {datetime.now().strftime('%Y-%m-%d %H:%M')}</p>
+    </body></html>"""
+    buf = io.BytesIO(html.encode("utf-8"))
+    return StreamingResponse(buf, media_type="text/html",
+        headers={"Content-Disposition": f'inline; filename="vacacion_{vac["cedula"]}_{vid}.html"'})
+
+
+@router.get("/permisos/{pid}/pdf")
+def permiso_pdf(pid: int, u=Depends(get_current_user)):
+    perm = query_one("""
+        SELECT p.*, e.nombres, e.apellidos, e.cedula, e.cargo, e.departamento
+        FROM nom_permisos p JOIN nom_empleados e ON e.id=p.empleado_id WHERE p.id=%s
+    """, (pid,))
+    if not perm: raise HTTPException(404)
+    cfg = query_one("SELECT * FROM sys_empresas LIMIT 1") or {}
+    empresa = cfg.get("nombre_comercial", "") or cfg.get("razon_social", "EMPRESA")
+    duracion = f"{float(perm.get('horas',0))} horas" if perm['modalidad'] == 'HORAS' else f"{int(float(perm.get('dias',1)))} dia(s)"
+    horario = ""
+    if perm.get('hora_salida') and perm.get('hora_regreso'):
+        horario = f"De {str(perm['hora_salida'])[:5]} a {str(perm['hora_regreso'])[:5]}"
+    html = f"""<!DOCTYPE html><html><head><meta charset="utf-8">
+    <title>Solicitud de Permiso</title>
+    <style>
+        body {{ font-family: Arial, sans-serif; font-size: 12px; margin: 30px; color: #333; }}
+        h2 {{ text-align: center; margin-bottom: 2px; }}
+        h3 {{ text-align: center; color: #555; margin-top: 2px; font-size: 14px; }}
+        .info {{ margin: 20px 0; }}
+        .info table {{ width: 100%; border-collapse: collapse; }}
+        .info td {{ padding: 6px 10px; border: 1px solid #ccc; }}
+        .info .label {{ font-weight: bold; background: #f5f0ff; width: 35%; }}
+        .firmas {{ display: flex; justify-content: space-between; margin-top: 60px; }}
+        .firma {{ text-align: center; width: 40%; }}
+        .firma .linea {{ border-top: 1px solid #333; padding-top: 6px; margin-top: 50px; }}
+        .footer {{ text-align: center; margin-top: 30px; font-size: 9px; color: #999; }}
+        .estado {{ display: inline-block; padding: 4px 16px; border-radius: 12px; font-weight: bold; font-size: 13px; }}
+        .aprobado {{ background: #d1fae5; color: #065f46; }}
+        .solicitado {{ background: #fef3c7; color: #92400e; }}
+        .rechazado {{ background: #fee2e2; color: #991b1b; }}
+    </style></head><body>
+    <h2>{empresa}</h2>
+    <h3>SOLICITUD DE PERMISO</h3>
+    <p style="text-align:center"><span class="estado {perm['estado'].lower()}">{perm['estado']}</span></p>
+    <div class="info"><table>
+        <tr><td class="label">Empleado</td><td>{perm['apellidos']} {perm['nombres']}</td></tr>
+        <tr><td class="label">Cedula</td><td>{perm['cedula']}</td></tr>
+        <tr><td class="label">Cargo</td><td>{perm.get('cargo','')}</td></tr>
+        <tr><td class="label">Departamento</td><td>{perm.get('departamento','')}</td></tr>
+    </table></div>
+    <div class="info"><table>
+        <tr><td class="label">Tipo de Permiso</td><td>{perm['tipo']}</td></tr>
+        <tr><td class="label">Fecha</td><td>{str(perm['fecha'])[:10]}</td></tr>
+        <tr><td class="label">Modalidad</td><td>{perm['modalidad']}</td></tr>
+        <tr><td class="label">Duracion</td><td>{duracion}</td></tr>
+        {f'<tr><td class="label">Horario</td><td>{horario}</td></tr>' if horario else ''}
+        <tr><td class="label">Motivo</td><td>{perm.get('motivo','')}</td></tr>
+        <tr><td class="label">Descuenta Vacacion</td><td>{'Si' if perm.get('descuenta_vacacion') else 'No'}</td></tr>
+    </table></div>
+    <div class="firmas">
+        <div class="firma"><div class="linea">EMPLEADO<br/>{perm['apellidos']} {perm['nombres']}<br/>C.I. {perm['cedula']}</div></div>
+        <div class="firma"><div class="linea">JEFE INMEDIATO / RRHH<br/>Nombre: ___________________<br/>Cargo: ____________________</div></div>
+    </div>
+    <p class="footer">Documento generado por NEXUS IA - {datetime.now().strftime('%Y-%m-%d %H:%M')}</p>
+    </body></html>"""
+    buf = io.BytesIO(html.encode("utf-8"))
+    return StreamingResponse(buf, media_type="text/html",
+        headers={"Content-Disposition": f'inline; filename="permiso_{perm["cedula"]}_{pid}.html"'})
+
+
 @router.get("/empleados/{eid}/vacaciones-disponibles")
 def vacaciones_disponibles(eid: int, u=Depends(get_current_user)):
     emp = query_one("SELECT * FROM nom_empleados WHERE id=%s", (eid,))
