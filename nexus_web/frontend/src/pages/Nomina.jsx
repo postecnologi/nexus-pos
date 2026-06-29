@@ -192,7 +192,7 @@ function TabEmpleados({ sty, t }) {
                     style={{ ...sty.btnOutline(e.activo ? t.red : t.green), padding: '4px 10px', fontSize: 11 }}>
                     {e.activo ? 'Desactivar' : 'Activar'}
                   </button>
-                  <button onClick={async ev => { ev.stopPropagation(); try { const r=await api.get(`/nomina/empleados/${e.id}/certificado-trabajo`,{responseType:'blob'}); window.open(URL.createObjectURL(new Blob([r.data],{type:'application/pdf'})),'_blank') } catch{alert('Error')} }}
+                  <button onClick={ev => { ev.stopPropagation(); descargarDoc(`/nomina/empleados/${e.id}/certificado-trabajo`) }}
                     style={{ ...sty.btnOutline(t.blue), padding: '4px 10px', fontSize: 11 }}
                     title="Certificado de Trabajo">
                     <Award size={12} />
@@ -425,9 +425,16 @@ function TabRoles({ sty, t }) {
   const verPdf = async (rid) => {
     try {
       const resp = await api.get(`/nomina/roles/${rid}/pdf`, { responseType: 'blob' })
-      const url = window.URL.createObjectURL(new Blob([resp.data], { type: 'application/pdf' }))
-      window.open(url, '_blank')
+      const ct = resp.headers['content-type'] || 'text/html'
+      window.open(URL.createObjectURL(new Blob([resp.data], { type: ct })), '_blank')
     } catch (e) { alert('Error al generar PDF') }
+  }
+  const descargarDoc = async (url) => {
+    try {
+      const resp = await api.get(url, { responseType: 'blob' })
+      const ct = resp.headers['content-type'] || 'text/html'
+      window.open(URL.createObjectURL(new Blob([resp.data], { type: ct })), '_blank')
+    } catch (e) { alert('Error al generar documento') }
   }
 
   const totalIngresos = roles.reduce((s, r) => s + parseFloat(r.total_ingresos || 0), 0)
@@ -454,7 +461,7 @@ function TabRoles({ sty, t }) {
               <select
                 onChange={e => {
                   if (e.target.value) {
-                    api.get(`/nomina/roles/archivo-bancario?periodo=${periodo}&banco=${e.target.value}`,{responseType:'blob'}).then(r=>window.open(URL.createObjectURL(new Blob([r.data])),'_blank')).catch(()=>alert('Error'))
+                    descargarDoc(`/nomina/roles/archivo-bancario?periodo=${periodo}&banco=${e.target.value}`)
                     e.target.value = ''
                   }
                 }}
@@ -468,7 +475,7 @@ function TabRoles({ sty, t }) {
                 <option value="GENERAL">General CSV</option>
               </select>
             </div>
-            <button onClick={() => api.get(`/nomina/roles/archivo-iess?periodo=${periodo}`,{responseType:'blob'}).then(r=>window.open(URL.createObjectURL(new Blob([r.data])),'_blank')).catch(()=>alert('Error'))}
+            <button onClick={() => descargarDoc(`/nomina/roles/archivo-iess?periodo=${periodo}`)}
               style={sty.btn(t.purple)}>
               <Download size={14} /> Archivo IESS
             </button>
@@ -1356,7 +1363,7 @@ function TabLiquidacion({ sty, t }) {
           </table>
 
           <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-            <button onClick={() => api.get(`/nomina/empleados/${result.empleado_id}/acta-finiquito?motivo=${result.motivo}`,{responseType:'blob'}).then(r=>window.open(URL.createObjectURL(new Blob([r.data],{type:'application/pdf'})),'_blank')).catch(()=>alert('Error'))}
+            <button onClick={() => descargarDoc(`/nomina/empleados/${result.empleado_id}/acta-finiquito?motivo=${result.motivo}`)}
               style={sty.btn(t.purple)}>
               <FileText size={14} /> Acta de Finiquito
             </button>
