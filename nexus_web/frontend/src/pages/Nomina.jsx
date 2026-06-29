@@ -192,7 +192,7 @@ function TabEmpleados({ sty, t }) {
                     style={{ ...sty.btnOutline(e.activo ? t.red : t.green), padding: '4px 10px', fontSize: 11 }}>
                     {e.activo ? 'Desactivar' : 'Activar'}
                   </button>
-                  <button onClick={ev => { ev.stopPropagation(); window.open(`/api/nomina/empleados/${e.id}/certificado-trabajo`, '_blank') }}
+                  <button onClick={async ev => { ev.stopPropagation(); try { const r=await api.get(`/nomina/empleados/${e.id}/certificado-trabajo`,{responseType:'blob'}); window.open(URL.createObjectURL(new Blob([r.data],{type:'application/pdf'})),'_blank') } catch{alert('Error')} }}
                     style={{ ...sty.btnOutline(t.blue), padding: '4px 10px', fontSize: 11 }}
                     title="Certificado de Trabajo">
                     <Award size={12} />
@@ -422,8 +422,12 @@ function TabRoles({ sty, t }) {
     } catch (err) { alert('Error') }
   }
 
-  const verPdf = (rid) => {
-    window.open(`${import.meta.env.VITE_API_URL||'http://localhost:8000/api'}/nomina/roles/${rid}/pdf`, '_blank')
+  const verPdf = async (rid) => {
+    try {
+      const resp = await api.get(`/nomina/roles/${rid}/pdf`, { responseType: 'blob' })
+      const url = window.URL.createObjectURL(new Blob([resp.data], { type: 'application/pdf' }))
+      window.open(url, '_blank')
+    } catch (e) { alert('Error al generar PDF') }
   }
 
   const totalIngresos = roles.reduce((s, r) => s + parseFloat(r.total_ingresos || 0), 0)
@@ -450,7 +454,7 @@ function TabRoles({ sty, t }) {
               <select
                 onChange={e => {
                   if (e.target.value) {
-                    window.open(`/api/nomina/roles/archivo-bancario?periodo=${periodo}&banco=${e.target.value}`, '_blank')
+                    api.get(`/nomina/roles/archivo-bancario?periodo=${periodo}&banco=${e.target.value}`,{responseType:'blob'}).then(r=>window.open(URL.createObjectURL(new Blob([r.data])),'_blank')).catch(()=>alert('Error'))
                     e.target.value = ''
                   }
                 }}
@@ -464,7 +468,7 @@ function TabRoles({ sty, t }) {
                 <option value="GENERAL">General CSV</option>
               </select>
             </div>
-            <button onClick={() => window.open(`/api/nomina/roles/archivo-iess?periodo=${periodo}`, '_blank')}
+            <button onClick={() => api.get(`/nomina/roles/archivo-iess?periodo=${periodo}`,{responseType:'blob'}).then(r=>window.open(URL.createObjectURL(new Blob([r.data])),'_blank')).catch(()=>alert('Error'))}
               style={sty.btn(t.purple)}>
               <Download size={14} /> Archivo IESS
             </button>
@@ -610,8 +614,7 @@ function RolDetalleModal({ sty, t, rol, onClose }) {
               <Check size={14} /> Aprobar
             </button>
           )}
-          <button onClick={() => window.open(`${import.meta.env.VITE_API_URL||'http://localhost:8000/api'}/nomina/roles/${r.id}/pdf`, '_blank')}
-            style={sty.btnOutline(t.blue)}>
+          <button onClick={() => verPdf(r.id)} style={sty.btnOutline(t.blue)}>
             <FileText size={14} /> Ver PDF
           </button>
           <button onClick={onClose} style={sty.btnOutline(t.muted)}>Cerrar</button>
@@ -1353,7 +1356,7 @@ function TabLiquidacion({ sty, t }) {
           </table>
 
           <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-            <button onClick={() => window.open(`/api/nomina/empleados/${result.empleado_id}/acta-finiquito?motivo=${result.motivo}`, '_blank')}
+            <button onClick={() => api.get(`/nomina/empleados/${result.empleado_id}/acta-finiquito?motivo=${result.motivo}`,{responseType:'blob'}).then(r=>window.open(URL.createObjectURL(new Blob([r.data],{type:'application/pdf'})),'_blank')).catch(()=>alert('Error'))}
               style={sty.btn(t.purple)}>
               <FileText size={14} /> Acta de Finiquito
             </button>
