@@ -394,6 +394,8 @@ def run_migrations():
         )""",
         "CREATE INDEX IF NOT EXISTS idx_audit_fecha ON sys_audit_log(created_at DESC)",
         "CREATE INDEX IF NOT EXISTS idx_audit_usuario ON sys_audit_log(usuario_id)",
+        "ALTER TABLE fin_movimientos_bancarios ALTER COLUMN tipo TYPE VARCHAR(50)",
+        "ALTER TABLE fin_movimientos_bancarios ALTER COLUMN concepto TYPE VARCHAR(500)",
         # ── Ordenes de Compra ──
         """CREATE TABLE IF NOT EXISTS com_ordenes_compra (
             id SERIAL PRIMARY KEY,
