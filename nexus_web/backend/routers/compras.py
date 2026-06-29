@@ -136,12 +136,11 @@ def crear_compra(f: CompraIn, u=Depends(get_current_user)):
 
     # Fecha vencimiento
     from datetime import date, timedelta
+    from fecha_validator import validar_fecha
     plazo = int(f.plazo_dias or 30)
-    fecha_venc = f.fecha_vencimiento or str(date.today() + timedelta(days=plazo))
 
-    # Insertar cabecera
-    # Fecha de emision — puede ser diferente a hoy
-    fecha_emis = f.fecha_emision or str(date.today())
+    fecha_emis = validar_fecha(f.fecha_emision, "fecha de emision")
+    fecha_venc = f.fecha_vencimiento or str(date.today() + timedelta(days=plazo))
 
     compra_id = insert("""
         INSERT INTO com_compras

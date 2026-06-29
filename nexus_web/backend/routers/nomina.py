@@ -1671,7 +1671,8 @@ def solicitar_permiso(empleado_id: int, tipo: str, modalidad: str, fecha: str,
                        motivo: str, horas: float = 0, dias: float = 0,
                        hora_salida: str = None, hora_regreso: str = None,
                        u=Depends(get_current_user)):
-    # Validate tipo
+    from fecha_validator import validar_fecha
+    fecha = validar_fecha(fecha, "fecha del permiso", permitir_futuro_dias=90)
     tipo_info = next((t for t in TIPOS_PERMISO if t['id'] == tipo), None)
     if not tipo_info: raise HTTPException(400, "Tipo de permiso inválido")
 
@@ -1873,7 +1874,9 @@ def portal_solicitar_permiso(tipo: str, modalidad: str, fecha: str,
                               motivo: str, horas: float = 0, dias: float = 0,
                               hora_salida: str = None, hora_regreso: str = None,
                               u=Depends(get_current_user)):
+    from fecha_validator import validar_fecha
     emp = _get_empleado_by_user(u["id"])
+    fecha = validar_fecha(fecha, "fecha del permiso", permitir_futuro_dias=90)
     tipo_info = next((t for t in TIPOS_PERMISO if t['id'] == tipo), None)
     if not tipo_info: raise HTTPException(400, "Tipo de permiso invalido")
     if modalidad == 'HORAS':
