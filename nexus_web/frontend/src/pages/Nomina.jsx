@@ -733,9 +733,10 @@ function TabVacaciones({ sty, t }) {
       {/* Stats */}
       <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
         {[
-          { label: 'Registros', value: filtered.length, color: t.blue },
-          { label: 'Total Dias', value: totalDias, color: t.amber },
-          { label: 'Total Valor', value: fmtMoney(totalValor), color: t.green },
+          { label: 'Solicitadas', value: filtered.filter(v => v.estado === 'SOLICITADA').length, color: t.amber },
+          { label: 'Aprobadas', value: filtered.filter(v => v.estado === 'APROBADA').length, color: t.green },
+          { label: 'Rechazadas', value: filtered.filter(v => v.estado === 'RECHAZADA').length, color: t.red },
+          { label: 'Total Dias', value: totalDias, color: t.blue },
         ].map((s, i) => (
           <div key={i} style={{
             flex: 1, minWidth: 140, padding: '14px 20px', background: s.color + '15',
@@ -751,13 +752,15 @@ function TabVacaciones({ sty, t }) {
         <table style={sty.table}>
           <thead>
             <tr>
-              {['Empleado', 'Fecha Inicio', 'Fecha Fin', 'Dias', 'Dias Derecho', 'Valor', 'Estado', 'Observaciones'].map(h =>
+              {['Empleado', 'Fecha Inicio', 'Fecha Fin', 'Dias', 'Valor', 'Estado', 'Observaciones', 'Acciones'].map(h =>
                 <th key={h} style={sty.th}>{h}</th>
               )}
             </tr>
           </thead>
           <tbody>
-            {filtered.map(v => (
+            {filtered.map(v => {
+              const estadoColor = v.estado === 'APROBADA' ? t.green : v.estado === 'RECHAZADA' ? t.red : t.amber
+              return (
               <tr key={v.id}
                 onMouseEnter={ev => ev.currentTarget.style.background = t.sur2}
                 onMouseLeave={ev => ev.currentTarget.style.background = 'transparent'}>
@@ -765,12 +768,32 @@ function TabVacaciones({ sty, t }) {
                 <td style={sty.td}>{v.fecha_inicio?.substring(0, 10)}</td>
                 <td style={sty.td}>{v.fecha_fin?.substring(0, 10)}</td>
                 <td style={sty.td}>{v.dias_tomados}</td>
-                <td style={sty.td}>{v.dias_derecho}</td>
                 <td style={sty.td}>{fmtMoney(v.valor)}</td>
-                <td style={sty.td}><span style={sty.badge(t.green)}>{v.estado}</span></td>
+                <td style={sty.td}><span style={sty.badge(estadoColor)}>{v.estado}</span></td>
                 <td style={sty.td}>{v.observaciones || '-'}</td>
+                <td style={{ ...sty.td, whiteSpace: 'nowrap' }}>
+                  {v.estado === 'SOLICITADA' && (
+                    <>
+                      <button onClick={async () => {
+                        try { await api.patch(`/nomina/vacaciones/${v.id}/aprobar`); load() }
+                        catch (err) { alert(err.response?.data?.detail || 'Error') }
+                      }} style={{ ...sty.btn(t.green), padding: '4px 10px', fontSize: 11, marginRight: 4 }}>
+                        <Check size={12} /> Aprobar
+                      </button>
+                      <button onClick={async () => {
+                        const obs = prompt('Motivo del rechazo (opcional):')
+                        if (obs === null) return
+                        try { await api.patch(`/nomina/vacaciones/${v.id}/rechazar`, null, { params: { observaciones: obs } }); load() }
+                        catch (err) { alert(err.response?.data?.detail || 'Error') }
+                      }} style={{ ...sty.btn(t.red), padding: '4px 10px', fontSize: 11 }}>
+                        <X size={12} /> Rechazar
+                      </button>
+                    </>
+                  )}
+                </td>
               </tr>
-            ))}
+              )
+            })}
             {!filtered.length && (
               <tr><td colSpan={8} style={{ ...sty.td, textAlign: 'center', color: t.muted, padding: 30 }}>
                 No hay registros de vacaciones

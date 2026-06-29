@@ -732,9 +732,28 @@ def crear_vacacion(vac: VacacionIn, u=Depends(get_current_user)):
     vid = insert("""
         INSERT INTO nom_vacaciones (empleado_id, fecha_inicio, fecha_fin, dias_tomados, dias_derecho, valor, estado, observaciones)
         VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
-    """, (vac.empleado_id, vac.fecha_inicio, vac.fecha_fin, vac.dias_tomados, vac_days, valor, "APROBADA", vac.observaciones))
+    """, (vac.empleado_id, vac.fecha_inicio, vac.fecha_fin, vac.dias_tomados, vac_days, valor, "SOLICITADA", vac.observaciones))
 
-    return {"id": vid, "msg": "Vacaciones registradas", "valor": valor}
+    return {"id": vid, "msg": "Vacaciones solicitadas (pendiente aprobacion)", "valor": valor}
+
+
+@router.patch("/vacaciones/{vid}/aprobar")
+def aprobar_vacacion(vid: int, u=Depends(get_current_user)):
+    vac = query_one("SELECT * FROM nom_vacaciones WHERE id=%s", (vid,))
+    if not vac: raise HTTPException(404)
+    if vac['estado'] != 'SOLICITADA': raise HTTPException(400, "Solo se pueden aprobar vacaciones solicitadas")
+    execute("UPDATE nom_vacaciones SET estado='APROBADA' WHERE id=%s", (vid,))
+    return {"msg": "Vacaciones aprobadas"}
+
+
+@router.patch("/vacaciones/{vid}/rechazar")
+def rechazar_vacacion(vid: int, observaciones: str = '', u=Depends(get_current_user)):
+    vac = query_one("SELECT * FROM nom_vacaciones WHERE id=%s", (vid,))
+    if not vac: raise HTTPException(404)
+    if vac['estado'] != 'SOLICITADA': raise HTTPException(400, "Solo se pueden rechazar vacaciones solicitadas")
+    execute("UPDATE nom_vacaciones SET estado='RECHAZADA', observaciones=%s WHERE id=%s", (observaciones, vid))
+    return {"msg": "Vacaciones rechazadas"}
+
 
 @router.get("/empleados/{eid}/vacaciones-disponibles")
 def vacaciones_disponibles(eid: int, u=Depends(get_current_user)):
@@ -1696,8 +1715,8 @@ def portal_solicitar_vacacion(vac: VacacionIn, u=Depends(get_current_user)):
     vid = insert("""
         INSERT INTO nom_vacaciones (empleado_id, fecha_inicio, fecha_fin, dias_tomados, dias_derecho, valor, estado, observaciones)
         VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
-    """, (emp["id"], vac.fecha_inicio, vac.fecha_fin, vac.dias_tomados, vac_days, valor, "APROBADA", vac.observaciones))
-    return {"id": vid, "msg": "Vacaciones registradas", "valor": valor}
+    """, (emp["id"], vac.fecha_inicio, vac.fecha_fin, vac.dias_tomados, vac_days, valor, "SOLICITADA", vac.observaciones))
+    return {"id": vid, "msg": "Vacaciones solicitadas (pendiente aprobacion)", "valor": valor}
 
 @router.get("/portal/mis-permisos")
 def portal_mis_permisos(u=Depends(get_current_user)):
