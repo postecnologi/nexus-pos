@@ -1754,9 +1754,22 @@ function TabReportes({ sty, t }) {
   const [utilNeta, setUtilNeta] = useState('')
   const [utilData, setUtilData] = useState(null)
   const [utilCalc, setUtilCalc] = useState(false)
+  const [resumenFin, setResumenFin] = useState(null)
+  const [loadingResumen, setLoadingResumen] = useState(false)
+
+  const cargarResumen = async (anio) => {
+    setLoadingResumen(true)
+    try {
+      const r = await api.get(`/nomina/utilidades/resumen-financiero?anio=${anio}`)
+      setResumenFin(r.data)
+      if (r.data.utilidad_neta > 0) setUtilNeta(r.data.utilidad_neta.toString())
+      else setUtilNeta('')
+    } catch { setResumenFin(null) }
+    setLoadingResumen(false)
+  }
 
   const calcularUtilidades = async () => {
-    if (!utilNeta || parseFloat(utilNeta) <= 0) { alert('Ingrese la utilidad neta'); return }
+    if (!utilNeta || parseFloat(utilNeta) <= 0) { alert('La utilidad neta debe ser mayor a 0'); return }
     setUtilCalc(true)
     try {
       const r = await api.post(`/nomina/utilidades/calcular?anio=${utilAnio}&utilidad_neta=${parseFloat(utilNeta)}`)
@@ -1945,13 +1958,19 @@ function TabReportes({ sty, t }) {
             <input type="number" value={utilAnio} onChange={e => setUtilAnio(parseInt(e.target.value))}
               style={{ ...sty.input, width: 100 }} />
           </div>
+          <button onClick={() => cargarResumen(utilAnio)} disabled={loadingResumen}
+            style={sty.btn(t.blue)}>
+            <RefreshCw size={14} /> {loadingResumen ? 'Cargando...' : 'Calcular desde Sistema'}
+          </button>
           <div style={{ minWidth: 200 }}>
-            <label style={sty.label}>Utilidad Neta de la Empresa ($)</label>
+            <label style={sty.label}>Utilidad Neta ($)
+              {resumenFin && <span style={{ fontWeight: 400, color: t.muted }}> (auto-calculada)</span>}
+            </label>
             <input type="number" value={utilNeta} onChange={e => setUtilNeta(e.target.value)}
-              style={sty.input} step="0.01" placeholder="Ej: 50000" />
+              style={sty.input} step="0.01" placeholder="Se calcula automaticamente" />
           </div>
           <button onClick={calcularUtilidades} disabled={utilCalc} style={sty.btn(t.green)}>
-            <Calculator size={14} /> {utilCalc ? 'Calculando...' : 'Calcular'}
+            <Calculator size={14} /> {utilCalc ? 'Calculando...' : 'Repartir'}
           </button>
           {utilData && (
             <button onClick={exportUtilPdf} style={sty.btn(t.purple)}>
@@ -1960,9 +1979,49 @@ function TabReportes({ sty, t }) {
           )}
         </div>
         <p style={{ fontSize: 10, color: t.muted, marginTop: 8 }}>
-          Art. 97-100 Codigo del Trabajo: 10% por dias trabajados + 5% por cargas familiares
+          Art. 97-100 Codigo del Trabajo: 10% por dias trabajados + 5% por cargas familiares.
+          Presione "Calcular desde Sistema" para obtener la utilidad neta automaticamente.
         </p>
       </div>
+
+      {resumenFin && (
+        <div style={sty.card}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: t.blue, marginBottom: 12 }}>
+            Resumen Financiero {resumenFin.anio}
+            <span style={{ fontWeight: 400, color: t.muted, marginLeft: 8, fontSize: 10 }}>
+              Fuente: {resumenFin.fuente === 'contabilidad' ? 'Modulo Contabilidad' : 'Ventas + Compras + Nomina'}
+            </span>
+          </div>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+            {[
+              { label: `Ingresos (${resumenFin.ventas.cantidad} facturas)`, value: fmtMoney(resumenFin.ingresos), color: t.green },
+              { label: `Costos (${resumenFin.compras.cantidad} compras)`, value: fmtMoney(resumenFin.costos), color: t.red },
+              { label: 'Gastos (nomina + otros)', value: fmtMoney(resumenFin.gastos), color: t.amber },
+              { label: 'Utilidad Bruta', value: fmtMoney(resumenFin.utilidad_bruta), color: t.blue },
+              { label: 'Utilidad Neta', value: fmtMoney(resumenFin.utilidad_neta), color: resumenFin.utilidad_neta > 0 ? t.green : t.red },
+              { label: '15% a Repartir', value: fmtMoney(resumenFin.utilidad_15_pct), color: t.purple },
+            ].map((s, i) => (
+              <div key={i} style={{
+                flex: '1 1 140px', padding: '10px 14px', background: s.color + '12',
+                borderRadius: 8, border: `1px solid ${s.color}30`, textAlign: 'center',
+              }}>
+                <div style={{ fontSize: 10, color: t.muted, marginBottom: 2 }}>{s.label}</div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: s.color }}>{s.value}</div>
+              </div>
+            ))}
+          </div>
+          {resumenFin.nomina.total > 0 && (
+            <div style={{ fontSize: 10, color: t.muted, marginTop: 8 }}>
+              Nomina: Sueldos {fmtMoney(resumenFin.nomina.sueldos)} + IESS Patronal {fmtMoney(resumenFin.nomina.iess_patronal)} + Provisiones {fmtMoney(resumenFin.nomina.provisiones)}
+            </div>
+          )}
+          {resumenFin.utilidad_neta <= 0 && (
+            <div style={{ marginTop: 8, padding: 8, background: t.redD, borderRadius: 6, border: `1px solid ${t.red}33`, fontSize: 11, color: t.red }}>
+              No hay utilidades para repartir (la empresa tiene perdida o utilidad $0).
+            </div>
+          )}
+        </div>
+      )}
 
       {utilData && (
         <>
