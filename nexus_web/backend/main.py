@@ -45,6 +45,40 @@ class TenantMiddleware(BaseHTTPMiddleware):
 if MULTI_TENANT:
     app.add_middleware(TenantMiddleware)
 
+# ── Middleware de Auditoría Automática ────────────────────────
+AUDIT_METHOD_MAP = {"POST": "CREAR", "PUT": "EDITAR", "PATCH": "EDITAR", "DELETE": "ELIMINAR"}
+AUDIT_SKIP = {"/api/auth/", "/api/admin/audit", "/api/nomina/portal/"}
+
+class AuditMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        response = await call_next(request)
+        method = request.method
+        path = request.url.path
+        if method in AUDIT_METHOD_MAP and response.status_code < 400:
+            if not any(path.startswith(s) for s in AUDIT_SKIP):
+                try:
+                    from jose import jwt as _jwt
+                    from auth import SECRET_KEY, ALGORITHM
+                    auth_header = request.headers.get("authorization", "")
+                    if auth_header.startswith("Bearer "):
+                        payload = _jwt.decode(auth_header[7:], SECRET_KEY, algorithms=[ALGORITHM])
+                        uid = int(payload.get("sub", 0))
+                        if uid:
+                            from database import query_one as _qo, insert as _ins
+                            user = _qo("SELECT nombre FROM sys_usuarios WHERE id=%s", (uid,))
+                            nombre = user["nombre"] if user else ""
+                            parts = path.replace("/api/", "").split("/")
+                            modulo = parts[0] if parts else path
+                            accion = AUDIT_METHOD_MAP[method]
+                            detalle = f"{method} {path}"
+                            _ins("INSERT INTO sys_audit_log (usuario_id, usuario_nombre, accion, modulo, detalle, ip) VALUES (%s,%s,%s,%s,%s,%s)",
+                                (uid, nombre, accion, modulo, detalle[:500], request.client.host if request.client else ""))
+                except Exception:
+                    pass
+        return response
+
+app.add_middleware(AuditMiddleware)
+
 # ── Carpeta de imágenes estáticas ─────────────────────────────
 UPLOAD_DIR = Path(__file__).parent.parent / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
