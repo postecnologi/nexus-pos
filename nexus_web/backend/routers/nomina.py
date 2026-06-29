@@ -1782,6 +1782,111 @@ def get_horas_acumuladas(eid: int, u=Depends(get_current_user)):
 #  UTILIDADES (15% reparto)
 # ══════════════════════════════════════════════════════════════════
 
+@router.get("/utilidades/resumen-financiero")
+def resumen_financiero(anio: int, u=Depends(get_current_user)):
+    fi = f"{anio}-01-01"
+    ff = f"{anio}-12-31"
+
+    ventas = query_one("""
+        SELECT COALESCE(SUM(total), 0) as total,
+               COALESCE(SUM(subtotal_0 + subtotal_iva), 0) as subtotal,
+               COALESCE(SUM(iva), 0) as iva,
+               COUNT(*) as cantidad
+        FROM ven_facturas
+        WHERE estado IN ('EMITIDA','PAGADA') AND fecha_emision >= %s AND fecha_emision <= %s
+    """, (fi, ff))
+
+    compras = query_one("""
+        SELECT COALESCE(SUM(total), 0) as total,
+               COALESCE(SUM(subtotal_0 + subtotal_iva), 0) as subtotal,
+               COALESCE(SUM(iva), 0) as iva,
+               COUNT(*) as cantidad
+        FROM com_compras
+        WHERE estado='CONFIRMADA' AND fecha >= %s AND fecha <= %s
+    """, (fi, ff))
+
+    gastos_nomina = query_one("""
+        SELECT COALESCE(SUM(total_ingresos), 0) as costo_bruto,
+               COALESCE(SUM(aporte_iess_patronal), 0) as iess_patronal,
+               COALESCE(SUM(decimo_tercero), 0) as d13,
+               COALESCE(SUM(decimo_cuarto), 0) as d14,
+               COALESCE(SUM(fondos_reserva), 0) as fr,
+               COALESCE(SUM(vacaciones_provision), 0) as vacaciones
+        FROM nom_roles_pago
+        WHERE estado='APROBADO' AND periodo >= %s AND periodo <= %s
+    """, (f"{anio}-01", f"{anio}-12"))
+
+    nomina_total = float(gastos_nomina["costo_bruto"]) + float(gastos_nomina["iess_patronal"]) + \
+                   float(gastos_nomina["d13"]) + float(gastos_nomina["d14"]) + \
+                   float(gastos_nomina["fr"]) + float(gastos_nomina["vacaciones"])
+
+    contabilidad = None
+    try:
+        gastos_cont = query_one("""
+            SELECT COALESCE(SUM(CASE WHEN c.naturaleza='DEUDORA' THEN d.debe - d.haber ELSE d.haber - d.debe END), 0) as total
+            FROM cont_asiento_detalles d
+            JOIN cont_asientos a ON a.id = d.asiento_id
+            JOIN cont_plan_cuentas c ON c.id = d.cuenta_id
+            WHERE a.estado='APROBADO' AND a.fecha >= %s AND a.fecha <= %s
+            AND c.tipo = 'GASTO' AND c.es_movimiento = true
+        """, (fi, ff))
+        ingresos_cont = query_one("""
+            SELECT COALESCE(SUM(CASE WHEN c.naturaleza='ACREEDORA' THEN d.haber - d.debe ELSE d.debe - d.haber END), 0) as total
+            FROM cont_asiento_detalles d
+            JOIN cont_asientos a ON a.id = d.asiento_id
+            JOIN cont_plan_cuentas c ON c.id = d.cuenta_id
+            WHERE a.estado='APROBADO' AND a.fecha >= %s AND a.fecha <= %s
+            AND c.tipo = 'INGRESO' AND c.es_movimiento = true
+        """, (fi, ff))
+        costos_cont = query_one("""
+            SELECT COALESCE(SUM(CASE WHEN c.naturaleza='DEUDORA' THEN d.debe - d.haber ELSE d.haber - d.debe END), 0) as total
+            FROM cont_asiento_detalles d
+            JOIN cont_asientos a ON a.id = d.asiento_id
+            JOIN cont_plan_cuentas c ON c.id = d.cuenta_id
+            WHERE a.estado='APROBADO' AND a.fecha >= %s AND a.fecha <= %s
+            AND c.tipo = 'COSTO' AND c.es_movimiento = true
+        """, (fi, ff))
+        contabilidad = {
+            "ingresos": round(float(ingresos_cont["total"]), 2),
+            "costos": round(float(costos_cont["total"]), 2),
+            "gastos": round(float(gastos_cont["total"]), 2),
+        }
+    except:
+        pass
+
+    ingresos_total = float(ventas["subtotal"])
+    costos_total = float(compras["subtotal"])
+    gastos_total = round(nomina_total, 2)
+
+    if contabilidad and contabilidad["ingresos"] > 0:
+        ingresos_total = contabilidad["ingresos"]
+        costos_total = contabilidad["costos"]
+        gastos_total = contabilidad["gastos"]
+
+    utilidad_bruta = round(ingresos_total - costos_total, 2)
+    utilidad_neta = round(utilidad_bruta - gastos_total, 2)
+
+    return {
+        "anio": anio,
+        "ventas": {"total": round(float(ventas["total"]), 2), "subtotal": round(float(ventas["subtotal"]), 2), "cantidad": ventas["cantidad"]},
+        "compras": {"total": round(float(compras["total"]), 2), "subtotal": round(float(compras["subtotal"]), 2), "cantidad": compras["cantidad"]},
+        "nomina": {
+            "sueldos": round(float(gastos_nomina["costo_bruto"]), 2),
+            "iess_patronal": round(float(gastos_nomina["iess_patronal"]), 2),
+            "provisiones": round(float(gastos_nomina["d13"]) + float(gastos_nomina["d14"]) + float(gastos_nomina["fr"]) + float(gastos_nomina["vacaciones"]), 2),
+            "total": round(nomina_total, 2),
+        },
+        "contabilidad": contabilidad,
+        "fuente": "contabilidad" if contabilidad and contabilidad["ingresos"] > 0 else "modulos",
+        "ingresos": round(ingresos_total, 2),
+        "costos": round(costos_total, 2),
+        "gastos": round(gastos_total, 2),
+        "utilidad_bruta": utilidad_bruta,
+        "utilidad_neta": utilidad_neta,
+        "utilidad_15_pct": round(max(0, utilidad_neta) * 0.15, 2),
+    }
+
+
 @router.post("/utilidades/calcular")
 def calcular_utilidades(anio: int, utilidad_neta: float, u=Depends(get_current_user)):
     if utilidad_neta <= 0:
