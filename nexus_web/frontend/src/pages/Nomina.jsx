@@ -374,11 +374,25 @@ function EmpleadoModal({ sty, t, emp, vendedores, usuarios, tecnicos, onClose, o
             options={tecnicos.map(tc => ({ value: tc.id, label: tc.nombre }))} />
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-          <button onClick={onClose} style={sty.btnOutline(t.muted)}>Cancelar</button>
-          <button onClick={save} disabled={saving} style={sty.btn()}>
-            {saving ? 'Guardando...' : (isEdit ? 'Actualizar' : 'Crear Empleado')}
-          </button>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          {isEdit && (
+            <button onClick={async () => {
+              const pass = prompt('Contraseña para el empleado (mínimo 4 caracteres):', '123456')
+              if (!pass || pass.length < 4) { alert('Contraseña debe tener al menos 4 caracteres'); return }
+              try {
+                const r = await api.post(`/nomina/empleados/${emp.id}/crear-acceso?password=${encodeURIComponent(pass)}`)
+                alert(r.data.msg)
+              } catch (err) { alert(err.response?.data?.detail || 'Error') }
+            }} style={sty.btn('#8B5CF6')}>
+              <Users size={14} /> {emp.usuario_id ? 'Ver Acceso' : 'Crear Acceso Portal'}
+            </button>
+          )}
+          <div style={{ display: 'flex', gap: 10, marginLeft: 'auto' }}>
+            <button onClick={onClose} style={sty.btnOutline(t.muted)}>Cancelar</button>
+            <button onClick={save} disabled={saving} style={sty.btn()}>
+              {saving ? 'Guardando...' : (isEdit ? 'Actualizar' : 'Crear Empleado')}
+            </button>
+          </div>
         </div>
       </div>
     </div>
