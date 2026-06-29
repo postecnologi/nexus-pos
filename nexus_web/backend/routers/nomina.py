@@ -1910,6 +1910,8 @@ def calcular_utilidades(anio: int, utilidad_neta: float, u=Depends(get_current_u
             "departamento": emp.get("departamento", ""),
             "salario_base": float(emp.get("salario_base", 0)),
             "fecha_ingreso": str(emp["fecha_ingreso"])[:10],
+            "fecha_salida": str(emp["fecha_salida"])[:10] if emp.get("fecha_salida") else None,
+            "activo": emp.get("activo", True),
             "dias_trabajados": dias,
             "cargas_familiares": cargas,
             "cargas_calculo": cargas_calc,
@@ -1943,10 +1945,12 @@ def utilidades_pdf(anio: int, utilidad_neta: float, u=Depends(get_current_user))
 
     rows_html = ""
     for r in data["empleados"]:
+        estado_txt = "Activo" if r.get("activo") else f"Salió {r.get('fecha_salida','')}"
         rows_html += f"""<tr>
             <td>{r['apellidos']} {r['nombres']}</td>
             <td>{r['cedula']}</td>
             <td>{r['cargo']}</td>
+            <td style="text-align:center">{estado_txt}</td>
             <td style="text-align:center">{r['dias_trabajados']}</td>
             <td style="text-align:center">{r['cargas_familiares']}</td>
             <td style="text-align:right">${r['utilidad_10']:.2f}</td>
@@ -1988,13 +1992,13 @@ def utilidades_pdf(anio: int, utilidad_neta: float, u=Depends(get_current_user))
 
     <table>
     <thead><tr>
-        <th>Empleado</th><th>Cedula</th><th>Cargo</th>
+        <th>Empleado</th><th>Cedula</th><th>Cargo</th><th>Estado</th>
         <th>Dias Trab.</th><th>Cargas</th>
         <th>10% Individual</th><th>5% Individual</th><th>Total</th>
     </tr></thead>
     <tbody>{rows_html}</tbody>
     <tfoot><tr class="totals">
-        <td colspan="5" style="text-align:right">TOTAL REPARTIDO:</td>
+        <td colspan="6" style="text-align:right">TOTAL REPARTIDO:</td>
         <td style="text-align:right">${sum(r['utilidad_10'] for r in data['empleados']):.2f}</td>
         <td style="text-align:right">${sum(r['utilidad_5'] for r in data['empleados']):.2f}</td>
         <td style="text-align:right">${data['total_repartido']:,.2f}</td>

@@ -2103,7 +2103,7 @@ function TabReportes({ sty, t }) {
               <table style={sty.table}>
                 <thead>
                   <tr>
-                    {['Empleado', 'Cedula', 'Cargo', 'Dias Trab.', 'Cargas', '10% Individual', '5% Individual', 'Total'].map(h =>
+                    {['Empleado', 'Cedula', 'Cargo', 'Estado', 'Dias Trab.', 'Cargas', '10% Individual', '5% Individual', 'Total'].map(h =>
                       <th key={h} style={sty.th}>{h}</th>
                     )}
                   </tr>
@@ -2113,9 +2113,18 @@ function TabReportes({ sty, t }) {
                     <tr key={i}
                       onMouseEnter={ev => ev.currentTarget.style.background = t.sur2}
                       onMouseLeave={ev => ev.currentTarget.style.background = 'transparent'}>
-                      <td style={sty.td}><strong>{e.apellidos} {e.nombres}</strong></td>
+                      <td style={sty.td}>
+                        <strong>{e.apellidos} {e.nombres}</strong>
+                        {e.fecha_salida && <br/>}
+                        {e.fecha_salida && <span style={{ fontSize: 10, color: t.muted }}>Salida: {e.fecha_salida}</span>}
+                      </td>
                       <td style={sty.td}>{e.cedula}</td>
                       <td style={sty.td}>{e.cargo}</td>
+                      <td style={sty.td}>
+                        <span style={sty.badge(e.activo ? t.green : t.amber)}>
+                          {e.activo ? 'Activo' : 'Salió'}
+                        </span>
+                      </td>
                       <td style={{ ...sty.td, textAlign: 'center' }}>{e.dias_trabajados}</td>
                       <td style={{ ...sty.td, textAlign: 'center' }}>{e.cargas_familiares}</td>
                       <td style={{ ...sty.td, textAlign: 'right' }}>{fmtMoney(e.utilidad_10)}</td>
@@ -2126,7 +2135,7 @@ function TabReportes({ sty, t }) {
                 </tbody>
                 <tfoot>
                   <tr style={{ background: t.sur2 }}>
-                    <td colSpan={5} style={{ ...sty.td, fontWeight: 700, textAlign: 'right' }}>TOTAL REPARTIDO:</td>
+                    <td colSpan={6} style={{ ...sty.td, fontWeight: 700, textAlign: 'right' }}>TOTAL REPARTIDO:</td>
                     <td style={{ ...sty.td, fontWeight: 700, textAlign: 'right' }}>
                       {fmtMoney(utilData.empleados.reduce((s, e) => s + e.utilidad_10, 0))}
                     </td>
