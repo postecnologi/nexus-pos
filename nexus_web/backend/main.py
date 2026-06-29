@@ -56,8 +56,8 @@ class AuditMiddleware(BaseHTTPMiddleware):
         method = request.method
         path = request.url.path
         status = response.status_code
-        is_error = status >= 500 or status in (401, 403)
-        should_log = (method in AUDIT_METHOD_MAP and status < 400) or is_error
+        is_error = status >= 400
+        should_log = (method in AUDIT_METHOD_MAP and status < 400) or (is_error and method != "GET")
         skip = AUDIT_SKIP_ALL if status >= 400 else AUDIT_SKIP_OK
         if should_log and not any(path.startswith(s) for s in skip):
             try:
@@ -84,6 +84,9 @@ class AuditMiddleware(BaseHTTPMiddleware):
                 elif status == 403:
                     accion = "ACCESO_DENEGADO"
                     detalle = f"Sin permiso {method} {path}"
+                elif status in (400, 422):
+                    accion = "VALIDACION"
+                    detalle = f"{status} {method} {path}"
                 else:
                     accion = AUDIT_METHOD_MAP[method]
                     detalle = f"{method} {path}"
@@ -958,6 +961,13 @@ _permisos_migrations = [
         updated_at TIMESTAMP DEFAULT NOW()
     )""",
 ]
+@app.on_event("startup")
+def limpiar_audit_log_antiguo():
+    try:
+        execute("DELETE FROM sys_audit_log WHERE created_at < NOW() - INTERVAL '90 days'")
+    except:
+        pass
+
 @app.on_event("startup")
 def run_permisos_migrations():
     ALL_MIGRATIONS.extend(_permisos_migrations)
