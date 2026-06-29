@@ -181,3 +181,85 @@ select { cursor: pointer; }
 
 /* Drag and drop feedback */
 .drag-over { outline: 2px dashed #3B82F6; outline-offset: -2px; background: rgba(59,130,246,0.05); }
+
+/* ══════════════════════════════════════════════════════════════
+   RESPONSIVE MOBILE — Global rules for all pages
+   ══════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  /* Tables: horizontal scroll */
+  table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; white-space: nowrap; }
+  thead, tbody, tr { display: table; width: 100%; table-layout: auto; }
+  thead th, tbody td { padding: 8px 10px !important; font-size: 12px !important; }
+
+  /* Main content area: less padding */
+  [style*="padding: 24px"],
+  [style*="padding:24px"],
+  [style*="padding: 28px"],
+  [style*="padding:28px"] {
+    padding: 12px !important;
+  }
+
+  /* Grids: stack to 1 column */
+  [style*="grid-template-columns: repeat"],
+  [style*="gridTemplateColumns"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Flex rows: wrap */
+  [style*="display: flex"][style*="gap"] {
+    flex-wrap: wrap !important;
+  }
+
+  /* Modals: full width */
+  [style*="position: fixed"][style*="inset: 0"] > div,
+  [style*="position:fixed"][style*="inset:0"] > div {
+    width: 95vw !important;
+    max-width: 95vw !important;
+    max-height: 90vh !important;
+    margin: 0 auto !important;
+  }
+
+  /* Buttons: don't overflow */
+  button { white-space: nowrap; font-size: 12px !important; }
+
+  /* Topbar actions: wrap */
+  [style*="display:'flex'"][style*="justifyContent:'space-between'"],
+  [style*="display: 'flex'"][style*="justifyContent: 'space-between'"] {
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+  }
+
+  /* Grids: responsive columns */
+  [style*="gridTemplateColumns"] {
+    grid-template-columns: 1fr 1fr !important;
+  }
+
+  /* Page titles smaller */
+  h1 { font-size: 18px !important; }
+  h2 { font-size: 16px !important; }
+
+  /* Inputs: full width */
+  input, select, textarea {
+    font-size: 16px !important; /* Prevents iOS zoom */
+  }
+
+  /* Hide less important columns */
+  .hide-mobile { display: none !important; }
+}
+
+@media (max-width: 480px) {
+  /* Very small screens: single column */
+  [style*="gridTemplateColumns"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Smaller padding */
+  [style*="padding: 24px"],
+  [style*="padding:24px"],
+  [style*="padding: 28px"],
+  [style*="padding:28px"],
+  [style*="padding: 20px"],
+  [style*="padding:20px"] {
+    padding: 8px !important;
+  }
+}

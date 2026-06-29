@@ -269,7 +269,7 @@ export default function Layout() {
 
   return (
     <div style={{display:'flex', height:'100vh', overflow:'hidden', background:C.bg}}>
-      <style>{`@media(max-width:768px){.nexus-sidebar{display:none!important}.nexus-mobile-btn{display:flex!important}.nexus-sidebar-mobile{display:flex!important}}`}</style>
+      <style>{`@media(max-width:768px){.nexus-sidebar{display:none!important}.nexus-mobile-btn{display:flex!important}.nexus-sidebar-mobile{display:flex!important}main{padding-top:50px!important}}`}</style>
 
       {/* Mobile menu button */}
       <button className="nexus-mobile-btn" onClick={() => setMobileMenu(!mobileMenu)} style={{
