@@ -289,6 +289,7 @@ function TabAuditoria() {
   const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(false)
   const [filtros, setFiltros] = useState({ modulo: '', accion: '', fecha_ini: '', fecha_fin: '' })
+  const [trigger, setTrigger] = useState(0)
 
   const cargar = useCallback(async () => {
     setLoading(true)
@@ -306,7 +307,7 @@ function TabAuditoria() {
       setStats(statsR.data || null)
     } catch { setLogs([]); setStats(null) }
     finally { setLoading(false) }
-  }, [filtros])
+  }, [filtros, trigger])
 
   useEffect(() => { cargar() }, [cargar])
 
@@ -398,7 +399,7 @@ function TabAuditoria() {
           cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
           <Search size={13} /> Filtrar
         </button>
-        <button onClick={() => { setFiltros({ modulo: '', accion: '', fecha_ini: '', fecha_fin: '' }) }}
+        <button onClick={() => { setFiltros({ modulo: '', accion: '', fecha_ini: '', fecha_fin: '' }); setTrigger(t => t + 1) }}
           style={{ padding: '7px 14px', borderRadius: 7, fontSize: 12,
             border: `1px solid ${C.bord2}`, background: 'transparent', color: C.muted,
             cursor: 'pointer' }}>
