@@ -47,34 +47,50 @@ if MULTI_TENANT:
 
 # ── Middleware de Auditoría Automática ────────────────────────
 AUDIT_METHOD_MAP = {"POST": "CREAR", "PUT": "EDITAR", "PATCH": "EDITAR", "DELETE": "ELIMINAR"}
-AUDIT_SKIP = {"/api/auth/", "/api/admin/audit", "/api/nomina/portal/"}
+AUDIT_SKIP_OK = {"/api/auth/", "/api/admin/audit", "/api/nomina/portal/"}
+AUDIT_SKIP_ALL = {"/api/admin/audit"}
 
 class AuditMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         response = await call_next(request)
         method = request.method
         path = request.url.path
-        if method in AUDIT_METHOD_MAP and response.status_code < 400:
-            if not any(path.startswith(s) for s in AUDIT_SKIP):
-                try:
-                    from jose import jwt as _jwt
-                    from auth import SECRET_KEY, ALGORITHM
-                    auth_header = request.headers.get("authorization", "")
-                    if auth_header.startswith("Bearer "):
-                        payload = _jwt.decode(auth_header[7:], SECRET_KEY, algorithms=[ALGORITHM])
-                        uid = int(payload.get("sub", 0))
-                        if uid:
-                            from database import query_one as _qo, insert as _ins
-                            user = _qo("SELECT nombre FROM sys_usuarios WHERE id=%s", (uid,))
-                            nombre = user["nombre"] if user else ""
-                            parts = path.replace("/api/", "").split("/")
-                            modulo = parts[0] if parts else path
-                            accion = AUDIT_METHOD_MAP[method]
-                            detalle = f"{method} {path}"
-                            _ins("INSERT INTO sys_audit_log (usuario_id, usuario_nombre, accion, modulo, detalle, ip) VALUES (%s,%s,%s,%s,%s,%s)",
-                                (uid, nombre, accion, modulo, detalle[:500], request.client.host if request.client else ""))
-                except Exception:
-                    pass
+        status = response.status_code
+        is_error = status >= 500 or status in (401, 403)
+        should_log = (method in AUDIT_METHOD_MAP and status < 400) or is_error
+        skip = AUDIT_SKIP_ALL if status >= 400 else AUDIT_SKIP_OK
+        if should_log and not any(path.startswith(s) for s in skip):
+            try:
+                from jose import jwt as _jwt
+                from auth import SECRET_KEY, ALGORITHM
+                from database import query_one as _qo, insert as _ins
+                uid = 0
+                nombre = ""
+                auth_header = request.headers.get("authorization", "")
+                if auth_header.startswith("Bearer "):
+                    payload = _jwt.decode(auth_header[7:], SECRET_KEY, algorithms=[ALGORITHM])
+                    uid = int(payload.get("sub", 0))
+                    if uid:
+                        user = _qo("SELECT nombre FROM sys_usuarios WHERE id=%s", (uid,))
+                        nombre = user["nombre"] if user else ""
+                parts = path.replace("/api/", "").split("/")
+                modulo = parts[0] if parts else path
+                if status >= 500:
+                    accion = "ERROR"
+                    detalle = f"500 {method} {path}"
+                elif status == 401:
+                    accion = "LOGIN_FALLIDO"
+                    detalle = f"Intento fallido {method} {path}"
+                elif status == 403:
+                    accion = "ACCESO_DENEGADO"
+                    detalle = f"Sin permiso {method} {path}"
+                else:
+                    accion = AUDIT_METHOD_MAP[method]
+                    detalle = f"{method} {path}"
+                _ins("INSERT INTO sys_audit_log (usuario_id, usuario_nombre, accion, modulo, detalle, ip) VALUES (%s,%s,%s,%s,%s,%s)",
+                    (uid, nombre, accion, modulo, detalle[:500], request.client.host if request.client else ""))
+            except Exception:
+                pass
         return response
 
 app.add_middleware(AuditMiddleware)

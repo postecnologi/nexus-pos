@@ -374,7 +374,7 @@ function TabAuditoria() {
           <select value={filtros.accion} onChange={e => setFiltros(p => ({ ...p, accion: e.target.value }))}
             style={fi}>
             <option value="">Todas</option>
-            {['LOGIN', 'CREAR', 'EDITAR', 'ELIMINAR', 'BACKUP', 'RESTAURAR', 'ERROR'].map(a => (
+            {['LOGIN', 'LOGIN_FALLIDO', 'CREAR', 'EDITAR', 'ELIMINAR', 'ACCESO_DENEGADO', 'ERROR', 'BACKUP', 'RESTAURAR'].map(a => (
               <option key={a} value={a}>{a}</option>
             ))}
           </select>
