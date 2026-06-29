@@ -1950,12 +1950,30 @@ function TabConfig({ sty, t }) {
 
   return (
     <>
+      {config.auto_actualizado && config.sbu_referencia && (
+        <div style={{
+          ...sty.card, background: t.greenD, border: `1px solid ${t.green}44`,
+          display: 'flex', alignItems: 'center', gap: 10, padding: '12px 20px',
+        }}>
+          <Check size={16} color={t.green} />
+          <span style={{ fontSize: 12, color: t.green }}>
+            Configuracion actualizada automaticamente para el ano {config.anio}.
+            SBU vigente: <strong>${parseFloat(config.sbu_referencia).toFixed(2)}</strong>.
+            Los porcentajes IESS se mantienen (9.45% / 11.15% / 8.33%).
+          </span>
+        </div>
+      )}
+
       <div style={sty.card}>
         <h3 style={{ margin: '0 0 16px', fontSize: 14, fontWeight: 700 }}>Configuracion de Nomina</h3>
 
         <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 16 }}>
           <div style={{ minWidth: 200 }}>
-            <label style={sty.label}>SBU (Salario Basico Unificado) $</label>
+            <label style={sty.label}>SBU (Salario Basico Unificado) $
+              {config.sbu_referencia && parseFloat(config.sbu) !== parseFloat(config.sbu_referencia) && (
+                <span style={{ color: t.amber, fontWeight: 400 }}> (referencia: ${parseFloat(config.sbu_referencia).toFixed(2)})</span>
+              )}
+            </label>
             <input type="number" value={config.sbu} onChange={e => set('sbu', e.target.value)}
               style={sty.input} step="0.01" />
           </div>
