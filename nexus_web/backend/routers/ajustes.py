@@ -56,6 +56,8 @@ def get_ajustes(
 def crear_ajuste(aj: AjusteIn, u=Depends(get_current_user)):
     if not aj.detalles:
         raise HTTPException(400, "Debe incluir al menos un producto")
+    if aj.tipo in ("ENTRADA","INGRESO"): aj.tipo = "CARGO"
+    if aj.tipo in ("SALIDA","EGRESO"): aj.tipo = "DESCARGO"
     if aj.tipo not in ("CARGO","DESCARGO"):
         raise HTTPException(400, "Tipo debe ser CARGO o DESCARGO")
 
