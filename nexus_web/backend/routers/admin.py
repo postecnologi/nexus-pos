@@ -233,6 +233,19 @@ def audit_stats(u=Depends(requiere_rol("admin"))):
     }
 
 
+@router.delete("/audit-log/limpiar")
+def limpiar_audit_log(dias: str = "90", u=Depends(requiere_rol("admin"))):
+    if dias == "all":
+        result = execute("DELETE FROM sys_audit_log")
+        registrar_audit(u["id"], u.get("nombre", ""), "ELIMINAR", "auditoria", "Borrados TODOS los registros de auditoria")
+        return {"msg": "Todos los registros eliminados"}
+    else:
+        d = int(dias)
+        execute(f"DELETE FROM sys_audit_log WHERE created_at < NOW() - INTERVAL '{d} days'")
+        registrar_audit(u["id"], u.get("nombre", ""), "ELIMINAR", "auditoria", f"Borrados registros de mas de {d} dias")
+        return {"msg": f"Registros de mas de {d} dias eliminados"}
+
+
 # ══════════════════════════════════════════════════════════════
 #  SYSTEM MONITOR
 # ══════════════════════════════════════════════════════════════

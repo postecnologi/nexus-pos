@@ -405,6 +405,38 @@ function TabAuditoria() {
             cursor: 'pointer' }}>
           Limpiar
         </button>
+        <div style={{ marginLeft: 'auto' }}>
+          <select
+            onChange={async e => {
+              const val = e.target.value
+              if (!val) return
+              const msgs = {
+                '30': 'registros de mas de 30 dias',
+                '60': 'registros de mas de 60 dias',
+                '90': 'registros de mas de 90 dias',
+                'all': 'TODOS los registros',
+              }
+              if (!confirm(`¿Borrar ${msgs[val]}? Esta accion no se puede deshacer.`)) {
+                e.target.value = ''; return
+              }
+              try {
+                await api.delete(`/admin/audit-log/limpiar?dias=${val}`)
+                setTrigger(t => t + 1)
+              } catch (err) { alert(err.response?.data?.detail || 'Error') }
+              e.target.value = ''
+            }}
+            style={{ padding: '7px 10px', borderRadius: 7, fontSize: 12,
+              border: `1px solid #EF444444`, background: '#EF444415', color: '#EF4444',
+              cursor: 'pointer', fontWeight: 600 }}
+            defaultValue=""
+          >
+            <option value="" disabled>Borrar registros...</option>
+            <option value="30">Mas de 30 dias</option>
+            <option value="60">Mas de 60 dias</option>
+            <option value="90">Mas de 90 dias</option>
+            <option value="all">Borrar todos</option>
+          </select>
+        </div>
       </div>
 
       {/* Log table */}
