@@ -1680,7 +1680,24 @@ def portal_mis_vacaciones(u=Depends(get_current_user)):
 def portal_solicitar_vacacion(vac: VacacionIn, u=Depends(get_current_user)):
     emp = _get_empleado_by_user(u["id"])
     vac.empleado_id = emp["id"]
-    return crear_vacacion(vac, u)
+
+    years = _years_worked(emp["fecha_ingreso"])
+    vac_days = _vacation_days(years)
+    taken = query_one(
+        "SELECT COALESCE(SUM(dias_tomados),0) as total FROM nom_vacaciones WHERE empleado_id=%s AND estado='APROBADA'",
+        (emp["id"],))
+    total_taken = _float(taken["total"]) if taken else 0
+    total_derecho = vac_days * max(1, int(years)) if years >= 1 else 0
+    available = max(0, total_derecho - total_taken)
+    if vac.dias_tomados > available:
+        raise HTTPException(400, f"Solo tiene {available} dias disponibles")
+    daily_value = round(_float(emp["salario_base"]) / 24, 2)
+    valor = round(daily_value * vac.dias_tomados, 2)
+    vid = insert("""
+        INSERT INTO nom_vacaciones (empleado_id, fecha_inicio, fecha_fin, dias_tomados, dias_derecho, valor, estado, observaciones)
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+    """, (emp["id"], vac.fecha_inicio, vac.fecha_fin, vac.dias_tomados, vac_days, valor, "APROBADA", vac.observaciones))
+    return {"id": vid, "msg": "Vacaciones registradas", "valor": valor}
 
 @router.get("/portal/mis-permisos")
 def portal_mis_permisos(u=Depends(get_current_user)):
@@ -1698,7 +1715,22 @@ def portal_solicitar_permiso(tipo: str, modalidad: str, fecha: str,
                               hora_salida: str = None, hora_regreso: str = None,
                               u=Depends(get_current_user)):
     emp = _get_empleado_by_user(u["id"])
-    return solicitar_permiso(emp["id"], tipo, modalidad, fecha, motivo, horas, dias, hora_salida, hora_regreso, u)
+    tipo_info = next((t for t in TIPOS_PERMISO if t['id'] == tipo), None)
+    if not tipo_info: raise HTTPException(400, "Tipo de permiso invalido")
+    if modalidad == 'HORAS':
+        if horas <= 0: raise HTTPException(400, "Debe indicar las horas")
+        dias = 0
+    else:
+        if dias <= 0: dias = 1
+        horas = dias * 8
+    descuenta = tipo_info['descuenta_vacacion']
+    pid = insert("""
+        INSERT INTO nom_permisos (empleado_id, tipo, modalidad, fecha, hora_salida, hora_regreso,
+                                   horas, dias, motivo, estado, descuenta_vacacion)
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,'SOLICITADO',%s)
+    """, (emp["id"], tipo, modalidad, fecha, hora_salida, hora_regreso,
+          horas, dias, motivo, descuenta))
+    return {"id": pid, "msg": "Permiso solicitado", "descuenta_vacacion": descuenta}
 
 @router.post("/empleados/{eid}/crear-acceso")
 def crear_acceso_empleado(eid: int, password: str = "123456", u=Depends(get_current_user)):

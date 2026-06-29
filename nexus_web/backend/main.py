@@ -588,6 +588,7 @@ def run_migrations():
             ('Cita servicio tecnico', 'CITA', 'Hola {cliente_nombre}, su equipo {equipo} esta listo para retirar. Orden #{numero_orden}.')
         ) AS t(nombre, tipo, contenido)
         WHERE NOT EXISTS (SELECT 1 FROM sys_whatsapp_plantillas LIMIT 1)""",
+        "ALTER TABLE nom_permisos ALTER COLUMN modalidad TYPE VARCHAR(20)",
     ]
     ALL_MIGRATIONS.extend(migrations)
     for sql in migrations:
