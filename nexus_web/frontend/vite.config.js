@@ -2,7 +2,6 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
-// https://vite.dev/config/
 export default defineConfig({
   plugins: [
     react(),
@@ -10,8 +9,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg'],
       manifest: {
-        name: 'NEXUS POS - Sistema ERP',
-        short_name: 'NEXUS POS',
+        name: 'NEXUS IA - Sistema ERP',
+        short_name: 'NEXUS IA',
         description: 'Sistema ERP/POS completo para Ecuador',
         theme_color: '#1E1B4B',
         background_color: '#0F172A',
@@ -26,17 +25,20 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        globPatterns: ['**/*.{js,css,ico,png,svg,woff2}'],
+        navigateFallback: null,
         runtimeCaching: [
           {
             urlPattern: /^https?:\/\/.*\/api\//,
             handler: 'NetworkFirst',
             options: {
               cacheName: 'api-cache',
-              expiration: { maxEntries: 50, maxAgeSeconds: 300 },
+              expiration: { maxEntries: 50, maxAgeSeconds: 60 },
             },
           },
         ],
+        skipWaiting: true,
+        clientsClaim: true,
       },
     }),
   ],
