@@ -138,12 +138,14 @@ def get_productos(
 
 @router.get("/productos/buscar-con-precio")
 def buscar_productos_con_precio(
+    q: str = "",
     busqueda: str = "",
     tipo_precio_id: Optional[int] = 1,
     u=Depends(get_current_user)
 ):
     """Busca productos y devuelve el precio según el tipo de precio del cliente"""
-    params = [f"%{busqueda}%", f"%{busqueda}%", tipo_precio_id or 1]
+    b = q or busqueda
+    params = [tipo_precio_id or 1, f"%{b}%", f"%{b}%"]
     return query("""
         SELECT p.id, p.codigo, p.descripcion, p.iva_porcentaje,
                m.nombre as marca_nombre,

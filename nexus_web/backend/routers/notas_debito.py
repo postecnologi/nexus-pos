@@ -29,7 +29,7 @@ class NotaDebitoIn(BaseModel):
 
 
 # ── 1. Listar notas de debito ──────────────────────────────
-@router.get("/")
+@router.get("")
 def get_notas_debito(
     fecha_ini: Optional[str] = None,
     fecha_fin: Optional[str] = None,
