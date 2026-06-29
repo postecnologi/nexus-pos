@@ -1410,6 +1410,14 @@ function TabLiquidacion({ sty, t }) {
   const [result, setResult] = useState(null)
   const [calculating, setCalculating] = useState(false)
 
+  const descargarDoc = async (url) => {
+    try {
+      const resp = await api.get(url, { responseType: 'blob' })
+      const ct = resp.headers['content-type'] || 'text/html'
+      window.open(URL.createObjectURL(new Blob([resp.data], { type: ct })), '_blank')
+    } catch (e) { alert('Error al generar documento') }
+  }
+
   useEffect(() => {
     api.get('/nomina/empleados', { params: { activo: 'true' } }).then(r => setEmpleados(r.data)).catch(() => {})
   }, [])
