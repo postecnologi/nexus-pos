@@ -74,16 +74,38 @@ class AprobarTodosIn(BaseModel):
 
 # ── Helpers ─────────────────────────────────────────────────────
 
+SBU_POR_ANIO = {
+    2020: 400.00, 2021: 400.00, 2022: 425.00, 2023: 450.00,
+    2024: 460.00, 2025: 470.00, 2026: 475.00, 2027: 480.00,
+}
+
+IESS_DEFAULTS = {
+    "aporte_personal_pct": 9.45,
+    "aporte_patronal_pct": 11.15,
+    "fondos_reserva_pct": 8.33,
+}
+
 def _get_config():
-    """Obtener configuración de nómina, crear si no existe."""
+    """Obtener configuración de nómina, crear si no existe. Auto-actualiza al cambiar de año."""
+    anio_actual = date.today().year
     c = query_one("SELECT * FROM nom_config ORDER BY id DESC LIMIT 1")
     if not c:
+        sbu = SBU_POR_ANIO.get(anio_actual, 475)
         insert(
             "INSERT INTO nom_config (sbu, aporte_personal_pct, aporte_patronal_pct, fondos_reserva_pct, anio) "
             "VALUES (%s,%s,%s,%s,%s)",
-            (470, 9.45, 11.15, 8.33, 2026)
+            (sbu, IESS_DEFAULTS["aporte_personal_pct"], IESS_DEFAULTS["aporte_patronal_pct"],
+             IESS_DEFAULTS["fondos_reserva_pct"], anio_actual)
         )
         c = query_one("SELECT * FROM nom_config ORDER BY id DESC LIMIT 1")
+    elif c.get("anio") and int(c["anio"]) < anio_actual:
+        sbu_nuevo = SBU_POR_ANIO.get(anio_actual)
+        if sbu_nuevo:
+            execute("UPDATE nom_config SET sbu=%s, anio=%s, updated_at=NOW() WHERE id=%s",
+                    (sbu_nuevo, anio_actual, c["id"]))
+            c = query_one("SELECT * FROM nom_config ORDER BY id DESC LIMIT 1")
+    c["auto_actualizado"] = c.get("anio") and int(c["anio"]) == anio_actual
+    c["sbu_referencia"] = SBU_POR_ANIO.get(anio_actual)
     return c
 
 def _years_worked(fecha_ingreso, ref_date=None):
