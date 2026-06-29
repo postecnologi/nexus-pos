@@ -28,7 +28,7 @@ print("  PRUEBA COMPLETA MODULO POR MODULO")
 print("=" * 56)
 
 print("\n--- 1. CONFIGURACION ---")
-ok("Vendedor", S.post(f"{BASE}/vendedores", json={"nombre":"Carlos Lopez","cedula":"1712345678","telefono":"0991111111","activo":True}))
+ok("Vendedor", S.post(f"{BASE}/vendedores", json={"codigo":"V001","nombre":"Carlos Lopez","cedula":"1712345678","telefono":"0991111111","activo":True}))
 
 print("\n--- 2. CLIENTES ---")
 ok("Cliente persona", S.post(f"{BASE}/clientes", json={"identificacion":"1759046343","razon_social":"HERNAN FERRER","tipo_identificacion":"CEDULA","telefono":"0999038296","direccion":"Quito","plazo_pago":30}))

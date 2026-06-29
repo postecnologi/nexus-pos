@@ -271,6 +271,7 @@ def run_migrations():
             estado VARCHAR(20) DEFAULT 'DISPONIBLE',
             created_at TIMESTAMP DEFAULT NOW()
         )""",
+        "ALTER TABLE inv_productos ADD COLUMN IF NOT EXISTS costo NUMERIC(12,4) DEFAULT 0",
         "ALTER TABLE inv_productos ADD COLUMN IF NOT EXISTS maneja_lotes BOOLEAN DEFAULT false",
         # ── Unidades de Medida ──
         """CREATE TABLE IF NOT EXISTS inv_unidades_medida (

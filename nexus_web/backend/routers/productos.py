@@ -215,17 +215,21 @@ def crear_producto(p: ProductoIn, u=Depends(get_current_user)):
         VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
     """, (p.codigo, p.descripcion, p.marca_id, p.categoria_id,
           p.iva_porcentaje, p.aplica_series, p.activo, p.clase))
-    # Create default price (tipo_precio 1) if precio is provided
-    if hasattr(p, 'precio_venta') and p.precio_venta:
+    # Create default price if provided
+    if p.precio_venta and p.precio_venta > 0:
         try:
-            insert("INSERT INTO inv_precios (producto_id, tipo_precio_id, precio, activo) VALUES (%s,1,%s,true)", (pid, p.precio_venta))
-        except: pass
+            execute("INSERT INTO inv_precios (producto_id, tipo_precio_id, precio, activo) VALUES (%s,1,%s,true) ON CONFLICT DO NOTHING", (pid, p.precio_venta))
+        except Exception:
+            pass
     # Create stock 0 in principal warehouse
     try:
-        bod = query_one("SELECT id FROM inv_bodegas WHERE es_principal=true AND activa=true LIMIT 1") or query_one("SELECT id FROM inv_bodegas WHERE activa=true LIMIT 1")
+        bod = query_one("SELECT id FROM inv_bodegas WHERE es_principal=true AND activa=true LIMIT 1")
+        if not bod:
+            bod = query_one("SELECT id FROM inv_bodegas WHERE activa=true LIMIT 1")
         if bod:
-            insert("INSERT INTO inv_stock (producto_id, bodega_id, cantidad) VALUES (%s,%s,0)", (pid, bod["id"]))
-    except: pass
+            execute("INSERT INTO inv_stock (producto_id, bodega_id, cantidad) VALUES (%s,%s,0) ON CONFLICT DO NOTHING", (pid, bod["id"]))
+    except Exception:
+        pass
     return {"id": pid, "msg": "Producto creado"}
 
 @router.put("/productos/{pid}")
