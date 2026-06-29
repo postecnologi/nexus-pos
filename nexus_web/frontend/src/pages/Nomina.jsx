@@ -376,16 +376,37 @@ function EmpleadoModal({ sty, t, emp, vendedores, usuarios, tecnicos, onClose, o
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           {isEdit && (
-            <button onClick={async () => {
-              const pass = prompt('Contraseña para el empleado (mínimo 4 caracteres):', '123456')
-              if (!pass || pass.length < 4) { alert('Contraseña debe tener al menos 4 caracteres'); return }
-              try {
-                const r = await api.post(`/nomina/empleados/${emp.id}/crear-acceso?password=${encodeURIComponent(pass)}`)
-                alert(r.data.msg)
-              } catch (err) { alert(err.response?.data?.detail || 'Error') }
-            }} style={sty.btn('#8B5CF6')}>
-              <Users size={14} /> {emp.usuario_id ? 'Ver Acceso' : 'Crear Acceso Portal'}
-            </button>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {!emp.usuario_id && (
+                <button onClick={async () => {
+                  const pass = prompt('Contraseña para el empleado (mínimo 4 caracteres):', '123456')
+                  if (!pass || pass.length < 4) { alert('Contraseña debe tener al menos 4 caracteres'); return }
+                  try {
+                    const r = await api.post(`/nomina/empleados/${emp.id}/crear-acceso?password=${encodeURIComponent(pass)}`)
+                    alert(r.data.msg)
+                  } catch (err) { alert(err.response?.data?.detail || 'Error') }
+                }} style={sty.btn('#8B5CF6')}>
+                  <Users size={14} /> Crear Acceso Portal
+                </button>
+              )}
+              {emp.usuario_id && (
+                <>
+                  <span style={{ fontSize: 11, color: '#10B981', display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <Check size={14} /> Portal activo (usuario: {emp.cedula})
+                  </span>
+                  <button onClick={async () => {
+                    const pass = prompt('Nueva contraseña (mínimo 4 caracteres):')
+                    if (!pass || pass.length < 4) { alert('Mínimo 4 caracteres'); return }
+                    try {
+                      await api.patch(`/usuarios/${emp.usuario_id}/password`, { password: pass })
+                      alert('Contraseña actualizada')
+                    } catch (err) { alert(err.response?.data?.detail || 'Error') }
+                  }} style={sty.btnOutline('#8B5CF6')}>
+                    <Edit2 size={12} /> Cambiar Contraseña
+                  </button>
+                </>
+              )}
+            </div>
           )}
           <div style={{ display: 'flex', gap: 10, marginLeft: 'auto' }}>
             <button onClick={onClose} style={sty.btnOutline(t.muted)}>Cancelar</button>
