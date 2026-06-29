@@ -469,3 +469,9 @@ def actualizar_solicitud(sid: int, estado: str = "CONTACTADA", notas: str = ""):
     from database import execute
     execute("UPDATE sys_solicitudes_demo SET estado=%s, notas=%s WHERE id=%s", (estado, notas, sid))
     return {"msg": "Solicitud actualizada"}
+
+@router.delete("/solicitudes/{sid}")
+def eliminar_solicitud(sid: int):
+    from database import execute
+    execute("DELETE FROM sys_solicitudes_demo WHERE id=%s", (sid,))
+    return {"msg": "Solicitud eliminada"}
