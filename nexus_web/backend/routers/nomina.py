@@ -493,6 +493,57 @@ def get_rol(rid: int, u=Depends(get_current_user)):
         raise HTTPException(404, "Rol de pagos no encontrado")
     return rol
 
+@router.patch("/roles/{rid}/novedades")
+def editar_novedades_rol(rid: int, data: dict, u=Depends(get_current_user)):
+    """Actualizar horas extras, bonificaciones, anticipos y descuentos de un rol en BORRADOR."""
+    rol = query_one("SELECT * FROM nom_roles_pago WHERE id=%s", (rid,))
+    if not rol:
+        raise HTTPException(404, "Rol no encontrado")
+    if rol["estado"] == "APROBADO":
+        raise HTTPException(400, "No se puede editar un rol ya aprobado")
+
+    def f(k): return float(data.get(k, rol.get(k) or 0) or 0)
+
+    horas_50      = f("horas_extras_50")
+    horas_100     = f("horas_extras_100")
+    bonificaciones = f("bonificaciones")
+    anticipo       = f("anticipo")
+    otros_desc     = f("otros_descuentos")
+
+    # Recalcular valores derivados
+    salario       = float(rol.get("salario_base") or 0)
+    valor_hora    = round(salario / 240, 4)
+    val_50        = round(valor_hora * 1.5 * horas_50, 2)
+    val_100       = round(valor_hora * 2.0 * horas_100, 2)
+    comisiones    = float(rol.get("comisiones") or 0)
+
+    total_ingresos = round(salario + val_50 + val_100 + comisiones + bonificaciones, 2)
+
+    pct_personal  = float(rol.get("porcentaje_iess_personal") or 9.45) / 100
+    pct_patronal  = float(rol.get("porcentaje_iess_patronal") or 12.15) / 100
+    aporte_personal = round(total_ingresos * pct_personal, 2)
+    aporte_patronal = round(total_ingresos * pct_patronal, 2)
+
+    prestamos_empresa = float(rol.get("prestamos_empresa") or 0)
+    prestamos_iess    = float(rol.get("prestamos_iess") or 0)
+    total_descuentos  = round(aporte_personal + prestamos_iess + prestamos_empresa + anticipo + otros_desc, 2)
+    neto              = round(total_ingresos - total_descuentos, 2)
+
+    execute("""
+        UPDATE nom_roles_pago SET
+            horas_extras_50=%s, horas_extras_100=%s,
+            valor_horas_extras_50=%s, valor_horas_extras_100=%s,
+            bonificaciones=%s, anticipo=%s, otros_descuentos=%s,
+            total_ingresos=%s, aporte_iess_personal=%s, aporte_iess_patronal=%s,
+            total_descuentos=%s, neto_a_pagar=%s
+        WHERE id=%s
+    """, (horas_50, horas_100, val_50, val_100,
+          bonificaciones, anticipo, otros_desc,
+          total_ingresos, aporte_personal, aporte_patronal,
+          total_descuentos, neto, rid))
+    return {"msg": "Novedades guardadas", "neto_a_pagar": neto, "total_ingresos": total_ingresos}
+
+
 @router.patch("/roles/{rid}/aprobar")
 def aprobar_rol(rid: int, u=Depends(get_current_user)):
     rol = query_one("SELECT estado FROM nom_roles_pago WHERE id=%s", (rid,))

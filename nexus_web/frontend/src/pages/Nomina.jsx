@@ -465,6 +465,7 @@ function TabRoles({ sty, t }) {
     } catch (e) { alert('Error al generar documento') }
   }
 
+  const [novedadModal, setNovedadModal] = useState(null)
   const totalIngresos = roles.reduce((s, r) => s + parseFloat(r.total_ingresos || 0), 0)
   const totalNeto = roles.reduce((s, r) => s + parseFloat(r.neto_a_pagar || 0), 0)
 
@@ -543,7 +544,13 @@ function TabRoles({ sty, t }) {
                     {r.estado}
                   </span>
                 </td>
-                <td style={sty.td}>
+                <td style={{...sty.td, whiteSpace:'nowrap'}}>
+                  {r.estado === 'BORRADOR' && (
+                    <button onClick={ev => { ev.stopPropagation(); setNovedadModal(r) }}
+                      style={{ ...sty.btnOutline(t.amber), padding: '4px 8px', fontSize: 11, marginRight: 4 }}>
+                      + Novedades
+                    </button>
+                  )}
                   <button onClick={ev => { ev.stopPropagation(); verPdf(r.id) }}
                     style={{ ...sty.btnOutline(t.blue), padding: '4px 8px', fontSize: 11 }}>
                     <FileText size={12} /> PDF
@@ -561,7 +568,109 @@ function TabRoles({ sty, t }) {
       </div>
 
       {detalle && <RolDetalleModal sty={sty} t={t} rol={detalle} onClose={() => { setDetalle(null); load() }} />}
+      {novedadModal && <NovedadesModal sty={sty} t={t} rol={novedadModal} onClose={() => { setNovedadModal(null); load() }} />}
     </>
+  )
+}
+
+function NovedadesModal({ sty, t, rol, onClose }) {
+  const [form, setForm] = useState({
+    horas_extras_50:  parseFloat(rol.horas_extras_50  || 0),
+    horas_extras_100: parseFloat(rol.horas_extras_100 || 0),
+    bonificaciones:   parseFloat(rol.bonificaciones   || 0),
+    anticipo:         parseFloat(rol.anticipo         || 0),
+    otros_descuentos: parseFloat(rol.otros_descuentos || 0),
+  })
+  const [saving, setSaving] = useState(false)
+  const [result, setResult] = useState(null)
+  const f = (k, v) => setForm(p => ({...p, [k]: parseFloat(v) || 0}))
+
+  const guardar = async () => {
+    setSaving(true)
+    try {
+      const r = await api.patch(`/nomina/roles/${rol.id}/novedades`, form)
+      setResult(r.data)
+      setTimeout(onClose, 1200)
+    } catch(e) { alert(e.response?.data?.detail || 'Error') }
+    setSaving(false)
+  }
+
+  const fi = {...sty.input, width:'100%', textAlign:'right'}
+  const lbl = {...sty.label, marginBottom:3}
+
+  return (
+    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.7)',display:'flex',
+      alignItems:'center',justifyContent:'center',zIndex:9999}}>
+      <div style={{background:t.surface,borderRadius:14,border:`1px solid ${t.bord2}`,
+        padding:28,width:440,boxShadow:'0 20px 60px rgba(0,0,0,.5)'}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
+          <div>
+            <div style={{fontWeight:700,fontSize:15,color:t.text}}>📋 Novedades del mes</div>
+            <div style={{fontSize:12,color:t.muted,marginTop:2}}>{rol.apellidos} {rol.nombres}</div>
+          </div>
+          <button onClick={onClose} style={{background:'none',border:'none',color:t.muted,cursor:'pointer',fontSize:20}}>×</button>
+        </div>
+
+        <div style={{borderBottom:`1px solid ${t.bord2}`,marginBottom:16,paddingBottom:12}}>
+          <div style={{fontSize:11,fontWeight:700,color:t.blue,marginBottom:10,textTransform:'uppercase'}}>Ingresos adicionales</div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+            <div>
+              <label style={lbl}>Horas Extras 50% (horas)</label>
+              <input type="number" min="0" step="0.5" value={form.horas_extras_50}
+                onChange={e=>f('horas_extras_50',e.target.value)} style={fi} />
+              <div style={{fontSize:10,color:t.muted,marginTop:2}}>
+                = {((parseFloat(rol.salario_base||0)/240)*1.5*form.horas_extras_50).toFixed(2)} USD
+              </div>
+            </div>
+            <div>
+              <label style={lbl}>Horas Extras 100% (horas)</label>
+              <input type="number" min="0" step="0.5" value={form.horas_extras_100}
+                onChange={e=>f('horas_extras_100',e.target.value)} style={fi} />
+              <div style={{fontSize:10,color:t.muted,marginTop:2}}>
+                = {((parseFloat(rol.salario_base||0)/240)*2.0*form.horas_extras_100).toFixed(2)} USD
+              </div>
+            </div>
+            <div style={{gridColumn:'1/-1'}}>
+              <label style={lbl}>Bonificación / otros ingresos ($)</label>
+              <input type="number" min="0" step="0.01" value={form.bonificaciones}
+                onChange={e=>f('bonificaciones',e.target.value)} style={fi} />
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div style={{fontSize:11,fontWeight:700,color:t.red,marginBottom:10,textTransform:'uppercase'}}>Descuentos adicionales</div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+            <div>
+              <label style={lbl}>Anticipo ($)</label>
+              <input type="number" min="0" step="0.01" value={form.anticipo}
+                onChange={e=>f('anticipo',e.target.value)} style={fi} />
+            </div>
+            <div>
+              <label style={lbl}>Otros descuentos ($)</label>
+              <input type="number" min="0" step="0.01" value={form.otros_descuentos}
+                onChange={e=>f('otros_descuentos',e.target.value)} style={fi} />
+            </div>
+          </div>
+        </div>
+
+        {result && (
+          <div style={{marginTop:14,padding:'10px 14px',borderRadius:8,
+            background:'rgba(16,185,129,.1)',border:'1px solid rgba(16,185,129,.3)',
+            fontSize:13,color:t.green}}>
+            ✅ Guardado — Neto a pagar: <strong>${parseFloat(result.neto_a_pagar).toFixed(2)}</strong>
+          </div>
+        )}
+
+        <div style={{display:'flex',gap:10,marginTop:20,justifyContent:'flex-end'}}>
+          <button onClick={onClose} style={{...sty.btnOutline(t.muted),padding:'8px 18px'}}>Cancelar</button>
+          <button onClick={guardar} disabled={saving}
+            style={{...sty.btn(t.blue),padding:'8px 20px'}}>
+            {saving ? 'Guardando...' : 'Guardar y recalcular'}
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }
 
