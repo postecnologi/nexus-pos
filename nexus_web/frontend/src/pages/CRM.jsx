@@ -849,9 +849,69 @@ function Clientes360Tab({ C }) {
     { key: 'oportunidades', label: 'Oportunidades' },
     { key: 'actividades', label: 'Actividades' },
     { key: 'notas', label: 'Notas' },
+    { key: 'comunicaciones', label: '📡 Comunicaciones' },
     { key: 'facturas', label: 'Facturas' },
     { key: 'cotizaciones', label: 'Cotizaciones' },
   ]
+
+  const [comunicaciones, setComunicaciones] = useState([])
+  const [vendedores, setVendedores] = useState([])
+  const [vendedorSelId, setVendedorSelId] = useState('')
+  const [msgEmail, setMsgEmail] = useState({ dest: '', asunto: '', contenido: '' })
+  const [msgWa, setMsgWa] = useState({ tel: '', texto: '' })
+  const [sendingEmail, setSendingEmail] = useState(false)
+  const [sendingWa, setSendingWa] = useState(false)
+  const [comMsg, setComMsg] = useState(null)
+
+  useEffect(() => {
+    api.get('/vendedores').then(r => setVendedores(r.data || [])).catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    if (subTab === 'comunicaciones' && cliente) {
+      api.get(`/crm-com/historial?cliente_id=${cliente.id}`)
+        .then(r => setComunicaciones(r.data)).catch(() => {})
+    }
+  }, [subTab, cliente])
+
+  const enviarEmail = async () => {
+    if (!msgEmail.dest || !msgEmail.asunto || !msgEmail.contenido) {
+      setComMsg({ok:false,text:'Complete todos los campos del email'}); return
+    }
+    setSendingEmail(true); setComMsg(null)
+    try {
+      await api.post('/crm-com/email/enviar', {
+        vendedor_id: vendedorSelId ? parseInt(vendedorSelId) : null,
+        destinatario: msgEmail.dest,
+        asunto: msgEmail.asunto,
+        contenido: msgEmail.contenido,
+        cliente_id: cliente?.id,
+      })
+      setComMsg({ok:true, text:'Email enviado correctamente'})
+      setMsgEmail({dest:'',asunto:'',contenido:''})
+      api.get(`/crm-com/historial?cliente_id=${cliente.id}`).then(r=>setComunicaciones(r.data)).catch(()=>{})
+    } catch(e) { setComMsg({ok:false, text:e.response?.data?.detail||'Error al enviar'}) }
+    setSendingEmail(false)
+  }
+
+  const enviarWa = async () => {
+    if (!msgWa.tel || !msgWa.texto) {
+      setComMsg({ok:false,text:'Complete teléfono y mensaje'}); return
+    }
+    setSendingWa(true); setComMsg(null)
+    try {
+      await api.post('/crm-com/whatsapp/enviar', {
+        vendedor_id: vendedorSelId ? parseInt(vendedorSelId) : null,
+        telefono: msgWa.tel,
+        mensaje: msgWa.texto,
+        cliente_id: cliente?.id,
+      })
+      setComMsg({ok:true, text:'Mensaje WhatsApp enviado'})
+      setMsgWa({tel:'',texto:''})
+      api.get(`/crm-com/historial?cliente_id=${cliente.id}`).then(r=>setComunicaciones(r.data)).catch(()=>{})
+    } catch(e) { setComMsg({ok:false, text:e.response?.data?.detail||'Error al enviar'}) }
+    setSendingWa(false)
+  }
 
   return (
     <div>
@@ -1016,6 +1076,110 @@ function Clientes360Tab({ C }) {
                     <div style={{ fontSize: 11, color: C.hint, marginTop: 6 }}>{fmtDateTime(n.fecha_creacion)} · {n.usuario_nombre || ''}</div>
                   </div>
                 ))}
+            </div>
+          )}
+
+          {subTab === 'comunicaciones' && (
+            <div>
+              {/* Selector de vendedor */}
+              <div style={{display:'flex',gap:10,alignItems:'center',marginBottom:16,flexWrap:'wrap'}}>
+                <div style={{flex:1,minWidth:200}}>
+                  <label style={{fontSize:11,color:C.muted,display:'block',marginBottom:3}}>Vendedor que envía</label>
+                  <select value={vendedorSelId} onChange={e=>setVendedorSelId(e.target.value)} style={FI}>
+                    <option value="">— Seleccionar vendedor —</option>
+                    {vendedores.map(v=><option key={v.id} value={v.id}>{v.nombre} {v.apellidos||''}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              {/* Email */}
+              <div style={{background:C.surface,borderRadius:10,border:`1px solid ${C.border}`,padding:16,marginBottom:12}}>
+                <div style={{fontSize:13,fontWeight:700,color:C.blue,marginBottom:12}}>✉️ Enviar Email</div>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:10}}>
+                  <div>
+                    <label style={{fontSize:11,color:C.muted,display:'block',marginBottom:3}}>Destinatario</label>
+                    <input value={msgEmail.dest} onChange={e=>setMsgEmail(p=>({...p,dest:e.target.value}))}
+                      style={FI} placeholder={cliente?.email||'email@ejemplo.com'} />
+                  </div>
+                  <div>
+                    <label style={{fontSize:11,color:C.muted,display:'block',marginBottom:3}}>Asunto</label>
+                    <input value={msgEmail.asunto} onChange={e=>setMsgEmail(p=>({...p,asunto:e.target.value}))}
+                      style={FI} placeholder="Asunto del email" />
+                  </div>
+                </div>
+                <textarea value={msgEmail.contenido} onChange={e=>setMsgEmail(p=>({...p,contenido:e.target.value}))}
+                  style={{...FI,minHeight:80,resize:'vertical',marginBottom:10}}
+                  placeholder="Escriba el mensaje..." />
+                <button onClick={enviarEmail} disabled={sendingEmail||!vendedorSelId}
+                  style={{...BTN(C.blue,C.blueD),opacity:(!vendedorSelId?0.5:1)}}>
+                  {sendingEmail?'Enviando...':'✉️ Enviar Email'}
+                </button>
+                {!vendedorSelId && <span style={{fontSize:11,color:C.muted,marginLeft:10}}>Seleccione un vendedor primero</span>}
+              </div>
+
+              {/* WhatsApp */}
+              <div style={{background:C.surface,borderRadius:10,border:`1px solid ${C.border}`,padding:16,marginBottom:12}}>
+                <div style={{fontSize:13,fontWeight:700,color:C.green,marginBottom:12}}>💬 Enviar WhatsApp</div>
+                <div style={{display:'grid',gridTemplateColumns:'200px 1fr',gap:10,marginBottom:10}}>
+                  <div>
+                    <label style={{fontSize:11,color:C.muted,display:'block',marginBottom:3}}>Teléfono</label>
+                    <input value={msgWa.tel} onChange={e=>setMsgWa(p=>({...p,tel:e.target.value}))}
+                      style={FI} placeholder={cliente?.telefono||'0991234567'} />
+                  </div>
+                  <div>
+                    <label style={{fontSize:11,color:C.muted,display:'block',marginBottom:3}}>Mensaje</label>
+                    <input value={msgWa.texto} onChange={e=>setMsgWa(p=>({...p,texto:e.target.value}))}
+                      style={FI} placeholder="Mensaje de WhatsApp..." />
+                  </div>
+                </div>
+                <button onClick={enviarWa} disabled={sendingWa||!vendedorSelId}
+                  style={{...BTN(C.green,'rgba(16,185,129,.15)'),opacity:(!vendedorSelId?0.5:1)}}>
+                  {sendingWa?'Enviando...':'💬 Enviar WhatsApp'}
+                </button>
+              </div>
+
+              {comMsg && (
+                <div style={{padding:'9px 14px',borderRadius:8,marginBottom:12,
+                  background:comMsg.ok?'rgba(16,185,129,.15)':'rgba(239,68,68,.15)',
+                  border:`1px solid ${comMsg.ok?'#10B98144':'#EF444444'}`,
+                  color:comMsg.ok?'#10B981':'#FCA5A5',fontSize:13}}>
+                  {comMsg.ok?'✅':'⚠️'} {comMsg.text}
+                </div>
+              )}
+
+              {/* Historial */}
+              <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:8}}>Historial de comunicaciones</div>
+              {comunicaciones.length === 0
+                ? <div style={{padding:20,textAlign:'center',color:C.muted,fontSize:13}}>Sin comunicaciones registradas</div>
+                : comunicaciones.map(com=>(
+                  <div key={com.id} style={{background:C.surface,borderRadius:8,
+                    border:`1px solid ${C.border}`,padding:'10px 14px',marginBottom:8,
+                    display:'flex',gap:10,alignItems:'flex-start'}}>
+                    <div style={{fontSize:18,flexShrink:0}}>{com.tipo==='EMAIL'?'✉️':'💬'}</div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                        <span style={{fontSize:12,fontWeight:600,color:C.text}}>
+                          {com.vendedor_nombre||'Sistema'} → {com.direccion}
+                        </span>
+                        <span style={{fontSize:10,color:C.muted,flexShrink:0,marginLeft:8}}>
+                          {new Date(com.created_at).toLocaleString('es-EC')}
+                        </span>
+                      </div>
+                      {com.asunto && <div style={{fontSize:11,color:C.blue,marginTop:2}}>{com.asunto}</div>}
+                      <div style={{fontSize:12,color:C.muted,marginTop:4,
+                        overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:'100%'}}>
+                        {com.contenido}
+                      </div>
+                      {com.estado==='ERROR' && <div style={{fontSize:11,color:'#EF4444',marginTop:2}}>❌ {com.error_msg}</div>}
+                    </div>
+                    <span style={{fontSize:10,padding:'2px 8px',borderRadius:10,flexShrink:0,
+                      background: com.estado==='ENVIADO'?'rgba(16,185,129,.15)':'rgba(239,68,68,.15)',
+                      color: com.estado==='ENVIADO'?'#10B981':'#EF4444'}}>
+                      {com.estado}
+                    </span>
+                  </div>
+                ))
+              }
             </div>
           )}
 
