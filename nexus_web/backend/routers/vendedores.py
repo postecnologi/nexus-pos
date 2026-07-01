@@ -127,8 +127,11 @@ def crear_vendedor(v: VendedorIn, u=Depends(get_current_user)):
 
 @router.put("/vendedores/{vid}")
 def actualizar_vendedor(vid: int, v: VendedorIn, u=Depends(get_current_user)):
+    actual = query_one("SELECT codigo FROM ven_vendedores WHERE id=%s", (vid,))
+    if not actual: raise HTTPException(404, "Vendedor no encontrado")
+    codigo = (v.codigo or "").strip() or actual["codigo"]
     existe = query_one(
-        "SELECT id FROM ven_vendedores WHERE codigo=%s AND id!=%s", (v.codigo, vid))
+        "SELECT id FROM ven_vendedores WHERE codigo=%s AND id!=%s", (codigo, vid))
     if existe: raise HTTPException(400, "Ya existe otro vendedor con ese código")
     execute("""
         UPDATE ven_vendedores SET
@@ -137,10 +140,10 @@ def actualizar_vendedor(vid: int, v: VendedorIn, u=Depends(get_current_user)):
             fecha_nacimiento=%s, sucursal_id=%s, comision_pct=%s,
             meta_mensual=%s, observaciones=%s, activo=%s
         WHERE id=%s
-    """, (v.codigo, v.nombre, v.apellidos, v.cedula, v.telefono, v.email,
+    """, (codigo, v.nombre, v.apellidos, v.cedula, v.telefono, v.email,
           v.direccion, v.ciudad,
           v.fecha_ingreso or None, v.fecha_nacimiento or None,
-          v.sucursal_id, v.comision_pct, v.meta_mensual,
+          v.sucursal_id, v.comision_pct or 0, v.meta_mensual or 0,
           v.observaciones, v.activo, vid))
     return {"msg": "Vendedor actualizado"}
 
