@@ -228,6 +228,7 @@ export default function Vendedores() {
   const [filtSuc,     setFiltSuc]     = useState('')
   const [modal,       setModal]       = useState(null)   // null|'nuevo'|vendedorObj
   const [verModal,    setVerModal]    = useState(null)
+  const [comModal,    setComModal]    = useState(null)  // vendedor para config comunicaciones
 
   async function cargar(bus=busqueda) {
     setLoading(true)
@@ -436,6 +437,12 @@ export default function Vendedores() {
                             color:C.muted,cursor:'pointer',fontSize:13}}>
                           ✏️
                         </button>
+                        <button onClick={()=>setComModal(v)} title="Configurar Email y WhatsApp"
+                          style={{padding:'5px 9px',borderRadius:7,
+                            border:`1px solid #10B98144`,background:'#10B98115',
+                            color:'#10B981',cursor:'pointer',fontSize:13}}>
+                          📡
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -455,6 +462,267 @@ export default function Vendedores() {
         />
       )}
       {verModal&&<ModalVer vendedor={verModal} onClose={()=>setVerModal(null)}/>}
+      {comModal&&<ModalComConfig vendedor={comModal} onClose={()=>setComModal(null)}/>}
+    </div>
+  )
+}
+
+// ── Modal Configurar Comunicaciones ───────────────────────────
+function ModalComConfig({ vendedor, onClose }) {
+  const C = useTheme()
+  const [tab, setTab] = useState('email')
+  const [cfg, setCfg] = useState({
+    smtp_host: '', smtp_port: 587, smtp_user: '', smtp_password: '',
+    smtp_tls: true, smtp_from_nombre: '',
+    evolution_url: '', evolution_key: '', wa_instancia: '', wa_telefono: '',
+  })
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [testing, setTesting] = useState(false)
+  const [waEstado, setWaEstado] = useState(null)
+  const [qrData, setQrData] = useState(null)
+  const [msg, setMsg] = useState(null)
+
+  const overlay = {position:'fixed',inset:0,background:'rgba(0,0,0,.7)',
+    display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999}
+  const box = {background:C.surface,borderRadius:16,border:`1px solid ${C.border}`,
+    padding:28,width:600,maxHeight:'90vh',overflowY:'auto'}
+  const fi = {width:'100%',padding:'9px 12px',borderRadius:8,fontSize:13,
+    border:`1px solid ${C.border}`,background:C.sur2,color:C.text,outline:'none',boxSizing:'border-box'}
+  const lbl = {fontSize:11,fontWeight:600,color:C.muted,display:'block',marginBottom:4}
+  const btn = (bg,col='#fff') => ({padding:'9px 20px',borderRadius:8,border:'none',
+    background:bg,color:col,fontWeight:700,fontSize:12,cursor:'pointer'})
+
+  useEffect(() => {
+    api.get(`/crm-com/config/${vendedor.id}`)
+      .then(r => { setCfg(p => ({...p, ...r.data})) })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [vendedor.id])
+
+  useEffect(() => {
+    if (tab === 'whatsapp' && cfg.wa_instancia) checkWaEstado()
+  }, [tab])
+
+  const checkWaEstado = () => {
+    api.get(`/crm-com/whatsapp/${vendedor.id}/estado`)
+      .then(r => setWaEstado(r.data)).catch(() => {})
+  }
+
+  const save = async () => {
+    setSaving(true); setMsg(null)
+    try {
+      await api.put(`/crm-com/config/${vendedor.id}`, cfg)
+      setMsg({ok: true, text: 'Configuracion guardada'})
+    } catch(e) { setMsg({ok:false, text: e.response?.data?.detail || 'Error'}) }
+    setSaving(false)
+  }
+
+  const testSmtp = async () => {
+    setTesting(true); setMsg(null)
+    try {
+      await save()
+      const r = await api.post(`/crm-com/config/${vendedor.id}/test-smtp`)
+      setMsg({ok: true, text: r.data.msg})
+    } catch(e) { setMsg({ok:false, text: e.response?.data?.detail || 'Error SMTP'}) }
+    setTesting(false)
+  }
+
+  const crearInstancia = async () => {
+    setMsg(null)
+    try {
+      await save()
+      const r = await api.post(`/crm-com/whatsapp/${vendedor.id}/crear-instancia`)
+      setCfg(p => ({...p, wa_instancia: r.data.instancia}))
+      setMsg({ok:true, text: r.data.msg})
+      getQr()
+    } catch(e) { setMsg({ok:false, text: e.response?.data?.detail || 'Error'}) }
+  }
+
+  const getQr = async () => {
+    setQrData(null)
+    try {
+      const r = await api.get(`/crm-com/whatsapp/${vendedor.id}/qr`)
+      setQrData(r.data)
+      checkWaEstado()
+    } catch(e) { setMsg({ok:false, text: e.response?.data?.detail || 'Error obteniendo QR'}) }
+  }
+
+  const s = (k, v) => setCfg(p => ({...p, [k]: v}))
+
+  if (loading) return null
+
+  return (
+    <div style={overlay} onClick={onClose}>
+      <div style={box} onClick={e=>e.stopPropagation()}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
+          <div>
+            <div style={{fontWeight:800,fontSize:16,color:C.text}}>📡 Configurar Comunicaciones</div>
+            <div style={{fontSize:12,color:C.muted,marginTop:2}}>{vendedor.nombre} {vendedor.apellidos || ''}</div>
+          </div>
+          <button onClick={onClose} style={{background:'none',border:'none',color:C.muted,cursor:'pointer',fontSize:20}}>×</button>
+        </div>
+
+        {/* Tabs */}
+        <div style={{display:'flex',gap:4,marginBottom:20,borderBottom:`1px solid ${C.border}`}}>
+          {[['email','✉️ Email SMTP'],['whatsapp','💬 WhatsApp']].map(([id,label]) => (
+            <button key={id} onClick={()=>setTab(id)}
+              style={{padding:'8px 16px',border:'none',background:'none',
+                color: tab===id ? C.blue : C.muted,
+                borderBottom: tab===id ? `2px solid ${C.blue}` : '2px solid transparent',
+                fontWeight: tab===id ? 700 : 400, cursor:'pointer', fontSize:13, marginBottom:-1}}>
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {tab === 'email' && (
+          <div>
+            <div style={{fontSize:11,color:C.muted,marginBottom:16,padding:'8px 12px',
+              background:'rgba(59,130,246,.08)',borderRadius:8,border:'1px solid rgba(59,130,246,.2)'}}>
+              El vendedor enviará emails usando su propia cuenta corporativa.
+              Funciona con Gmail, Office365, Zoho o cualquier servidor SMTP.
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+              <div style={{gridColumn:'1/-1'}}>
+                <label style={lbl}>Nombre que aparece en los emails</label>
+                <input value={cfg.smtp_from_nombre || ''} onChange={e=>s('smtp_from_nombre',e.target.value)}
+                  style={fi} placeholder="Ej: Juan López — Empresa S.A." />
+              </div>
+              <div style={{gridColumn:'1/-1'}}>
+                <label style={lbl}>Email corporativo (usuario SMTP)</label>
+                <input value={cfg.smtp_user || ''} onChange={e=>s('smtp_user',e.target.value)}
+                  style={fi} placeholder="juan@empresa.com" />
+              </div>
+              <div>
+                <label style={lbl}>Servidor SMTP</label>
+                <input value={cfg.smtp_host || ''} onChange={e=>s('smtp_host',e.target.value)}
+                  style={fi} placeholder="smtp.gmail.com / smtp.office365.com" />
+              </div>
+              <div>
+                <label style={lbl}>Puerto</label>
+                <input type="number" value={cfg.smtp_port || 587} onChange={e=>s('smtp_port',parseInt(e.target.value))}
+                  style={fi} />
+              </div>
+              <div style={{gridColumn:'1/-1'}}>
+                <label style={lbl}>Contraseña / App Password</label>
+                <input type="password" value={cfg.smtp_password || ''} onChange={e=>s('smtp_password',e.target.value)}
+                  style={fi} placeholder="Contraseña o App Password" />
+              </div>
+              <div style={{gridColumn:'1/-1',display:'flex',alignItems:'center',gap:8}}>
+                <input type="checkbox" id="tls" checked={!!cfg.smtp_tls} onChange={e=>s('smtp_tls',e.target.checked)}
+                  style={{width:16,height:16,cursor:'pointer'}} />
+                <label htmlFor="tls" style={{color:C.text,fontSize:13,cursor:'pointer'}}>
+                  Usar TLS/STARTTLS (recomendado — puerto 587)
+                </label>
+              </div>
+            </div>
+            <div style={{marginTop:8,fontSize:11,color:C.muted}}>
+              💡 Gmail: activa "Verificación en 2 pasos" y usa un <strong>App Password</strong> en lugar de tu contraseña normal.
+              Office365: usa tu contraseña normal con puerto 587.
+            </div>
+          </div>
+        )}
+
+        {tab === 'whatsapp' && (
+          <div>
+            <div style={{fontSize:11,color:C.muted,marginBottom:16,padding:'8px 12px',
+              background:'rgba(16,185,129,.08)',borderRadius:8,border:'1px solid rgba(16,185,129,.2)'}}>
+              Evolution API permite conectar el número del vendedor escaneando un QR — igual que WhatsApp Web.
+              Instala Evolution API en tu servidor primero.
+            </div>
+
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:16}}>
+              <div style={{gridColumn:'1/-1'}}>
+                <label style={lbl}>URL de Evolution API</label>
+                <input value={cfg.evolution_url || ''} onChange={e=>s('evolution_url',e.target.value)}
+                  style={fi} placeholder="http://tuservidor:8080" />
+              </div>
+              <div style={{gridColumn:'1/-1'}}>
+                <label style={lbl}>API Key de Evolution</label>
+                <input type="password" value={cfg.evolution_key || ''} onChange={e=>s('evolution_key',e.target.value)}
+                  style={fi} placeholder="tu-api-key-de-evolution" />
+              </div>
+              <div>
+                <label style={lbl}>Numero WhatsApp del vendedor</label>
+                <input value={cfg.wa_telefono || ''} onChange={e=>s('wa_telefono',e.target.value)}
+                  style={fi} placeholder="0991234567" />
+              </div>
+              <div>
+                <label style={lbl}>Nombre de instancia (auto)</label>
+                <input value={cfg.wa_instancia || ''} readOnly
+                  style={{...fi,opacity:.6}} placeholder="Se genera automáticamente" />
+              </div>
+            </div>
+
+            {/* Estado de conexión */}
+            {waEstado && (
+              <div style={{padding:'10px 14px',borderRadius:8,marginBottom:12,
+                background: waEstado.conectado ? 'rgba(16,185,129,.1)' : 'rgba(239,68,68,.1)',
+                border: `1px solid ${waEstado.conectado ? '#10B981' : '#EF4444'}44`,
+                fontSize:12, color: waEstado.conectado ? '#10B981' : '#EF4444',
+                display:'flex',alignItems:'center',gap:8}}>
+                {waEstado.conectado ? '✅ Conectado' : '❌ Desconectado'} — Estado: {waEstado.estado}
+                <button onClick={checkWaEstado} style={{marginLeft:'auto',padding:'3px 10px',
+                  borderRadius:6,border:'none',background:'rgba(255,255,255,.1)',
+                  color:'inherit',cursor:'pointer',fontSize:11}}>Actualizar</button>
+              </div>
+            )}
+
+            {/* QR Code */}
+            {qrData?.qr && (
+              <div style={{textAlign:'center',marginBottom:16}}>
+                <div style={{fontSize:12,color:C.muted,marginBottom:8}}>
+                  Escanea este QR con WhatsApp del número {cfg.wa_telefono}
+                </div>
+                <img src={qrData.qr} alt="QR WhatsApp"
+                  style={{width:200,height:200,border:`2px solid ${C.border}`,borderRadius:8}} />
+                <div style={{marginTop:8}}>
+                  <button onClick={getQr} style={{...btn('rgba(255,255,255,.08)',C.muted),fontSize:11}}>
+                    Actualizar QR
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+              {!cfg.wa_instancia ? (
+                <button onClick={crearInstancia}
+                  style={btn('#10B981')}>
+                  🔗 Crear instancia y obtener QR
+                </button>
+              ) : (
+                <button onClick={getQr}
+                  style={btn('#10B981')}>
+                  📱 Mostrar QR para conectar
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {msg && (
+          <div style={{marginTop:14,padding:'9px 14px',borderRadius:8,
+            background: msg.ok ? 'rgba(16,185,129,.15)' : 'rgba(239,68,68,.15)',
+            border: `1px solid ${msg.ok ? '#10B98144' : '#EF444444'}`,
+            color: msg.ok ? '#10B981' : '#FCA5A5', fontSize:13}}>
+            {msg.ok ? '✅' : '⚠️'} {msg.text}
+          </div>
+        )}
+
+        <div style={{display:'flex',gap:10,marginTop:20,justifyContent:'flex-end'}}>
+          <button onClick={onClose} style={btn('transparent',C.muted)}>Cerrar</button>
+          {tab === 'email' && (
+            <button onClick={testSmtp} disabled={testing}
+              style={btn('rgba(59,130,246,.2)',C.blue)}>
+              {testing ? 'Probando...' : '🔌 Probar conexión'}
+            </button>
+          )}
+          <button onClick={save} disabled={saving} style={btn(C.blue)}>
+            {saving ? 'Guardando...' : 'Guardar'}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

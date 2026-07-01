@@ -13,7 +13,7 @@ from routers import (
     usuarios, reportes, kardex, cotizaciones, toma_fisica, servicio_tecnico,
     crm, retenciones, notas_debito, contabilidad,
     guias_remision, liquidaciones, nomina, admin, superadmin,
-    whatsapp, depositos, notas_venta, ordenes_compra,
+    whatsapp, depositos, notas_venta, ordenes_compra, crm_comunicaciones,
 )
 
 app = FastAPI(title="NEXUS POS API", version="2.0.0")
@@ -621,6 +621,39 @@ def run_migrations():
             updated_at TIMESTAMP DEFAULT NOW()
         )""",
         "INSERT INTO cont_config_cuentas (id) SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM cont_config_cuentas)",
+        # Config por vendedor: SMTP + WhatsApp Evolution API
+        """CREATE TABLE IF NOT EXISTS crm_config_vendedor (
+            id SERIAL PRIMARY KEY,
+            vendedor_id INTEGER REFERENCES ven_vendedores(id) ON DELETE CASCADE UNIQUE,
+            smtp_host VARCHAR(200),
+            smtp_port INTEGER DEFAULT 587,
+            smtp_user VARCHAR(200),
+            smtp_password VARCHAR(500),
+            smtp_tls BOOLEAN DEFAULT true,
+            smtp_from_nombre VARCHAR(200),
+            wa_instancia VARCHAR(100),
+            wa_conectado BOOLEAN DEFAULT false,
+            wa_telefono VARCHAR(30),
+            evolution_url VARCHAR(300),
+            evolution_key VARCHAR(300),
+            created_at TIMESTAMP DEFAULT NOW(),
+            updated_at TIMESTAMP DEFAULT NOW()
+        )""",
+        # Historial de comunicaciones CRM
+        """CREATE TABLE IF NOT EXISTS crm_comunicaciones (
+            id SERIAL PRIMARY KEY,
+            cliente_id INTEGER REFERENCES ven_clientes(id),
+            lead_id INTEGER,
+            vendedor_id INTEGER REFERENCES ven_vendedores(id),
+            tipo VARCHAR(20) NOT NULL,
+            direccion VARCHAR(200),
+            asunto VARCHAR(500),
+            contenido TEXT,
+            estado VARCHAR(20) DEFAULT 'ENVIADO',
+            error_msg TEXT,
+            wa_msg_id VARCHAR(200),
+            created_at TIMESTAMP DEFAULT NOW()
+        )""",
     ]
     ALL_MIGRATIONS.extend(migrations)
     for sql in migrations:
@@ -685,6 +718,7 @@ app.include_router(whatsapp.router)
 app.include_router(depositos.router)
 app.include_router(notas_venta.router)
 app.include_router(ordenes_compra.router)
+app.include_router(crm_comunicaciones.router)
 if MULTI_TENANT:
     app.include_router(superadmin.router)
 
