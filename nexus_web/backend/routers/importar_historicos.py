@@ -14,21 +14,22 @@ from routers.importar import router, _leer_excel, _val, _float, _excel_template
 # ══════════════════════════════════════════════════════════════
 
 COLS_VENTAS = [
-    ("numero",       "N° Factura",          "Ej: 001-001-000000123",    True),
-    ("fecha",        "Fecha",               "YYYY-MM-DD",               True),
-    ("cliente_ruc",  "RUC/Cédula cliente",  "RUC o cédula del cliente", False),
-    ("subtotal_0",   "Subtotal 0%",         "Valor base 0%",            False),
-    ("subtotal_iva", "Subtotal IVA",        "Valor base gravado con IVA",False),
-    ("iva",          "Valor IVA",           "Monto de IVA",             False),
-    ("total",        "Total",               "Total de la factura",      True),
-    ("observacion",  "Observación",         "Nota opcional",            False),
+    ("numero",        "N° Factura",          "Ej: 001-001-000000123",      True),
+    ("fecha",         "Fecha",               "YYYY-MM-DD",                 True),
+    ("cliente_ruc",   "RUC/Cédula cliente",  "RUC o cédula del cliente",   False),
+    ("vendedor_cod",  "Código vendedor",      "Código del vendedor (HERFER01)", False),
+    ("subtotal_0",    "Subtotal 0%",         "Valor base 0%",              False),
+    ("subtotal_iva",  "Subtotal IVA",        "Valor base gravado con IVA", False),
+    ("iva",           "Valor IVA",           "Monto de IVA",               False),
+    ("total",         "Total",               "Total de la factura",        True),
+    ("observacion",   "Observación",         "Nota opcional",              False),
 ]
 
 EJEMPLOS_VENTAS = [
     {"numero":"001-001-000000001","fecha":"2024-01-15","cliente_ruc":"1712345678",
-     "subtotal_0":"0","subtotal_iva":"89.29","iva":"13.39","total":"102.68","observacion":""},
+     "vendedor_cod":"HERFER01","subtotal_0":"0","subtotal_iva":"89.29","iva":"13.39","total":"102.68","observacion":""},
     {"numero":"001-001-000000002","fecha":"2024-01-20","cliente_ruc":"0912345678001",
-     "subtotal_0":"50","subtotal_iva":"0","iva":"0","total":"50.00","observacion":""},
+     "vendedor_cod":"CARLOG01","subtotal_0":"50","subtotal_iva":"0","iva":"0","total":"50.00","observacion":""},
 ]
 
 @router.get("/plantilla/ventas-historicas")
@@ -52,6 +53,8 @@ async def importar_ventas(file: UploadFile = File(...), u=Depends(get_current_us
 
             ident = _val(row, "ruc/cédula cliente", "ruc/cedula", "cliente_ruc", "cedula", "ruc")
             cli   = query_one("SELECT id FROM ven_clientes WHERE identificacion=%s", (ident,)) if ident else None
+            vend_cod = _val(row, "código vendedor", "vendedor_cod", "vendedor", "codigo_vendedor")
+            vend  = query_one("SELECT id FROM ven_vendedores WHERE codigo=%s", (vend_cod,)) if vend_cod else None
             sub0  = _float(_val(row, "subtotal 0%", "subtotal_0", "base0"))
             subiva= _float(_val(row, "subtotal iva", "subtotal_iva", "baseiva"))
             iva   = _float(_val(row, "valor iva", "iva"))
@@ -63,10 +66,11 @@ async def importar_ventas(file: UploadFile = File(...), u=Depends(get_current_us
 
             insert("""
                 INSERT INTO ven_facturas
-                    (numero_factura, cliente_id, fecha, subtotal_0, subtotal_iva,
+                    (numero_factura, cliente_id, vendedor_id, fecha, subtotal_0, subtotal_iva,
                      total_iva, total, estado, observaciones)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,'HISTORICO',%s)
-            """, (numero, cli["id"] if cli else None, fecha, sub0, subiva, iva, total, obs))
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,'HISTORICO',%s)
+            """, (numero, cli["id"] if cli else None, vend["id"] if vend else None,
+                  fecha, sub0, subiva, iva, total, obs))
             ok += 1
         except Exception as e:
             errores.append(f"Fila {i}: {str(e)[:80]}")
