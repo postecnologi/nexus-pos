@@ -361,7 +361,7 @@ export default function Vendedores() {
             <thead>
               <tr>
                 {['Código','Nombre','Sucursal','Cédula','Teléfono','Comisión','Meta mensual','Ventas mes','Cumplimiento','Estado',''].map((h,i)=>(
-                  <th key={i} style={{...TH,textAlign:i>=5&&i<=8?'center':'left'}}>{h}</th>
+                  <th key={i} style={{...TH,textAlign:i>=5&&i<=8?'center':'left',width:i===10?110:undefined}}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -427,7 +427,7 @@ export default function Vendedores() {
                       </span>
                     </td>
 
-                    <td style={{...TD,textAlign:'center'}}>
+                    <td style={{...TD,textAlign:'center',whiteSpace:'nowrap',width:110}}>
                       <div style={{display:'flex',gap:5,justifyContent:'center'}}>
                         <button onClick={()=>setVerModal(v)} title="Ver detalle"
                           style={{padding:'5px 9px',borderRadius:7,
@@ -441,7 +441,7 @@ export default function Vendedores() {
                             color:C.muted,cursor:'pointer',fontSize:13}}>
                           ✏️
                         </button>
-                        <button onClick={()=>setComModal(v)} title="Configurar Email y WhatsApp"
+                        <button onClick={()=>setComModal(v)} title="Configurar Email"
                           style={{padding:'5px 9px',borderRadius:7,
                             border:`1px solid #10B98144`,background:'#10B98115',
                             color:'#10B981',cursor:'pointer',fontSize:13}}>
