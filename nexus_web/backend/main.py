@@ -14,6 +14,7 @@ from routers import (
     crm, retenciones, notas_debito, contabilidad,
     guias_remision, liquidaciones, nomina, admin, superadmin,
     whatsapp, depositos, notas_venta, ordenes_compra, crm_comunicaciones,
+    biometrico,
 )
 
 app = FastAPI(title="NEXUS POS API", version="2.0.0")
@@ -654,6 +655,41 @@ def run_migrations():
             wa_msg_id VARCHAR(200),
             created_at TIMESTAMP DEFAULT NOW()
         )""",
+        # Biométrico — dispositivos
+        """CREATE TABLE IF NOT EXISTS nom_biometricos (
+            id SERIAL PRIMARY KEY,
+            nombre VARCHAR(100) NOT NULL,
+            marca VARCHAR(30) DEFAULT 'ZKTeco',
+            sucursal_id INTEGER REFERENCES sys_sucursales(id),
+            device_id VARCHAR(50) DEFAULT '',
+            descripcion TEXT,
+            activo BOOLEAN DEFAULT true,
+            created_at TIMESTAMP DEFAULT NOW()
+        )""",
+        # Biométrico — mapeo usuario biométrico ↔ empleado
+        """CREATE TABLE IF NOT EXISTS nom_bio_mapeo (
+            id SERIAL PRIMARY KEY,
+            biometrico_id INTEGER NOT NULL REFERENCES nom_biometricos(id) ON DELETE CASCADE,
+            bio_user_id VARCHAR(50) NOT NULL,
+            empleado_id INTEGER NOT NULL REFERENCES nom_empleados(id) ON DELETE CASCADE,
+            UNIQUE(biometrico_id, bio_user_id)
+        )""",
+        # Biométrico — registros de asistencia
+        """CREATE TABLE IF NOT EXISTS nom_asistencia (
+            id SERIAL PRIMARY KEY,
+            empleado_id INTEGER NOT NULL REFERENCES nom_empleados(id) ON DELETE CASCADE,
+            biometrico_id INTEGER REFERENCES nom_biometricos(id),
+            fecha DATE NOT NULL,
+            hora_entrada TIMESTAMP,
+            hora_salida TIMESTAMP,
+            horas_trabajadas NUMERIC(5,2) DEFAULT 0,
+            horas_extras_50 NUMERIC(5,2) DEFAULT 0,
+            horas_extras_100 NUMERIC(5,2) DEFAULT 0,
+            estado VARCHAR(20) DEFAULT 'NORMAL',
+            observacion TEXT,
+            created_at TIMESTAMP DEFAULT NOW(),
+            UNIQUE(empleado_id, fecha, biometrico_id)
+        )""",
     ]
     ALL_MIGRATIONS.extend(migrations)
     for sql in migrations:
@@ -719,6 +755,7 @@ app.include_router(depositos.router)
 app.include_router(notas_venta.router)
 app.include_router(ordenes_compra.router)
 app.include_router(crm_comunicaciones.router)
+app.include_router(biometrico.router)
 if MULTI_TENANT:
     app.include_router(superadmin.router)
 

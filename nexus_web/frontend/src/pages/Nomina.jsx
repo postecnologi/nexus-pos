@@ -4,7 +4,7 @@ import api from '../api'
 import {
   Users, Calculator, Calendar, DollarSign, FileText, Settings, ClipboardList,
   Plus, Search, Edit2, Check, X, ChevronDown, Download, Eye, Trash2,
-  RefreshCw, AlertTriangle, Briefcase, CreditCard, Award, Clock
+  RefreshCw, AlertTriangle, Briefcase, CreditCard, Award, Clock, Fingerprint, Upload
 } from 'lucide-react'
 
 // ── Helpers ──────────────────────────────────────────────────────
@@ -14,6 +14,7 @@ const fmtMoney = v => `$${fmt(v)}`
 const TABS = [
   { id: 'empleados',   label: 'Empleados',    icon: Users },
   { id: 'roles',       label: 'Rol de Pagos', icon: Calculator },
+  { id: 'asistencia',  label: 'Asistencia',   icon: Fingerprint },
   { id: 'prestamos',   label: 'Prestamos',    icon: CreditCard },
   { id: 'vacaciones',  label: 'Vacaciones',   icon: Calendar },
   { id: 'permisos',    label: 'Permisos',     icon: Clock },
@@ -102,6 +103,7 @@ export default function Nomina() {
 
       {tab === 'empleados' && <TabEmpleados sty={sty} t={t} />}
       {tab === 'roles' && <TabRoles sty={sty} t={t} />}
+      {tab === 'asistencia' && <TabAsistencia sty={sty} t={t} />}
       {tab === 'prestamos' && <TabPrestamos sty={sty} t={t} />}
       {tab === 'vacaciones' && <TabVacaciones sty={sty} t={t} />}
       {tab === 'permisos' && <TabPermisos sty={sty} t={t} />}
@@ -113,6 +115,443 @@ export default function Nomina() {
   )
 }
 
+
+// ══════════════════════════════════════════════════════════════════
+//  TAB ASISTENCIA (BIOMÉTRICO)
+// ══════════════════════════════════════════════════════════════════
+function TabAsistencia({ sty, t }) {
+  const hoy = new Date()
+  const [subTab, setSubTab] = useState('registros')
+  const [periodo, setPeriodo] = useState(`${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}`)
+  const [dispositivos, setDispositivos] = useState([])
+  const [bioSel, setBioSel] = useState('')
+  const [registros, setRegistros] = useState([])
+  const [resumen, setResumen] = useState([])
+  const [empleados, setEmpleados] = useState([])
+  const [mapeo, setMapeo] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [importResult, setImportResult] = useState(null)
+  const [msg, setMsg] = useState(null)
+  const [modalBio, setModalBio] = useState(null)
+  const [modalMapeo, setModalMapeo] = useState(false)
+  const [sucursales, setSucursales] = useState([])
+
+  useEffect(() => {
+    api.get('/biometrico/dispositivos').then(r => setDispositivos(r.data || [])).catch(() => {})
+    api.get('/nomina/empleados').then(r => setEmpleados(r.data || [])).catch(() => {})
+    api.get('/sucursales').then(r => setSucursales(r.data || [])).catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    if (subTab === 'registros') cargarRegistros()
+    if (subTab === 'resumen') cargarResumen()
+    if (subTab === 'mapeo') cargarMapeo()
+  }, [subTab, periodo, bioSel])
+
+  const cargarRegistros = () => {
+    const p = { desde: periodo+'-01', hasta: periodo+'-31' }
+    if (bioSel) p.biometrico_id = bioSel
+    api.get('/biometrico/registros', { params: p })
+      .then(r => setRegistros(r.data || [])).catch(() => {})
+  }
+
+  const cargarResumen = () => {
+    const p = { periodo }
+    if (bioSel) p.biometrico_id = bioSel
+    api.get('/biometrico/resumen', { params: p })
+      .then(r => setResumen(r.data || [])).catch(() => {})
+  }
+
+  const cargarMapeo = () => {
+    const p = bioSel ? { biometrico_id: bioSel } : {}
+    api.get('/biometrico/mapeo', { params: p })
+      .then(r => setMapeo(r.data || [])).catch(() => {})
+  }
+
+  const importarCSV = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file || !bioSel) { alert('Selecciona un dispositivo primero'); return }
+    setUploading(true); setImportResult(null)
+    const fd = new FormData()
+    fd.append('file', file)
+    try {
+      const r = await api.post(`/biometrico/importar?biometrico_id=${bioSel}`, fd,
+        { headers: { 'Content-Type': 'multipart/form-data' } })
+      setImportResult(r.data)
+      cargarRegistros()
+    } catch(e) { setImportResult({ error: e.response?.data?.detail || 'Error al importar' }) }
+    setUploading(false)
+    e.target.value = ''
+  }
+
+  const aplicarANomina = async () => {
+    if (!confirm('¿Aplicar horas extras del biométrico a los roles de pago del periodo?')) return
+    try {
+      const r = await api.post('/biometrico/aplicar-a-nomina', { periodo, biometrico_id: bioSel || undefined })
+      setMsg({ ok: true, text: r.data.msg })
+    } catch(e) { setMsg({ ok: false, text: e.response?.data?.detail || 'Error' }) }
+  }
+
+  const ESTADO_COLOR = { NORMAL:'#10B981', TARDE:'#F59E0B', MEDIO_DIA:'#06B6D4', FALTA:'#EF4444' }
+  const fmtHora = v => v ? new Date(v).toLocaleTimeString('es-EC',{hour:'2-digit',minute:'2-digit'}) : '—'
+  const fmtFecha = v => v ? new Date(v+'T00:00:00').toLocaleDateString('es-EC') : '—'
+
+  return (
+    <div>
+      {/* Header */}
+      <div style={{...sty.card, display:'flex', gap:12, alignItems:'center', flexWrap:'wrap'}}>
+        <Fingerprint size={20} style={{color:t.blue}} />
+        <span style={{fontWeight:700,fontSize:15,color:t.text}}>Control de Asistencia</span>
+        <div style={{marginLeft:'auto',display:'flex',gap:8,flexWrap:'wrap'}}>
+          <input type="month" value={periodo} onChange={e=>setPeriodo(e.target.value)} style={{...sty.input,width:160}} />
+          <select value={bioSel} onChange={e=>setBioSel(e.target.value)} style={{...sty.select,width:180}}>
+            <option value="">Todos los dispositivos</option>
+            {dispositivos.map(d=><option key={d.id} value={d.id}>{d.nombre} ({d.marca})</option>)}
+          </select>
+          <button onClick={()=>setModalBio({})} style={sty.btn()}>
+            <Plus size={13}/> Nuevo dispositivo
+          </button>
+        </div>
+      </div>
+
+      {/* Sub-tabs */}
+      <div style={{display:'flex',gap:4,marginBottom:16,borderBottom:`1px solid ${t.border}`}}>
+        {[['registros','📋 Registros'],['resumen','📊 Resumen mensual'],['mapeo','🔗 Mapeo empleados'],['importar','⬆️ Importar CSV']].map(([id,label])=>(
+          <button key={id} onClick={()=>setSubTab(id)}
+            style={{padding:'8px 16px',border:'none',background:'none',cursor:'pointer',fontSize:12,
+              fontWeight:subTab===id?700:400,
+              color:subTab===id?t.blue:t.muted,
+              borderBottom:subTab===id?`2px solid ${t.blue}`:'2px solid transparent',
+              marginBottom:-1}}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {msg && (
+        <div style={{marginBottom:12,padding:'10px 16px',borderRadius:8,
+          background:msg.ok?'rgba(16,185,129,.1)':'rgba(239,68,68,.1)',
+          border:`1px solid ${msg.ok?'#10B98144':'#EF444444'}`,
+          color:msg.ok?t.green:t.red,fontSize:13,display:'flex',justifyContent:'space-between'}}>
+          {msg.ok?'✅':'⚠️'} {msg.text}
+          <button onClick={()=>setMsg(null)} style={{background:'none',border:'none',cursor:'pointer',color:t.muted}}>×</button>
+        </div>
+      )}
+
+      {/* REGISTROS */}
+      {subTab==='registros' && (
+        <div style={sty.card}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
+            <span style={{color:t.muted,fontSize:12}}>{registros.length} registros</span>
+            <button onClick={aplicarANomina} style={sty.btn(t.green)}>
+              <Check size={13}/> Aplicar horas extras a nómina
+            </button>
+          </div>
+          <div style={{overflowX:'auto'}}>
+            <table style={sty.table}>
+              <thead>
+                <tr>{['Empleado','Cargo','Fecha','Entrada','Salida','Horas','Extras 50%','Extras 100%','Estado'].map(h=>
+                  <th key={h} style={sty.th}>{h}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {registros.length===0 && (
+                  <tr><td colSpan={9} style={{...sty.td,textAlign:'center',color:t.muted,padding:30}}>
+                    Sin registros. Importe el archivo CSV del biométrico.
+                  </td></tr>
+                )}
+                {registros.map(r=>(
+                  <tr key={r.id}>
+                    <td style={sty.td}><strong>{r.apellidos} {r.nombres}</strong></td>
+                    <td style={{...sty.td,color:t.muted,fontSize:11}}>{r.cargo||'—'}</td>
+                    <td style={sty.td}>{fmtFecha(r.fecha)}</td>
+                    <td style={{...sty.td,color:t.green}}>{fmtHora(r.hora_entrada)}</td>
+                    <td style={{...sty.td,color:t.blue}}>{fmtHora(r.hora_salida)}</td>
+                    <td style={{...sty.td,fontWeight:600}}>{parseFloat(r.horas_trabajadas||0).toFixed(1)}h</td>
+                    <td style={{...sty.td,color:t.amber}}>{parseFloat(r.horas_extras_50||0).toFixed(1)}h</td>
+                    <td style={{...sty.td,color:t.red}}>{parseFloat(r.horas_extras_100||0).toFixed(1)}h</td>
+                    <td style={sty.td}>
+                      <span style={{padding:'2px 8px',borderRadius:10,fontSize:10,fontWeight:700,
+                        background:(ESTADO_COLOR[r.estado]||t.muted)+'22',
+                        color:ESTADO_COLOR[r.estado]||t.muted}}>
+                        {r.estado}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* RESUMEN MENSUAL */}
+      {subTab==='resumen' && (
+        <div style={sty.card}>
+          <div style={{overflowX:'auto'}}>
+            <table style={sty.table}>
+              <thead>
+                <tr>{['Empleado','Normal','Tarde','Medio día','Faltas','Total horas','Extras 50%','Extras 100%'].map(h=>
+                  <th key={h} style={sty.th}>{h}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {resumen.length===0 && (
+                  <tr><td colSpan={8} style={{...sty.td,textAlign:'center',color:t.muted,padding:30}}>
+                    Sin datos para este período.
+                  </td></tr>
+                )}
+                {resumen.map(r=>(
+                  <tr key={r.empleado_id}>
+                    <td style={sty.td}><strong>{r.apellidos} {r.nombres}</strong><br/>
+                      <span style={{fontSize:10,color:t.muted}}>{r.cedula}</span></td>
+                    <td style={{...sty.td,textAlign:'center',color:t.green}}>{r.dias_normal}</td>
+                    <td style={{...sty.td,textAlign:'center',color:t.amber}}>{r.dias_tarde}</td>
+                    <td style={{...sty.td,textAlign:'center',color:t.cyan}}>{r.medio_dia}</td>
+                    <td style={{...sty.td,textAlign:'center',color:t.red}}>{r.faltas}</td>
+                    <td style={{...sty.td,textAlign:'center',fontWeight:600}}>{parseFloat(r.total_horas||0).toFixed(1)}h</td>
+                    <td style={{...sty.td,textAlign:'center',color:t.amber}}>{parseFloat(r.total_extras_50||0).toFixed(1)}h</td>
+                    <td style={{...sty.td,textAlign:'center',color:t.red}}>{parseFloat(r.total_extras_100||0).toFixed(1)}h</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* MAPEO */}
+      {subTab==='mapeo' && (
+        <div style={sty.card}>
+          <div style={{marginBottom:12}}>
+            <p style={{color:t.muted,fontSize:12,margin:0}}>
+              Vincula el ID de usuario del biométrico con el empleado en el sistema.
+              Este ID aparece en el archivo CSV exportado por ZKTeco o Anviz.
+            </p>
+          </div>
+          <MapeoForm t={t} sty={sty} dispositivos={dispositivos} empleados={empleados}
+            mapeo={mapeo} onSaved={cargarMapeo} />
+        </div>
+      )}
+
+      {/* IMPORTAR */}
+      {subTab==='importar' && (
+        <div style={sty.card}>
+          <div style={{fontSize:13,color:t.muted,marginBottom:20,padding:'12px 16px',
+            background:t.sur2,borderRadius:8,border:`1px solid ${t.bord2}`}}>
+            <strong style={{color:t.text}}>¿Cómo exportar el archivo?</strong>
+            <ul style={{margin:'8px 0 0',paddingLeft:20,lineHeight:2}}>
+              <li><strong>ZKTeco</strong>: Software ZKBio Time → Reportes → Registros de asistencia → Exportar CSV</li>
+              <li><strong>Anviz</strong>: Software CrossChex → Registros → Exportar → Formato CSV o Excel</li>
+              <li>El sistema detecta el formato automáticamente (columnas ID, Fecha/Hora, Tipo entrada/salida)</li>
+            </ul>
+          </div>
+
+          {!bioSel && (
+            <div style={{padding:'12px 16px',borderRadius:8,background:'rgba(245,158,11,.1)',
+              border:'1px solid rgba(245,158,11,.3)',color:t.amber,fontSize:13,marginBottom:16}}>
+              ⚠️ Selecciona un dispositivo en el filtro de arriba antes de importar
+            </div>
+          )}
+
+          <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:16,padding:40,
+            border:`2px dashed ${t.bord2}`,borderRadius:12}}>
+            <Upload size={40} style={{color:t.muted}} />
+            <div style={{fontSize:14,color:t.muted}}>Arrastra el archivo CSV aquí o haz clic para seleccionar</div>
+            <label style={{...sty.btn(),cursor:'pointer'}}>
+              <Upload size={14}/> {uploading ? 'Importando...' : 'Seleccionar archivo CSV'}
+              <input type="file" accept=".csv,.txt,.xls,.xlsx" onChange={importarCSV}
+                disabled={!bioSel||uploading} style={{display:'none'}} />
+            </label>
+          </div>
+
+          {importResult && (
+            <div style={{marginTop:16,padding:'12px 16px',borderRadius:8,
+              background:importResult.error?'rgba(239,68,68,.1)':'rgba(16,185,129,.1)',
+              border:`1px solid ${importResult.error?'#EF444444':'#10B98144'}`,
+              color:importResult.error?t.red:t.green,fontSize:13}}>
+              {importResult.error ? `❌ ${importResult.error}` : `✅ ${importResult.msg}`}
+              {importResult.sin_mapeo?.length > 0 && (
+                <div style={{marginTop:8,color:t.amber}}>
+                  ⚠️ IDs sin mapeo: {importResult.sin_mapeo.join(', ')} — ve a la pestaña "Mapeo empleados"
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Lista de dispositivos */}
+      {dispositivos.length > 0 && subTab !== 'mapeo' && subTab !== 'importar' && (
+        <div style={{...sty.card,marginTop:0}}>
+          <div style={{fontSize:11,fontWeight:700,color:t.muted,textTransform:'uppercase',marginBottom:10}}>
+            Dispositivos registrados
+          </div>
+          <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+            {dispositivos.map(d=>(
+              <div key={d.id} style={{padding:'8px 14px',borderRadius:8,border:`1px solid ${t.bord2}`,
+                background:t.sur2,display:'flex',gap:10,alignItems:'center'}}>
+                <Fingerprint size={14} style={{color:d.activo?t.green:t.muted}} />
+                <div>
+                  <div style={{fontSize:12,fontWeight:600,color:t.text}}>{d.nombre}</div>
+                  <div style={{fontSize:10,color:t.muted}}>{d.marca} · {d.sucursal_nombre||'Sin sucursal'}</div>
+                </div>
+                <button onClick={()=>setModalBio(d)}
+                  style={{background:'none',border:'none',cursor:'pointer',color:t.muted,fontSize:13}}>✏️</button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Modal nuevo/editar dispositivo */}
+      {modalBio !== null && (
+        <DispositivoModal t={t} sty={sty} dispositivo={modalBio} sucursales={sucursales}
+          onClose={()=>setModalBio(null)}
+          onSaved={()=>{
+            setModalBio(null)
+            api.get('/biometrico/dispositivos').then(r=>setDispositivos(r.data||[])).catch(()=>{})
+          }} />
+      )}
+    </div>
+  )
+}
+
+function DispositivoModal({ t, sty, dispositivo, sucursales, onClose, onSaved }) {
+  const esEdit = !!dispositivo?.id
+  const [form, setForm] = useState({
+    nombre: dispositivo?.nombre || '',
+    marca: dispositivo?.marca || 'ZKTeco',
+    sucursal_id: dispositivo?.sucursal_id || '',
+    device_id: dispositivo?.device_id || '',
+    descripcion: dispositivo?.descripcion || '',
+  })
+  const [saving, setSaving] = useState(false)
+  const s = (k,v) => setForm(p=>({...p,[k]:v}))
+
+  const guardar = async () => {
+    if (!form.nombre) return alert('El nombre es obligatorio')
+    setSaving(true)
+    try {
+      if (esEdit) await api.put(`/biometrico/dispositivos/${dispositivo.id}`, form)
+      else await api.post('/biometrico/dispositivos', form)
+      onSaved()
+    } catch(e) { alert(e.response?.data?.detail || 'Error') }
+    setSaving(false)
+  }
+
+  return (
+    <div style={sty.modal}>
+      <div style={{...sty.modalContent, maxWidth:440}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
+          <div style={{fontWeight:700,fontSize:15,color:t.text}}>
+            {esEdit ? '✏️ Editar dispositivo' : '➕ Nuevo dispositivo biométrico'}
+          </div>
+          <button onClick={onClose} style={{background:'none',border:'none',cursor:'pointer',color:t.muted,fontSize:20}}>×</button>
+        </div>
+        <div style={{display:'flex',flexDirection:'column',gap:12}}>
+          <div><label style={sty.label}>Nombre *</label>
+            <input value={form.nombre} onChange={e=>s('nombre',e.target.value)} style={sty.input} placeholder="Ej: Biométrico Entrada Principal" /></div>
+          <div><label style={sty.label}>Marca</label>
+            <select value={form.marca} onChange={e=>s('marca',e.target.value)} style={sty.select}>
+              <option value="ZKTeco">ZKTeco</option>
+              <option value="Anviz">Anviz</option>
+              <option value="FingerTec">FingerTec</option>
+              <option value="Otro">Otro</option>
+            </select></div>
+          <div><label style={sty.label}>Sucursal</label>
+            <select value={form.sucursal_id} onChange={e=>s('sucursal_id',e.target.value)} style={sty.select}>
+              <option value="">— Seleccionar sucursal —</option>
+              {sucursales.map(s=><option key={s.id} value={s.id}>{s.nombre}</option>)}
+            </select></div>
+          <div><label style={sty.label}>ID del dispositivo (serial)</label>
+            <input value={form.device_id} onChange={e=>s('device_id',e.target.value)} style={sty.input} placeholder="Ej: 123456789" /></div>
+          <div><label style={sty.label}>Descripción / Ubicación</label>
+            <input value={form.descripcion} onChange={e=>s('descripcion',e.target.value)} style={sty.input} placeholder="Ej: Entrada planta baja" /></div>
+        </div>
+        <div style={{display:'flex',gap:10,marginTop:20,justifyContent:'flex-end'}}>
+          <button onClick={onClose} style={{...sty.btnOutline(t.muted),padding:'8px 16px'}}>Cancelar</button>
+          <button onClick={guardar} disabled={saving} style={{...sty.btn(),padding:'8px 20px'}}>
+            {saving?'Guardando...':'Guardar'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function MapeoForm({ t, sty, dispositivos, empleados, mapeo, onSaved }) {
+  const [bioId, setBioId] = useState('')
+  const [bioUserId, setBioUserId] = useState('')
+  const [empId, setEmpId] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const guardar = async () => {
+    if (!bioId || !bioUserId || !empId) return alert('Completa todos los campos')
+    setSaving(true)
+    try {
+      await api.post('/biometrico/mapeo', { biometrico_id: parseInt(bioId), bio_user_id: bioUserId, empleado_id: parseInt(empId) })
+      setBioUserId(''); setEmpId('')
+      onSaved()
+    } catch(e) { alert(e.response?.data?.detail || 'Error') }
+    setSaving(false)
+  }
+
+  const eliminar = async (mid) => {
+    if (!confirm('¿Eliminar mapeo?')) return
+    await api.delete(`/biometrico/mapeo/${mid}`)
+    onSaved()
+  }
+
+  return (
+    <div>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr auto',gap:10,marginBottom:20,alignItems:'flex-end'}}>
+        <div><label style={sty.label}>Dispositivo</label>
+          <select value={bioId} onChange={e=>setBioId(e.target.value)} style={sty.select}>
+            <option value="">— Seleccionar —</option>
+            {dispositivos.map(d=><option key={d.id} value={d.id}>{d.nombre}</option>)}
+          </select></div>
+        <div><label style={sty.label}>ID en biométrico</label>
+          <input value={bioUserId} onChange={e=>setBioUserId(e.target.value)} style={sty.input} placeholder="Ej: 1, 2, 100..." /></div>
+        <div><label style={sty.label}>Empleado</label>
+          <select value={empId} onChange={e=>setEmpId(e.target.value)} style={sty.select}>
+            <option value="">— Seleccionar —</option>
+            {empleados.filter(e=>e.activo).map(e=><option key={e.id} value={e.id}>{e.apellidos} {e.nombres}</option>)}
+          </select></div>
+        <button onClick={guardar} disabled={saving} style={{...sty.btn(),whiteSpace:'nowrap'}}>
+          <Plus size={13}/> Agregar
+        </button>
+      </div>
+      <table style={sty.table}>
+        <thead>
+          <tr>{['Dispositivo','ID Biométrico','Empleado','Cédula',''].map(h=><th key={h} style={sty.th}>{h}</th>)}</tr>
+        </thead>
+        <tbody>
+          {mapeo.length===0 && (
+            <tr><td colSpan={5} style={{...sty.td,textAlign:'center',color:t.muted,padding:20}}>
+              Sin mapeos. Agrega la vinculación ID biométrico → empleado.
+            </td></tr>
+          )}
+          {mapeo.map(m=>(
+            <tr key={m.id}>
+              <td style={sty.td}>{m.biometrico_nombre}</td>
+              <td style={{...sty.td,fontFamily:'monospace',fontWeight:700,color:t.blue}}>{m.bio_user_id}</td>
+              <td style={sty.td}>{m.apellidos} {m.nombres}</td>
+              <td style={{...sty.td,color:t.muted,fontSize:11}}>{m.cedula}</td>
+              <td style={sty.td}>
+                <button onClick={()=>eliminar(m.id)}
+                  style={{...sty.btnOutline(t.red),padding:'3px 8px',fontSize:11}}>
+                  <Trash2 size={11}/> Quitar
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
 
 // ══════════════════════════════════════════════════════════════════
 //  TAB EMPLEADOS
