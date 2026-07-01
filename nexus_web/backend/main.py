@@ -14,7 +14,7 @@ from routers import (
     crm, retenciones, notas_debito, contabilidad,
     guias_remision, liquidaciones, nomina, admin, superadmin,
     whatsapp, depositos, notas_venta, ordenes_compra, crm_comunicaciones,
-    biometrico,
+    biometrico, importar,
 )
 
 app = FastAPI(title="NEXUS POS API", version="2.0.0")
@@ -756,6 +756,7 @@ app.include_router(notas_venta.router)
 app.include_router(ordenes_compra.router)
 app.include_router(crm_comunicaciones.router)
 app.include_router(biometrico.router)
+app.include_router(importar.router)
 if MULTI_TENANT:
     app.include_router(superadmin.router)
 

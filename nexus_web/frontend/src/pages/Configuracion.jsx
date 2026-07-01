@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import {
   Building, MapPin, Warehouse, Check, X,
   Plus, Edit2, ToggleLeft, ToggleRight, ChevronDown,
-  ChevronUp, Star, Package, Shield, Upload, FileCheck, AlertTriangle
+  ChevronUp, Star, Package, Shield, Upload, FileCheck, AlertTriangle, Download
 } from 'lucide-react'
 import api from '../api'
 import LogoUploader from '../components/LogoUploader'
@@ -86,10 +86,11 @@ const BLANK_BOD = {
   responsable:'',telefono:'',es_principal:false,activa:true
 }
 const TABS = [
-  {id:'empresa',  icon:Building,  label:'Empresa'   },
-  {id:'sucursales',icon:MapPin,   label:'Sucursales'},
-  {id:'bodegas',  icon:Warehouse, label:'Bodegas'   },
-  {id:'sri',      icon:Shield,    label:'Facturación Electrónica'},
+  {id:'empresa',   icon:Building,  label:'Empresa'   },
+  {id:'sucursales',icon:MapPin,    label:'Sucursales'},
+  {id:'bodegas',   icon:Warehouse, label:'Bodegas'   },
+  {id:'sri',       icon:Shield,    label:'Facturación Electrónica'},
+  {id:'importar',  icon:Upload,    label:'Importar datos'},
 ]
 
 export default function Configuracion() {
@@ -645,6 +646,9 @@ export default function Configuracion() {
 
         {/* ══════════ SRI ══════════ */}
         {tab==='sri'&&<PanelSRI msg={msg} setMsg={setMsg}/>}
+
+        {/* ══════════ IMPORTAR ══════════ */}
+        {tab==='importar'&&<PanelImportar C={C} SI={SI}/>}
       </div>
 
       {/* ── MODAL SUCURSAL ── */}
@@ -1358,6 +1362,128 @@ function EmailConfig({ setMsg }) {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// ══════════════════════════════════════════════════════════════
+//  PANEL IMPORTAR DATOS
+// ══════════════════════════════════════════════════════════════
+function PanelImportar({ C, SI }) {
+  const MODULOS = [
+    { id:'productos',   label:'Productos / Inventario', icon:'📦', desc:'Importa tu catálogo de productos con precios, stock y categorías.' },
+    { id:'clientes',    label:'Clientes',               icon:'👥', desc:'Importa tu lista de clientes con RUC, nombre y contacto.' },
+    { id:'proveedores', label:'Proveedores',            icon:'🏭', desc:'Importa tus proveedores con RUC y datos de contacto.' },
+    { id:'empleados',   label:'Empleados (Nómina)',     icon:'👤', desc:'Importa empleados con datos laborales y salarios.' },
+  ]
+
+  const [activo, setActivo] = useState(null)
+  const [uploading, setUploading] = useState(false)
+  const [result, setResult] = useState(null)
+
+  const descargarPlantilla = async (modulo) => {
+    try {
+      const r = await api.get(`/importar/plantilla/${modulo}`, { responseType: 'blob' })
+      const url = URL.createObjectURL(new Blob([r.data],
+        { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }))
+      const a = document.createElement('a')
+      a.href = url; a.download = `plantilla_${modulo}.xlsx`; a.click()
+    } catch(e) { alert('Error al descargar plantilla') }
+  }
+
+  const importar = async (e, modulo) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true); setResult(null)
+    const fd = new FormData()
+    fd.append('file', file)
+    try {
+      const r = await api.post(`/importar/${modulo}`, fd,
+        { headers: { 'Content-Type': 'multipart/form-data' } })
+      setResult({ ok: true, ...r.data })
+    } catch(err) {
+      setResult({ ok: false, msg: err.response?.data?.detail || 'Error al importar' })
+    }
+    setUploading(false)
+    e.target.value = ''
+  }
+
+  const card = { background: C.surface, borderRadius: 12, border: `1px solid ${C.bord2}`, padding: 20, marginBottom: 12 }
+  const btn = (color='#3B82F6') => ({ padding: '8px 16px', borderRadius: 8, border: 'none',
+    background: color, color: '#fff', fontWeight: 700, fontSize: 12, cursor: 'pointer',
+    display: 'inline-flex', alignItems: 'center', gap: 6 })
+  const btnO = (color='#3B82F6') => ({ padding: '8px 16px', borderRadius: 8,
+    border: `1px solid ${color}44`, background: color+'15', color: color,
+    fontWeight: 700, fontSize: 12, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 })
+
+  return (
+    <div>
+      <div style={{ ...card, background: C.sur2, marginBottom: 20 }}>
+        <div style={{ fontWeight: 700, fontSize: 14, color: C.text, marginBottom: 6 }}>
+          📥 Importación masiva de datos
+        </div>
+        <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.7 }}>
+          Importa datos desde Excel de tu sistema anterior. <strong style={{ color: C.text }}>Pasos:</strong><br/>
+          1. Descarga la plantilla del módulo que quieres importar<br/>
+          2. Llena la plantilla con tus datos (respeta las columnas)<br/>
+          3. Sube el archivo — el sistema importa y actualiza automáticamente
+        </div>
+      </div>
+
+      {MODULOS.map(m => (
+        <div key={m.id} style={card}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
+              <span style={{ fontSize: 28 }}>{m.icon}</span>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 14, color: C.text }}>{m.label}</div>
+                <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{m.desc}</div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <button onClick={() => descargarPlantilla(m.id)} style={btnO()}>
+                <Download size={13} /> Plantilla Excel
+              </button>
+              <label style={{ ...btn('#10B981'), cursor: 'pointer' }}>
+                <Upload size={13} /> {uploading && activo === m.id ? 'Importando...' : 'Importar archivo'}
+                <input type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }}
+                  disabled={uploading}
+                  onChange={e => { setActivo(m.id); importar(e, m.id) }} />
+              </label>
+            </div>
+          </div>
+
+          {activo === m.id && result && (
+            <div style={{ marginTop: 14, padding: '12px 16px', borderRadius: 8,
+              background: result.ok ? 'rgba(16,185,129,.08)' : 'rgba(239,68,68,.08)',
+              border: `1px solid ${result.ok ? '#10B98133' : '#EF444433'}` }}>
+              <div style={{ fontWeight: 700, color: result.ok ? '#10B981' : '#EF4444', marginBottom: 6 }}>
+                {result.ok ? `✅ ${result.msg}` : `❌ ${result.msg}`}
+              </div>
+              {result.errores?.length > 0 && (
+                <div style={{ marginTop: 8 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: C.amber, marginBottom: 4 }}>
+                    ⚠️ {result.errores.length} errores:
+                  </div>
+                  <div style={{ maxHeight: 120, overflowY: 'auto', fontSize: 11, color: C.muted, lineHeight: 1.8 }}>
+                    {result.errores.map((e, i) => <div key={i}>• {e}</div>)}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      ))}
+
+      <div style={{ ...card, background: 'transparent', border: `1px dashed ${C.bord2}` }}>
+        <div style={{ fontSize: 12, color: C.hint, lineHeight: 1.8 }}>
+          💡 <strong style={{ color: C.muted }}>Notas importantes:</strong><br />
+          • Si el código/RUC/cédula ya existe, se <strong style={{ color: C.amber }}>actualiza</strong> el registro (no duplica)<br />
+          • Los campos marcados con <span style={{ color: C.red }}>*</span> en la plantilla son obligatorios<br />
+          • El plan de cuentas se importa desde el módulo de Contabilidad<br />
+          • Máximo 5,000 filas por importación
+        </div>
+      </div>
     </div>
   )
 }
