@@ -235,7 +235,7 @@ export default function Vendedores() {
     try {
       const [v,s] = await Promise.all([
         api.get('/vendedores',{params:{busqueda:bus,activo:filtActivo,sucursal_id:filtSuc||undefined}}),
-        api.get('/vendedores/sucursales/lista').catch(()=>({data:[]})),
+        api.get('/sucursales').catch(()=>({data:[]})),
       ])
       setVendedores(v.data); setSucursales(s.data)
     } catch(e){console.error(e)} finally{setLoading(false)}
