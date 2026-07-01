@@ -509,6 +509,26 @@ def aprobar_todos(data: AprobarTodosIn, u=Depends(get_current_user)):
         "UPDATE nom_roles_pago SET estado='APROBADO', fecha_pago=CURRENT_DATE WHERE periodo=%s AND estado='BORRADOR'",
         (data.periodo,)
     )
+    # Asiento contable automatico consolidado de nomina
+    try:
+        from routers.contabilidad import generar_asiento_automatico
+        totales = query_one("""
+            SELECT COALESCE(SUM(total_ingresos),0) as sueldos,
+                   COALESCE(SUM(aporte_iess_personal),0) as iess_personal,
+                   COALESCE(SUM(aporte_iess_patronal),0) as iess_patronal,
+                   COALESCE(SUM(neto_a_pagar),0) as neto
+            FROM nom_roles_pago WHERE periodo=%s AND estado='APROBADO'
+        """, (data.periodo,))
+        if totales and float(totales['sueldos']) > 0:
+            generar_asiento_automatico('nomina', {
+                "referencia": data.periodo,
+                "sueldos": float(totales['sueldos']),
+                "iess_personal": float(totales['iess_personal']),
+                "iess_patronal": float(totales['iess_patronal']),
+                "neto": float(totales['neto']),
+            })
+    except Exception:
+        pass
     return {"msg": f"Todos los roles del periodo {data.periodo} aprobados"}
 
 @router.get("/roles/{rid}/pdf")

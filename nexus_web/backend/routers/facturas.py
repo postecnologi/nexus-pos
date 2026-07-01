@@ -261,6 +261,20 @@ def crear_factura(f: FacturaIn, u=Depends(get_current_user)):
             except Exception as e:
                 print(f"Error creando CXC: {e}")
 
+    # Asiento contable automatico
+    try:
+        from routers.contabilidad import generar_asiento_automatico
+        tiene_credito = any(p["forma_pago"] == "CREDITO" for p in f.pagos)
+        tipo_asiento = "venta_credito" if tiene_credito else "venta_contado"
+        generar_asiento_automatico(tipo_asiento, {
+            "referencia": num_factura,
+            "subtotal": subtotal_gravado + subtotal_cero,
+            "iva": iva_total,
+            "total": total,
+        })
+    except Exception:
+        pass
+
     return {"id": fac_id, "numero_factura": num_factura, "total": total,
             "msg": "Factura emitida correctamente"}
 
