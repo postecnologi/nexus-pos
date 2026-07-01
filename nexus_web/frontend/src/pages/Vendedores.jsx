@@ -82,7 +82,7 @@ function ModalVendedor({vendedor, sucursales, onClose, onSaved}) {
   }
 
   const fi={width:'100%',padding:'9px 12px',borderRadius:8,fontSize:13,
-    border:`1px solid ${C.border}`,background:C.surface2,color:C.text,
+    border:`1px solid ${C.border}`,background:C.sur2,color:C.text,
     outline:'none',boxSizing:'border-box'}
   const lbl={fontSize:11,fontWeight:600,color:C.muted,display:'block',
     marginBottom:4,textTransform:'uppercase',letterSpacing:'.05em'}
