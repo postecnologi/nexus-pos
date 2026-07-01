@@ -19,8 +19,8 @@ class VendedorIn(BaseModel):
     fecha_ingreso:    Optional[str] = None
     fecha_nacimiento: Optional[str] = None
     sucursal_id:      Optional[int] = None
-    comision_pct:     float = 0
-    meta_mensual:     float = 0
+    comision_pct:     Optional[float] = 0
+    meta_mensual:     Optional[float] = None
     observaciones:    Optional[str] = None
     activo:           bool = True
 
@@ -120,7 +120,7 @@ def crear_vendedor(v: VendedorIn, u=Depends(get_current_user)):
     """, (codigo, v.nombre, v.apellidos, v.cedula, v.telefono, v.email,
           v.direccion, v.ciudad,
           v.fecha_ingreso or None, v.fecha_nacimiento or None,
-          v.sucursal_id, v.comision_pct, v.meta_mensual,
+          v.sucursal_id, v.comision_pct or 0, v.meta_mensual or 0,
           v.observaciones, v.activo))
     return {"id": vid, "msg": "Vendedor creado"}
 
