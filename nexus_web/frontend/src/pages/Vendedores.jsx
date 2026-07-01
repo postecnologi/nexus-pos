@@ -349,7 +349,7 @@ export default function Vendedores() {
       </div>
 
       {/* Tabla */}
-      <div style={{background:C.surface,borderRadius:12,border:`1px solid ${C.border}`,overflow:'hidden'}}>
+      <div style={{background:C.surface,borderRadius:12,border:`1px solid ${C.border}`,overflowX:'auto'}}>
         {loading ? (
           <div style={{padding:40,textAlign:'center',color:C.hint,fontSize:13}}>Cargando vendedores...</div>
         ) : vendedores.length===0 ? (
