@@ -587,7 +587,7 @@ function ModalComConfig({ vendedor, onClose }) {
               <div style={{gridColumn:'1/-1'}}>
                 <label style={lbl}>Nombre que aparece en los emails</label>
                 <input value={cfg.smtp_from_nombre || ''} onChange={e=>s('smtp_from_nombre',e.target.value)}
-                  style={fi} placeholder="Ej: Juan López — Empresa S.A." />
+                  style={fi} placeholder="Ej: Juan López — Empresa S.A." autoComplete="off" />
               </div>
               <div style={{gridColumn:'1/-1'}}>
                 <label style={lbl}>Email corporativo (usuario SMTP)</label>
@@ -636,12 +636,12 @@ function ModalComConfig({ vendedor, onClose }) {
               <div style={{gridColumn:'1/-1'}}>
                 <label style={lbl}>URL de Evolution API</label>
                 <input value={cfg.evolution_url || ''} onChange={e=>s('evolution_url',e.target.value)}
-                  style={fi} placeholder="http://tuservidor:8080" />
+                  style={fi} placeholder="http://tuservidor:8080" autoComplete="off" />
               </div>
               <div style={{gridColumn:'1/-1'}}>
                 <label style={lbl}>API Key de Evolution</label>
-                <input type="password" value={cfg.evolution_key || ''} onChange={e=>s('evolution_key',e.target.value)}
-                  style={fi} placeholder="tu-api-key-de-evolution" />
+                <input type="text" value={cfg.evolution_key || ''} onChange={e=>s('evolution_key',e.target.value)}
+                  style={fi} placeholder="nexus-evolution-2026" autoComplete="off" />
               </div>
               <div>
                 <label style={lbl}>Numero WhatsApp del vendedor</label>
