@@ -243,6 +243,236 @@ def inicializar_plan_cuentas(u=Depends(get_current_user)):
     return {"msg": f"Plan de cuentas inicializado con {len(cuentas)} cuentas", "total": len(cuentas)}
 
 
+@router.get("/plan-cuentas/plantilla-excel")
+def descargar_plantilla_excel(u=Depends(get_current_user)):
+    """Descarga plantilla Excel para importar plan de cuentas."""
+    import io
+    from fastapi.responses import StreamingResponse
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Plan de Cuentas"
+
+    # Estilos
+    header_fill = PatternFill("solid", fgColor="1E40AF")
+    header_font = Font(bold=True, color="FFFFFF", size=11)
+    example_fill = PatternFill("solid", fgColor="EFF6FF")
+    border = Border(
+        left=Side(style='thin'), right=Side(style='thin'),
+        top=Side(style='thin'), bottom=Side(style='thin')
+    )
+
+    headers = ["codigo", "nombre", "tipo", "nivel", "es_movimiento", "padre_codigo"]
+    col_widths = [15, 45, 15, 8, 15, 15]
+    for i, (h, w) in enumerate(zip(headers, col_widths), 1):
+        cell = ws.cell(row=1, column=i, value=h.upper())
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal='center')
+        cell.border = border
+        ws.column_dimensions[chr(64 + i)].width = w
+
+    # Ejemplos
+    ejemplos = [
+        ("1", "ACTIVOS", "ACTIVO", 1, "No", ""),
+        ("1.1", "ACTIVOS CORRIENTES", "ACTIVO", 2, "No", "1"),
+        ("1.1.01", "Caja General", "ACTIVO", 3, "Si", "1.1"),
+        ("1.1.02", "Bancos", "ACTIVO", 3, "Si", "1.1"),
+        ("1.1.03", "Cuentas por Cobrar", "ACTIVO", 3, "Si", "1.1"),
+        ("2", "PASIVOS", "PASIVO", 1, "No", ""),
+        ("2.1", "PASIVOS CORRIENTES", "PASIVO", 2, "No", "2"),
+        ("2.1.01", "Cuentas por Pagar", "PASIVO", 3, "Si", "2.1"),
+        ("3", "PATRIMONIO", "PATRIMONIO", 1, "No", ""),
+        ("3.1.01", "Capital Social", "PATRIMONIO", 3, "Si", "3"),
+        ("4", "INGRESOS", "INGRESO", 1, "No", ""),
+        ("4.1", "Ingresos Operacionales", "INGRESO", 2, "No", "4"),
+        ("4.1.01", "Ventas", "INGRESO", 3, "Si", "4.1"),
+        ("5", "COSTOS", "COSTO", 1, "No", ""),
+        ("5.1.01", "Costo de Ventas", "COSTO", 3, "Si", "5"),
+        ("6", "GASTOS", "GASTO", 1, "No", ""),
+        ("6.1", "Gastos Administrativos", "GASTO", 2, "No", "6"),
+        ("6.1.01", "Sueldos y Salarios", "GASTO", 3, "Si", "6.1"),
+        ("6.1.02", "Arriendo", "GASTO", 3, "Si", "6.1"),
+    ]
+    for row_idx, row_data in enumerate(ejemplos, 2):
+        for col_idx, val in enumerate(row_data, 1):
+            cell = ws.cell(row=row_idx, column=col_idx, value=val)
+            cell.fill = example_fill
+            cell.border = border
+
+    # Hoja de instrucciones
+    ws2 = wb.create_sheet("Instrucciones")
+    instrucciones = [
+        ("INSTRUCCIONES PARA IMPORTAR PLAN DE CUENTAS", True),
+        ("", False),
+        ("COLUMNAS REQUERIDAS:", True),
+        ("codigo       - Codigo de la cuenta (ej: 1, 1.1, 1.1.01)", False),
+        ("nombre       - Nombre descriptivo de la cuenta", False),
+        ("tipo         - ACTIVO, PASIVO, PATRIMONIO, INGRESO, COSTO o GASTO", False),
+        ("nivel        - Nivel jerarquico (1=raiz, 2=grupo, 3=subcuenta)", False),
+        ("es_movimiento - Si = cuenta de movimiento (recibe transacciones), No = cuenta de grupo", False),
+        ("padre_codigo  - Codigo de la cuenta padre (dejar vacio si es raiz)", False),
+        ("", False),
+        ("TIPOS VALIDOS:", True),
+        ("ACTIVO    - Bienes y derechos (naturaleza deudora)", False),
+        ("PASIVO    - Obligaciones (naturaleza acreedora)", False),
+        ("PATRIMONIO - Capital y reservas (naturaleza acreedora)", False),
+        ("INGRESO   - Ventas y otros ingresos (naturaleza acreedora)", False),
+        ("COSTO     - Costo de ventas (naturaleza deudora)", False),
+        ("GASTO     - Gastos operativos y financieros (naturaleza deudora)", False),
+        ("", False),
+        ("IMPORTANTE:", True),
+        ("- Use la hoja 'Plan de Cuentas' para ingresar sus datos", False),
+        ("- Borre los ejemplos antes de importar", False),
+        ("- La primera fila es el encabezado, no la modifique", False),
+        ("- El sistema detecta la naturaleza automaticamente segun el tipo", False),
+    ]
+    ws2.column_dimensions['A'].width = 70
+    for i, (texto, bold) in enumerate(instrucciones, 1):
+        cell = ws2.cell(row=i, column=1, value=texto)
+        if bold:
+            cell.font = Font(bold=True, color="1E40AF")
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return StreamingResponse(buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": 'attachment; filename="plantilla_plan_cuentas.xlsx"'})
+
+
+@router.post("/plan-cuentas/importar-excel")
+def importar_plan_cuentas_excel(
+    file: bytes = None,
+    reemplazar: bool = False,
+    u=Depends(get_current_user)
+):
+    """Importa plan de cuentas desde archivo Excel."""
+    raise HTTPException(501, "Use multipart/form-data")
+
+
+from fastapi import File, UploadFile
+
+@router.post("/plan-cuentas/importar")
+def importar_plan_cuentas(
+    file: UploadFile = File(...),
+    reemplazar: bool = False,
+    u=Depends(get_current_user)
+):
+    import io, openpyxl
+
+    content = file.file.read()
+    try:
+        wb = openpyxl.load_workbook(io.BytesIO(content), data_only=True)
+    except Exception:
+        raise HTTPException(400, "Archivo Excel invalido")
+
+    # Buscar la hoja con datos
+    ws = None
+    for sheet_name in wb.sheetnames:
+        if 'instruccion' not in sheet_name.lower():
+            ws = wb[sheet_name]
+            break
+    if not ws:
+        raise HTTPException(400, "No se encontro hoja de datos en el archivo")
+
+    # Leer encabezados
+    headers = [str(ws.cell(1, c).value or '').strip().lower() for c in range(1, ws.max_column + 1)]
+    required = ['codigo', 'nombre', 'tipo']
+    for r in required:
+        if r not in headers:
+            raise HTTPException(400, f"Falta columna requerida: '{r}'. Columnas encontradas: {headers}")
+
+    col = {h: i for i, h in enumerate(headers)}
+
+    TIPO_NATURALEZA = {
+        'ACTIVO': 'DEUDORA', 'COSTO': 'DEUDORA', 'GASTO': 'DEUDORA',
+        'PASIVO': 'ACREEDORA', 'PATRIMONIO': 'ACREEDORA', 'INGRESO': 'ACREEDORA',
+    }
+    TIPOS_VALIDOS = set(TIPO_NATURALEZA.keys())
+
+    filas = []
+    errores = []
+    for row_idx in range(2, ws.max_row + 1):
+        codigo = str(ws.cell(row_idx, col['codigo'] + 1).value or '').strip()
+        nombre = str(ws.cell(row_idx, col['nombre'] + 1).value or '').strip()
+        tipo   = str(ws.cell(row_idx, col['tipo'] + 1).value or '').strip().upper()
+
+        if not codigo and not nombre:
+            continue
+
+        if not codigo:
+            errores.append(f"Fila {row_idx}: falta codigo")
+            continue
+        if not nombre:
+            errores.append(f"Fila {row_idx}: falta nombre para {codigo}")
+            continue
+        if tipo not in TIPOS_VALIDOS:
+            errores.append(f"Fila {row_idx}: tipo '{tipo}' invalido para {codigo}")
+            continue
+
+        nivel_val = ws.cell(row_idx, col.get('nivel', -1) + 1).value if 'nivel' in col else None
+        nivel = int(nivel_val) if nivel_val and str(nivel_val).isdigit() else len(codigo.split('.'))
+
+        es_mov_val = str(ws.cell(row_idx, col.get('es_movimiento', -1) + 1).value or '').strip().lower() if 'es_movimiento' in col else ''
+        es_movimiento = es_mov_val in ('si', 'sí', 'yes', '1', 'true', 'x')
+
+        padre_codigo = str(ws.cell(row_idx, col.get('padre_codigo', -1) + 1).value or '').strip() if 'padre_codigo' in col else ''
+
+        filas.append({
+            'codigo': codigo, 'nombre': nombre, 'tipo': tipo,
+            'naturaleza': TIPO_NATURALEZA[tipo],
+            'nivel': nivel, 'es_movimiento': es_movimiento,
+            'padre_codigo': padre_codigo,
+        })
+
+    if errores and len(errores) > len(filas):
+        raise HTTPException(400, f"Demasiados errores: {errores[:5]}")
+
+    if reemplazar:
+        execute("DELETE FROM cont_plan_cuentas")
+
+    # Resincronizar secuencia antes de insertar
+    execute("SELECT setval(pg_get_serial_sequence('cont_plan_cuentas','id'), COALESCE((SELECT MAX(id) FROM cont_plan_cuentas), 0) + 1, false)")
+
+    creadas = 0
+    omitidas = 0
+    for f in filas:
+        existe = query_one("SELECT id FROM cont_plan_cuentas WHERE codigo=%s", (f['codigo'],))
+        if existe:
+            omitidas += 1
+            continue
+
+        padre_id = None
+        if f['padre_codigo']:
+            padre = query_one("SELECT id FROM cont_plan_cuentas WHERE codigo=%s", (f['padre_codigo'],))
+            if padre:
+                padre_id = padre['id']
+
+        try:
+            execute("""
+                INSERT INTO cont_plan_cuentas
+                    (codigo, nombre, tipo, naturaleza, nivel, es_movimiento, padre_id, activa)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,true)
+            """, (f['codigo'], f['nombre'], f['tipo'], f['naturaleza'],
+                  f['nivel'], f['es_movimiento'], padre_id))
+            creadas += 1
+        except Exception as e:
+            if 'unique' in str(e).lower() or 'duplicada' in str(e).lower():
+                omitidas += 1
+            else:
+                errores.append(f"Error en {f['codigo']}: {str(e)[:80]}")
+
+    return {
+        "msg": f"Importacion completada: {creadas} cuentas creadas, {omitidas} omitidas (ya existian)",
+        "creadas": creadas,
+        "omitidas": omitidas,
+        "errores": errores,
+    }
+
+
 # ═══════════════════════════════════════════════════════════
 # ASIENTOS CONTABLES
 # ═══════════════════════════════════════════════════════════

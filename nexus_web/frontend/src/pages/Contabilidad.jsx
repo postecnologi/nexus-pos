@@ -133,6 +133,38 @@ function TabPlanCuentas({ C, fi }) {
     }
   }
 
+  async function descargarPlantilla() {
+    try {
+      const resp = await api.get('/contabilidad/plan-cuentas/plantilla-excel', { responseType: 'blob' })
+      const url = URL.createObjectURL(new Blob([resp.data], { type: resp.headers['content-type'] }))
+      const a = document.createElement('a')
+      a.href = url; a.download = 'plantilla_plan_cuentas.xlsx'; a.click()
+      URL.revokeObjectURL(url)
+    } catch { alert('Error al descargar plantilla') }
+  }
+
+  async function importarExcel(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reemplazar = window.confirm(
+      '¿Desea REEMPLAZAR el plan de cuentas actual?\n\n' +
+      'OK = Borrar todo e importar desde cero\n' +
+      'Cancelar = Solo agregar cuentas nuevas (no borra las existentes)'
+    )
+    const form = new FormData()
+    form.append('file', file)
+    try {
+      const r = await api.post(`/contabilidad/plan-cuentas/importar?reemplazar=${reemplazar}`, form, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      })
+      alert(`${r.data.msg}${r.data.errores?.length ? '\n\nAdvertencias:\n' + r.data.errores.slice(0, 5).join('\n') : ''}`)
+      cargar()
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Error al importar')
+    }
+    e.target.value = ''
+  }
+
   function toggleCollapse(codigo) {
     setCollapsed(prev => ({ ...prev, [codigo]: !prev[codigo] }))
   }
@@ -163,6 +195,18 @@ function TabPlanCuentas({ C, fi }) {
             background: C.blueD, color: C.blue, fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
           Inicializar Plan Ecuador
         </button>
+        <button onClick={descargarPlantilla}
+          style={{ padding: '8px 16px', borderRadius: 8, border: `1px solid #10B981`,
+            background: '#10B98115', color: '#10B981', fontWeight: 700, fontSize: 12, cursor: 'pointer',
+            display: 'flex', alignItems: 'center', gap: 6 }}>
+          ⬇ Plantilla Excel
+        </button>
+        <label style={{ padding: '8px 16px', borderRadius: 8, border: `1px solid #F59E0B`,
+          background: '#F59E0B15', color: '#F59E0B', fontWeight: 700, fontSize: 12, cursor: 'pointer',
+          display: 'flex', alignItems: 'center', gap: 6 }}>
+          ⬆ Importar Excel
+          <input type="file" accept=".xlsx,.xls" onChange={importarExcel} style={{ display: 'none' }} />
+        </label>
         <button onClick={() => setShowModal(true)}
           style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px',
             borderRadius: 8, border: 'none', background: C.blue, color: '#fff',
