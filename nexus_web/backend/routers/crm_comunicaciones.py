@@ -1,12 +1,11 @@
 """
-CRM Comunicaciones — Email y WhatsApp por vendedor
-Cada vendedor tiene su propio SMTP y su instancia de Evolution API (WhatsApp).
+CRM Comunicaciones — Email por vendedor (SMTP corporativo).
 """
 from fastapi import APIRouter, Depends, HTTPException
 from database import query, query_one, execute, insert
 from auth import get_current_user
 from typing import Optional
-import httpx, smtplib, ssl
+import smtplib, ssl
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
@@ -37,30 +36,22 @@ def get_config(vendedor_id: int, u=Depends(get_current_user)):
     cfg = _get_config_vendedor(vendedor_id)
     if not cfg:
         return {"vendedor_id": vendedor_id, "smtp_host": "", "smtp_port": 587,
-                "smtp_user": "", "smtp_tls": True, "smtp_from_nombre": "",
-                "wa_instancia": "", "wa_conectado": False, "wa_telefono": ""}
-    safe = {k: v for k, v in cfg.items() if k not in ('smtp_password', 'evolution_key')}
-    # Devolver indicadores de si tienen valor (no el valor real por seguridad)
+                "smtp_user": "", "smtp_tls": True, "smtp_from_nombre": ""}
+    safe = {k: v for k, v in cfg.items() if k not in ('smtp_password', 'evolution_key', 'evolution_url',
+                                                        'wa_instancia', 'wa_telefono', 'wa_conectado')}
     safe["smtp_password"] = "●●●●●●●●" if cfg.get("smtp_password") else ""
-    safe["evolution_key"] = cfg.get("evolution_key") or ""  # La URL no es secreta, la key sí pero la necesita
     safe["smtp_configurado"] = bool(cfg.get("smtp_host") and cfg.get("smtp_user"))
-    safe["wa_configurado"] = bool(cfg.get("wa_instancia"))
     return safe
 
 
 @router.put("/config/{vendedor_id}")
 def save_config(vendedor_id: int, data: dict, u=Depends(get_current_user)):
-    campos_permitidos = {
-        "smtp_host", "smtp_port", "smtp_user", "smtp_password",
-        "smtp_tls", "smtp_from_nombre", "wa_instancia",
-        "wa_telefono", "evolution_url", "evolution_key"
-    }
-    # No sobreescribir passwords con placeholder
+    campos_permitidos = {"smtp_host", "smtp_port", "smtp_user", "smtp_password", "smtp_tls", "smtp_from_nombre"}
     filtered = {}
     for k, v in data.items():
         if k not in campos_permitidos:
             continue
-        if k in ('smtp_password', 'evolution_key') and v and set(v) <= {'●', '•', '*'}:
+        if k == 'smtp_password' and v and set(v) <= {'●', '•', '*'}:
             continue  # Es placeholder, no actualizar
         filtered[k] = v
     if not filtered:
@@ -173,140 +164,6 @@ def enviar_email(data: dict, u=Depends(get_current_user)):
 
     return {"ok": True, "msg": f"Email enviado a {destinatario}"}
 
-
-# ══════════════════════════════════════════════════════════════════
-#  WHATSAPP — Evolution API
-# ══════════════════════════════════════════════════════════════════
-
-def _evo_url(cfg: dict, path: str):
-    base = (cfg.get("evolution_url") or "").rstrip("/")
-    if not base:
-        raise HTTPException(400, "URL de Evolution API no configurada")
-    return f"{base}{path}"
-
-def _evo_headers(cfg: dict):
-    return {"apikey": cfg.get("evolution_key", ""), "Content-Type": "application/json"}
-
-
-@router.post("/whatsapp/{vendedor_id}/crear-instancia")
-def crear_instancia_wa(vendedor_id: int, u=Depends(get_current_user)):
-    cfg = _get_config_vendedor(vendedor_id)
-    if not cfg or not cfg.get("evolution_url"):
-        raise HTTPException(400, "Configure primero la URL y API Key de Evolution")
-
-    vend = query_one("SELECT codigo, nombre FROM ven_vendedores WHERE id=%s", (vendedor_id,))
-    instancia = f"vendedor_{vend['codigo'].lower().replace('-','_')}" if vend else f"vendedor_{vendedor_id}"
-
-    try:
-        resp = httpx.post(
-            _evo_url(cfg, "/instance/create"),
-            headers=_evo_headers(cfg),
-            json={"instanceName": instancia, "qrcode": True, "integration": "WHATSAPP-BAILEYS"},
-            timeout=15
-        )
-        if resp.status_code not in (200, 201):
-            raise HTTPException(400, f"Evolution API error: {resp.text[:200]}")
-        execute("UPDATE crm_config_vendedor SET wa_instancia=%s, updated_at=NOW() WHERE vendedor_id=%s",
-                (instancia, vendedor_id))
-        return {"ok": True, "instancia": instancia, "msg": "Instancia creada. Obtenga el QR para conectar."}
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(500, f"Error conectando a Evolution API: {str(e)}")
-
-
-@router.get("/whatsapp/{vendedor_id}/qr")
-def get_qr_wa(vendedor_id: int, u=Depends(get_current_user)):
-    cfg = _get_config_vendedor(vendedor_id)
-    if not cfg or not cfg.get("wa_instancia"):
-        raise HTTPException(400, "Primero cree la instancia de WhatsApp")
-    try:
-        resp = httpx.get(
-            _evo_url(cfg, f"/instance/connect/{cfg['wa_instancia']}"),
-            headers=_evo_headers(cfg),
-            timeout=15
-        )
-        if resp.status_code != 200:
-            raise HTTPException(400, f"Error obteniendo QR: {resp.text[:200]}")
-        data = resp.json()
-        return {"qr": data.get("base64") or data.get("qrcode", {}).get("base64", ""),
-                "estado": data.get("state", ""),
-                "instancia": cfg["wa_instancia"]}
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(500, f"Error: {str(e)}")
-
-
-@router.get("/whatsapp/{vendedor_id}/estado")
-def estado_wa(vendedor_id: int, u=Depends(get_current_user)):
-    cfg = _get_config_vendedor(vendedor_id)
-    if not cfg or not cfg.get("wa_instancia"):
-        return {"conectado": False, "estado": "NO_CONFIGURADO"}
-    try:
-        resp = httpx.get(
-            _evo_url(cfg, f"/instance/connectionState/{cfg['wa_instancia']}"),
-            headers=_evo_headers(cfg),
-            timeout=10
-        )
-        data = resp.json()
-        conectado = data.get("instance", {}).get("state") == "open"
-        if conectado != cfg.get("wa_conectado"):
-            execute("UPDATE crm_config_vendedor SET wa_conectado=%s, updated_at=NOW() WHERE vendedor_id=%s",
-                    (conectado, vendedor_id))
-        return {"conectado": conectado, "estado": data.get("instance", {}).get("state", ""), "instancia": cfg["wa_instancia"]}
-    except Exception:
-        return {"conectado": False, "estado": "ERROR"}
-
-
-@router.post("/whatsapp/enviar")
-def enviar_whatsapp(data: dict, u=Depends(get_current_user)):
-    vendedor_id = data.get("vendedor_id")
-    telefono = str(data.get("telefono", "")).strip().replace(" ", "").replace("-", "").replace("+", "")
-    mensaje = data.get("mensaje", "").strip()
-    cliente_id = data.get("cliente_id")
-
-    if not telefono or not mensaje:
-        raise HTTPException(400, "Telefono y mensaje son obligatorios")
-
-    cfg = _get_config_vendedor(vendedor_id) if vendedor_id else None
-    if not cfg or not cfg.get("wa_instancia"):
-        raise HTTPException(400, "El vendedor no tiene WhatsApp configurado")
-    if not cfg.get("wa_conectado"):
-        raise HTTPException(400, "El WhatsApp del vendedor no esta conectado. Escanee el QR.")
-
-    # Formato telefono Ecuador: 593XXXXXXXXX
-    if telefono.startswith("0") and len(telefono) == 10:
-        telefono = "593" + telefono[1:]
-    elif not telefono.startswith("593"):
-        telefono = "593" + telefono
-
-    try:
-        resp = httpx.post(
-            _evo_url(cfg, f"/message/sendText/{cfg['wa_instancia']}"),
-            headers=_evo_headers(cfg),
-            json={"number": telefono, "text": mensaje},
-            timeout=20
-        )
-        if resp.status_code not in (200, 201):
-            raise HTTPException(400, f"Error enviando mensaje: {resp.text[:200]}")
-        rdata = resp.json()
-        wa_msg_id = rdata.get("key", {}).get("id", "") or rdata.get("id", "")
-        insert("""
-            INSERT INTO crm_comunicaciones
-                (cliente_id, vendedor_id, tipo, direccion, contenido, estado, wa_msg_id)
-            VALUES (%s,%s,'WHATSAPP',%s,%s,'ENVIADO',%s)
-        """, (cliente_id, vendedor_id, telefono, mensaje[:2000], wa_msg_id))
-        return {"ok": True, "msg": "Mensaje enviado", "wa_msg_id": wa_msg_id}
-    except HTTPException:
-        raise
-    except Exception as e:
-        insert("""
-            INSERT INTO crm_comunicaciones
-                (cliente_id, vendedor_id, tipo, direccion, contenido, estado, error_msg)
-            VALUES (%s,%s,'WHATSAPP',%s,%s,'ERROR',%s)
-        """, (cliente_id, vendedor_id, telefono, mensaje[:2000], str(e)[:300]))
-        raise HTTPException(500, f"Error: {str(e)}")
 
 
 # ══════════════════════════════════════════════════════════════════

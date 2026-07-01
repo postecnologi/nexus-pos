@@ -4,6 +4,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 import psycopg2
 from psycopg2.extras import RealDictCursor
+from psycopg2.pool import ThreadedConnectionPool
 from contextlib import contextmanager
 
 load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")
@@ -32,31 +33,56 @@ else:
 # Thread-local storage for tenant database override
 _tenant_local = threading.local()
 
+# Pool de conexiones por base de datos: evita abrir/cerrar conexión en cada query
+_pools: dict[str, ThreadedConnectionPool] = {}
+_pools_lock = threading.Lock()
+
+POOL_MIN = 2   # conexiones siempre abiertas
+POOL_MAX = 10  # máximo simultáneo (VPS 1GB: no subir mucho)
+
+
+def _get_pool(db_name: str) -> ThreadedConnectionPool:
+    if db_name not in _pools:
+        with _pools_lock:
+            if db_name not in _pools:
+                config = dict(DB_CONFIG)
+                config["database"] = db_name
+                _pools[db_name] = ThreadedConnectionPool(
+                    POOL_MIN, POOL_MAX,
+                    cursor_factory=RealDictCursor,
+                    **config
+                )
+    return _pools[db_name]
+
 
 def set_tenant_db(db_name):
-    """Set the current tenant database for this thread/request."""
     _tenant_local.db_name = db_name
 
 
 def clear_tenant_db():
-    """Clear tenant database override."""
     _tenant_local.db_name = None
 
 
 def get_current_db():
-    """Get the current database name (tenant or default)."""
     return getattr(_tenant_local, 'db_name', None) or DB_CONFIG["database"]
 
 
 def get_connection():
-    config = dict(DB_CONFIG)
-    config["database"] = get_current_db()
-    return psycopg2.connect(**config, cursor_factory=RealDictCursor)
+    """Obtiene conexión del pool (no usar directamente — usar db())."""
+    db_name = get_current_db()
+    pool = _get_pool(db_name)
+    conn = pool.getconn()
+    # Asegura que las conexiones recicladas del pool estén en estado limpio
+    if conn.closed:
+        pool.putconn(conn, close=True)
+        conn = pool.getconn()
+    conn.cursor_factory = RealDictCursor
+    return conn, pool
 
 
 @contextmanager
 def db():
-    conn = get_connection()
+    conn, pool = get_connection()
     try:
         yield conn
         conn.commit()
@@ -64,7 +90,7 @@ def db():
         conn.rollback()
         raise
     finally:
-        conn.close()
+        pool.putconn(conn)  # devuelve al pool, no cierra
 
 
 def query(sql, params=None):

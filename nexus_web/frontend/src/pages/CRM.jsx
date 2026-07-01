@@ -808,7 +808,6 @@ function Clientes360Tab({ C }) {
   const [historial, setHistorial] = useState(null)
   const [loading, setLoading] = useState(false)
   const [subTab, setSubTab] = useState('oportunidades')
-  const [showWA, setShowWA] = useState(false)
   const [showEmail, setShowEmail] = useState(false)
   const [showNewOpp, setShowNewOpp] = useState(false)
   const [showNewNote, setShowNewNote] = useState(false)
@@ -858,9 +857,7 @@ function Clientes360Tab({ C }) {
   const [vendedores, setVendedores] = useState([])
   const [vendedorSelId, setVendedorSelId] = useState('')
   const [msgEmail, setMsgEmail] = useState({ dest: '', asunto: '', contenido: '' })
-  const [msgWa, setMsgWa] = useState({ tel: '', texto: '' })
   const [sendingEmail, setSendingEmail] = useState(false)
-  const [sendingWa, setSendingWa] = useState(false)
   const [comMsg, setComMsg] = useState(null)
 
   useEffect(() => {
@@ -894,24 +891,6 @@ function Clientes360Tab({ C }) {
     setSendingEmail(false)
   }
 
-  const enviarWa = async () => {
-    if (!msgWa.tel || !msgWa.texto) {
-      setComMsg({ok:false,text:'Complete teléfono y mensaje'}); return
-    }
-    setSendingWa(true); setComMsg(null)
-    try {
-      await api.post('/crm-com/whatsapp/enviar', {
-        vendedor_id: vendedorSelId ? parseInt(vendedorSelId) : null,
-        telefono: msgWa.tel,
-        mensaje: msgWa.texto,
-        cliente_id: cliente?.id,
-      })
-      setComMsg({ok:true, text:'Mensaje WhatsApp enviado'})
-      setMsgWa({tel:'',texto:''})
-      api.get(`/crm-com/historial?cliente_id=${cliente.id}`).then(r=>setComunicaciones(r.data)).catch(()=>{})
-    } catch(e) { setComMsg({ok:false, text:e.response?.data?.detail||'Error al enviar'}) }
-    setSendingWa(false)
-  }
 
   return (
     <div>
@@ -985,9 +964,6 @@ function Clientes360Tab({ C }) {
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <button onClick={() => setShowWA(true)} style={BTN(C.green, C.greenD)} title="WhatsApp">
-                  <MessageCircle size={14} /> WhatsApp
-                </button>
                 <button onClick={() => setShowEmail(true)} style={BTN(C.blue, C.blueD)} title="Email">
                   <Mail size={14} /> Email
                 </button>
@@ -1117,27 +1093,6 @@ function Clientes360Tab({ C }) {
                 {!vendedorSelId && <span style={{fontSize:11,color:C.muted,marginLeft:10}}>Seleccione un vendedor primero</span>}
               </div>
 
-              {/* WhatsApp */}
-              <div style={{background:C.surface,borderRadius:10,border:`1px solid ${C.border}`,padding:16,marginBottom:12}}>
-                <div style={{fontSize:13,fontWeight:700,color:C.green,marginBottom:12}}>💬 Enviar WhatsApp</div>
-                <div style={{display:'grid',gridTemplateColumns:'200px 1fr',gap:10,marginBottom:10}}>
-                  <div>
-                    <label style={{fontSize:11,color:C.muted,display:'block',marginBottom:3}}>Teléfono</label>
-                    <input value={msgWa.tel} onChange={e=>setMsgWa(p=>({...p,tel:e.target.value}))}
-                      style={FI} placeholder={cliente?.telefono||'0991234567'} />
-                  </div>
-                  <div>
-                    <label style={{fontSize:11,color:C.muted,display:'block',marginBottom:3}}>Mensaje</label>
-                    <input value={msgWa.texto} onChange={e=>setMsgWa(p=>({...p,texto:e.target.value}))}
-                      style={FI} placeholder="Mensaje de WhatsApp..." />
-                  </div>
-                </div>
-                <button onClick={enviarWa} disabled={sendingWa||!vendedorSelId}
-                  style={{...BTN(C.green,'rgba(16,185,129,.15)'),opacity:(!vendedorSelId?0.5:1)}}>
-                  {sendingWa?'Enviando...':'💬 Enviar WhatsApp'}
-                </button>
-              </div>
-
               {comMsg && (
                 <div style={{padding:'9px 14px',borderRadius:8,marginBottom:12,
                   background:comMsg.ok?'rgba(16,185,129,.15)':'rgba(239,68,68,.15)',
@@ -1223,9 +1178,6 @@ function Clientes360Tab({ C }) {
         </>
       )}
 
-      {/* WhatsApp modal */}
-      <WhatsAppModal open={showWA} onClose={() => setShowWA(false)} cliente={cliente} C={C} />
-
       {/* Email modal */}
       <EmailModal open={showEmail} onClose={() => setShowEmail(false)} cliente={cliente} C={C} />
 
@@ -1248,72 +1200,6 @@ function Clientes360Tab({ C }) {
 
       <style>{`@keyframes spin { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }`}</style>
     </div>
-  )
-}
-
-// ═════════════════════════════════════════════════════════════
-//  WhatsApp Modal
-// ═════════════════════════════════════════════════════════════
-function WhatsAppModal({ open, onClose, cliente, C }) {
-  const { FI, FI_SELECT, BTN } = getStyles(C)
-  const [phone, setPhone] = useState('')
-  const [msg, setMsg] = useState('')
-  const [sending, setSending] = useState(false)
-  const [plantillas, setPlantillas] = useState([])
-
-  useEffect(() => {
-    if (open && cliente) {
-      setPhone(cliente.telefono || cliente.celular || '')
-      setMsg('')
-      api.get('/crm/plantillas', { params: { tipo: 'WHATSAPP' } })
-        .then(r => setPlantillas(r.data || [])).catch(() => {})
-    }
-  }, [open, cliente])
-
-  function usarPlantilla(e) {
-    const p = plantillas.find(x => x.id === parseInt(e.target.value))
-    if (p) setMsg(p.contenido)
-  }
-
-  async function enviar() {
-    if (!phone) return
-    setSending(true)
-    try {
-      const { data } = await api.post('/crm/whatsapp/enviar', { telefono: phone, mensaje: msg, cliente_id: cliente?.id })
-      if (data.link) window.open(data.link, '_blank')
-      onClose()
-    } catch { /* ignore */ }
-    setSending(false)
-  }
-
-  return (
-    <Modal open={open} onClose={onClose} title="Enviar WhatsApp" C={C} width={420}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <div>
-          <label style={{ fontSize: 11, color: C.muted, display: 'block', marginBottom: 4 }}>Telefono</label>
-          <input value={phone} onChange={e => setPhone(e.target.value)} style={FI} placeholder="+593..." />
-        </div>
-        {plantillas.length > 0 && (
-          <div>
-            <label style={{ fontSize: 11, color: C.muted, display: 'block', marginBottom: 4 }}>Usar plantilla</label>
-            <select onChange={usarPlantilla} style={FI_SELECT} defaultValue="">
-              <option value="">Seleccionar plantilla...</option>
-              {plantillas.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
-            </select>
-          </div>
-        )}
-        <div>
-          <label style={{ fontSize: 11, color: C.muted, display: 'block', marginBottom: 4 }}>Mensaje</label>
-          <textarea value={msg} onChange={e => setMsg(e.target.value)}
-            style={{ ...FI, minHeight: 80, resize: 'vertical' }} placeholder="Escribe tu mensaje..." />
-        </div>
-        <button onClick={enviar} disabled={sending || !phone}
-          style={{ ...BTN(C.green, C.greenD), justifyContent: 'center', opacity: (sending || !phone) ? 0.5 : 1 }}>
-          {sending ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <MessageCircle size={14} />}
-          {sending ? 'Enviando...' : 'Abrir WhatsApp'}
-        </button>
-      </div>
-    </Modal>
   )
 }
 
@@ -1746,7 +1632,6 @@ function AutomatizacionesTab({ C }) {
     { value: 'CREAR_ACTIVIDAD', label: 'Crear actividad de seguimiento' },
     { value: 'CAMBIAR_PROBABILIDAD', label: 'Cambiar probabilidad' },
     { value: 'ENVIAR_EMAIL', label: 'Enviar email (plantilla)' },
-    { value: 'ENVIAR_WHATSAPP', label: 'Enviar WhatsApp (plantilla)' },
   ]
 
   if (loading) return <div style={{ padding: 40, textAlign: 'center', color: C.muted }}><Loader2 size={24} style={{ animation: 'spin 1s linear infinite' }} /></div>
@@ -1923,7 +1808,6 @@ function PlantillasTab({ C }) {
               <label style={{ fontSize: 11, color: C.muted, display: 'block', marginBottom: 4 }}>Tipo</label>
               <select value={form.tipo} onChange={e => setForm(f => ({ ...f, tipo: e.target.value }))} style={FI_SELECT} disabled={!!editId}>
                 <option value="EMAIL">Email</option>
-                <option value="WHATSAPP">WhatsApp</option>
               </select>
             </div>
           </div>
