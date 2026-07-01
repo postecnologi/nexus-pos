@@ -1371,10 +1371,14 @@ function EmailConfig({ setMsg }) {
 // ══════════════════════════════════════════════════════════════
 function PanelImportar({ C, SI }) {
   const MODULOS = [
-    { id:'productos',   label:'Productos / Inventario', icon:'📦', desc:'Importa tu catálogo de productos con precios, stock y categorías.' },
-    { id:'clientes',    label:'Clientes',               icon:'👥', desc:'Importa tu lista de clientes con RUC, nombre y contacto.' },
-    { id:'proveedores', label:'Proveedores',            icon:'🏭', desc:'Importa tus proveedores con RUC y datos de contacto.' },
-    { id:'empleados',   label:'Empleados (Nómina)',     icon:'👤', desc:'Importa empleados con datos laborales y salarios.' },
+    { id:'productos',          label:'Productos / Inventario',  icon:'📦', desc:'Catálogo de productos con precios, stock y categorías.' },
+    { id:'clientes',           label:'Clientes',                icon:'👥', desc:'Lista de clientes con RUC, nombre y contacto.' },
+    { id:'proveedores',        label:'Proveedores',             icon:'🏭', desc:'Proveedores con RUC y datos de contacto.' },
+    { id:'empleados',          label:'Empleados (Nómina)',      icon:'👤', desc:'Empleados con datos laborales y salarios.' },
+    { id:'ventas-historicas',  label:'Historial de Ventas',     icon:'🧾', desc:'Facturas del sistema anterior para conservar el historial de ventas.' },
+    { id:'compras-historicas', label:'Historial de Compras',    icon:'🛒', desc:'Compras del sistema anterior para conservar el historial.' },
+    { id:'saldos-cxc',         label:'Saldos CxC (lo que te deben)', icon:'💰', desc:'Saldos pendientes de clientes — lo más crítico al migrar.' },
+    { id:'saldos-cxp',         label:'Saldos CxP (lo que debes)',    icon:'📤', desc:'Saldos pendientes con proveedores — deudas actuales.' },
   ]
 
   const [activo, setActivo] = useState(null)
@@ -1430,7 +1434,9 @@ function PanelImportar({ C, SI }) {
         </div>
       </div>
 
-      {MODULOS.map(m => (
+      <div style={{fontSize:11,fontWeight:700,color:C.muted,textTransform:'uppercase',
+        letterSpacing:'.06em',marginBottom:8,marginTop:4}}>Datos maestros</div>
+      {MODULOS.slice(0,4).map(m => (
         <div key={m.id} style={card}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
@@ -1453,6 +1459,52 @@ function PanelImportar({ C, SI }) {
             </div>
           </div>
 
+          {activo === m.id && result && (
+            <div style={{ marginTop: 14, padding: '12px 16px', borderRadius: 8,
+              background: result.ok ? 'rgba(16,185,129,.08)' : 'rgba(239,68,68,.08)',
+              border: `1px solid ${result.ok ? '#10B98133' : '#EF444433'}` }}>
+              <div style={{ fontWeight: 700, color: result.ok ? '#10B981' : '#EF4444', marginBottom: 6 }}>
+                {result.ok ? `✅ ${result.msg}` : `❌ ${result.msg}`}
+              </div>
+              {result.errores?.length > 0 && (
+                <div style={{ marginTop: 8 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: C.amber, marginBottom: 4 }}>
+                    ⚠️ {result.errores.length} errores:
+                  </div>
+                  <div style={{ maxHeight: 120, overflowY: 'auto', fontSize: 11, color: C.muted, lineHeight: 1.8 }}>
+                    {result.errores.map((e, i) => <div key={i}>• {e}</div>)}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      ))}
+
+      <div style={{fontSize:11,fontWeight:700,color:C.muted,textTransform:'uppercase',
+        letterSpacing:'.06em',marginBottom:8,marginTop:16}}>Historial y saldos de migración</div>
+      {MODULOS.slice(4).map(m => (
+        <div key={m.id} style={card}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
+              <span style={{ fontSize: 28 }}>{m.icon}</span>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 14, color: C.text }}>{m.label}</div>
+                <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{m.desc}</div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <button onClick={() => descargarPlantilla(m.id)} style={btnO()}>
+                <Download size={13} /> Plantilla Excel
+              </button>
+              <label style={{ ...btn('#10B981'), cursor: 'pointer' }}>
+                <Upload size={13} /> {uploading && activo === m.id ? 'Importando...' : 'Importar archivo'}
+                <input type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }}
+                  disabled={uploading}
+                  onChange={e => { setActivo(m.id); importar(e, m.id) }} />
+              </label>
+            </div>
+          </div>
           {activo === m.id && result && (
             <div style={{ marginTop: 14, padding: '12px 16px', borderRadius: 8,
               background: result.ok ? 'rgba(16,185,129,.08)' : 'rgba(239,68,68,.08)',
