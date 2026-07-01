@@ -276,28 +276,24 @@ function EmpleadoModal({ sty, t, emp, vendedores, usuarios, tecnicos, onClose, o
     setSaving(false)
   }
 
-  const Field = ({ label, name, type = 'text', required, ...props }) => (
+  const F = (label, name, type = 'text', required = false) => (
     <div style={{ flex: 1, minWidth: 160 }}>
       <label style={sty.label}>{label}{required && ' *'}</label>
-      <input type={type} value={form[name] || ''} onChange={e => set(name, e.target.value)}
-        style={sty.input} {...props} />
+      <input type={type} value={form[name] || ''} onChange={e => set(name, e.target.value)} style={sty.input} />
     </div>
   )
-
-  const Select = ({ label, name, options, ...props }) => (
+  const S = (label, name, options) => (
     <div style={{ flex: 1, minWidth: 160 }}>
       <label style={sty.label}>{label}</label>
-      <select value={form[name] || ''} onChange={e => set(name, e.target.value)} style={sty.select} {...props}>
+      <select value={form[name] || ''} onChange={e => set(name, e.target.value)} style={sty.select}>
         <option value="">-- Seleccione --</option>
         {options.map(o => typeof o === 'string'
           ? <option key={o} value={o}>{o}</option>
-          : <option key={o.value} value={o.value}>{o.label}</option>
-        )}
+          : <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
     </div>
   )
-
-  const Checkbox = ({ label, name }) => (
+  const CB = (label, name) => (
     <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: t.text, cursor: 'pointer' }}>
       <input type="checkbox" checked={!!form[name]} onChange={e => set(name, e.target.checked)} />
       {label}
@@ -317,61 +313,58 @@ function EmpleadoModal({ sty, t, emp, vendedores, usuarios, tecnicos, onClose, o
         {/* Datos Personales */}
         <div style={{ fontSize: 13, fontWeight: 700, color: t.blue, marginBottom: 8, marginTop: 8 }}>Datos Personales</div>
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
-          <Field label="Cedula" name="cedula" required />
-          <Field label="Nombres" name="nombres" required />
-          <Field label="Apellidos" name="apellidos" required />
+          {F('Cedula', 'cedula', 'text', true)}
+          {F('Nombres', 'nombres', 'text', true)}
+          {F('Apellidos', 'apellidos', 'text', true)}
         </div>
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
-          <Field label="Fecha Nacimiento" name="fecha_nacimiento" type="date" />
-          <Select label="Genero" name="genero" options={GENEROS} />
-          <Select label="Estado Civil" name="estado_civil" options={ESTADOS_CIVILES} />
+          {F('Fecha Nacimiento', 'fecha_nacimiento', 'date')}
+          {S('Genero', 'genero', GENEROS)}
+          {S('Estado Civil', 'estado_civil', ESTADOS_CIVILES)}
         </div>
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
-          <Field label="Direccion" name="direccion" />
-          <Field label="Telefono" name="telefono" />
-          <Field label="Email" name="email" type="email" />
+          {F('Direccion', 'direccion')}
+          {F('Telefono', 'telefono')}
+          {F('Email', 'email', 'email')}
         </div>
 
         {/* Datos Laborales */}
         <div style={{ fontSize: 13, fontWeight: 700, color: t.blue, marginBottom: 8, marginTop: 16 }}>Datos Laborales</div>
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
-          <Field label="Codigo" name="codigo" />
-          <Field label="Cargo" name="cargo" />
-          <Field label="Departamento" name="departamento" />
+          {F('Codigo', 'codigo')}
+          {F('Cargo', 'cargo')}
+          {F('Departamento', 'departamento')}
         </div>
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
-          <Field label="Fecha Ingreso" name="fecha_ingreso" type="date" required />
-          <Field label="Fecha Salida" name="fecha_salida" type="date" />
-          <Select label="Tipo Contrato" name="tipo_contrato" options={TIPOS_CONTRATO} />
+          {F('Fecha Ingreso', 'fecha_ingreso', 'date', true)}
+          {F('Fecha Salida', 'fecha_salida', 'date')}
+          {S('Tipo Contrato', 'tipo_contrato', TIPOS_CONTRATO)}
         </div>
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
-          <Field label="Salario Base ($)" name="salario_base" type="number" required />
-          <Select label="Region" name="region" options={REGIONES} />
-          <Field label="Cargas Familiares" name="num_cargas_familiares" type="number" />
+          {F('Salario Base ($)', 'salario_base', 'number', true)}
+          {S('Region', 'region', REGIONES)}
+          {F('Cargas Familiares', 'num_cargas_familiares', 'number')}
         </div>
         <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', marginBottom: 12 }}>
-          <Checkbox label="Tiene Fondos de Reserva" name="tiene_fondos_reserva" />
-          <Checkbox label="Decimo 13ro Mensualizado" name="decimo_tercero_acumulado" />
-          <Checkbox label="Decimo 14to Mensualizado" name="decimo_cuarto_acumulado" />
+          {CB('Tiene Fondos de Reserva', 'tiene_fondos_reserva')}
+          {CB('Decimo 13ro Mensualizado', 'decimo_tercero_acumulado')}
+          {CB('Decimo 14to Mensualizado', 'decimo_cuarto_acumulado')}
         </div>
 
         {/* Datos Bancarios */}
         <div style={{ fontSize: 13, fontWeight: 700, color: t.blue, marginBottom: 8, marginTop: 16 }}>Datos Bancarios</div>
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
-          <Field label="Banco" name="banco" />
-          <Field label="Numero Cuenta" name="cuenta_bancaria" />
-          <Select label="Tipo Cuenta" name="tipo_cuenta" options={['AHORROS', 'CORRIENTE']} />
+          {F('Banco', 'banco')}
+          {F('Numero Cuenta', 'cuenta_bancaria')}
+          {S('Tipo Cuenta', 'tipo_cuenta', ['AHORROS', 'CORRIENTE'])}
         </div>
 
         {/* Vincular */}
         <div style={{ fontSize: 13, fontWeight: 700, color: t.blue, marginBottom: 8, marginTop: 16 }}>Vincular con</div>
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
-          <Select label="Vendedor" name="vendedor_id"
-            options={vendedores.map(v => ({ value: v.id, label: `${v.nombre} ${v.apellidos || ''}` }))} />
-          <Select label="Usuario Sistema" name="usuario_id"
-            options={usuarios.map(u => ({ value: u.id, label: u.nombre || u.username }))} />
-          <Select label="Tecnico" name="tecnico_id"
-            options={tecnicos.map(tc => ({ value: tc.id, label: tc.nombre }))} />
+          {S('Vendedor', 'vendedor_id', vendedores.map(v => ({ value: v.id, label: `${v.nombre} ${v.apellidos || ''}` })))}
+          {S('Usuario Sistema', 'usuario_id', usuarios.map(u => ({ value: u.id, label: u.nombre || u.username })))}
+          {S('Tecnico', 'tecnico_id', tecnicos.map(tc => ({ value: tc.id, label: tc.nombre })))}
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
