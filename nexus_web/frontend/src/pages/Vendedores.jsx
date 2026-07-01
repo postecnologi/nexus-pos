@@ -312,7 +312,7 @@ export default function Vendedores() {
             placeholder="Buscar por código, nombre o cédula..."
             style={{paddingLeft:34,width:'100%',padding:'9px 12px 9px 34px',
               borderRadius:9,border:`1px solid ${C.border}`,
-              background:C.surface2,color:C.text,fontSize:13,
+              background:C.sur2,color:C.text,fontSize:13,
               outline:'none',boxSizing:'border-box'}}/>
         </div>
 
@@ -325,7 +325,7 @@ export default function Vendedores() {
 
         <select value={filtSuc} onChange={e=>setFiltSuc(e.target.value)}
           style={{padding:'9px 12px',borderRadius:9,border:`1px solid ${C.border}`,
-            background:C.surface2,color:C.text,fontSize:13,outline:'none'}}>
+            background:C.sur2,color:C.text,fontSize:13,outline:'none'}}>
           <option value="">Todas las sucursales</option>
           {sucursales.map(s=><option key={s.id} value={s.id}>{s.nombre}</option>)}
         </select>
@@ -335,7 +335,7 @@ export default function Vendedores() {
           {[['true','Activos'],['false','Inactivos'],['','Todos']].map(([v,l])=>(
             <button key={v} onClick={()=>setFiltActivo(v)}
               style={{padding:'9px 14px',border:'none',cursor:'pointer',fontSize:12,fontWeight:600,
-                background:filtActivo===v?C.blue:C.surface2,
+                background:filtActivo===v?C.blue:C.sur2,
                 color:filtActivo===v?'white':C.muted,transition:'all .15s'}}>
               {l}
             </button>
@@ -367,7 +367,7 @@ export default function Vendedores() {
                   : null
                 return (
                   <tr key={v.id}
-                    onMouseEnter={e=>e.currentTarget.style.background=C.surface2}
+                    onMouseEnter={e=>e.currentTarget.style.background=C.sur2}
                     onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
 
                     <td style={TD}>
@@ -426,13 +426,13 @@ export default function Vendedores() {
                       <div style={{display:'flex',gap:5,justifyContent:'center'}}>
                         <button onClick={()=>setVerModal(v)} title="Ver detalle"
                           style={{padding:'5px 9px',borderRadius:7,
-                            border:`1px solid ${C.border}`,background:C.surface2,
+                            border:`1px solid ${C.border}`,background:C.sur2,
                             color:C.muted,cursor:'pointer',fontSize:13}}>
                           👁
                         </button>
                         <button onClick={()=>setModal(v)} title="Editar"
                           style={{padding:'5px 9px',borderRadius:7,
-                            border:`1px solid ${C.border}`,background:C.surface2,
+                            border:`1px solid ${C.border}`,background:C.sur2,
                             color:C.muted,cursor:'pointer',fontSize:13}}>
                           ✏️
                         </button>
