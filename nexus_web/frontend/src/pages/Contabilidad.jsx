@@ -5,7 +5,7 @@ import {
   Calculator, Plus, Search, X, Trash2, Eye, ChevronRight, ChevronDown,
   AlertCircle, Check, BookOpen, BarChart3, FileText, List, Download,
   RefreshCw, Lock, CheckCircle, Target, Layers, DollarSign, GitCompare,
-  Globe, Building2
+  Globe, Building2, Settings
 } from 'lucide-react'
 
 const fmt$ = v => '$' + Number(v || 0).toLocaleString('es-EC', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
