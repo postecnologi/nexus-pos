@@ -24,6 +24,7 @@ const TABS = [
   { key: 'conciliacion', label: 'Conciliacion', icon: GitCompare },
   { key: 'monedas', label: 'Monedas', icon: Globe },
   { key: 'consolidado', label: 'Consolidado', icon: Building2 },
+  { key: 'config-cuentas', label: 'Configurar Cuentas', icon: Settings },
 ]
 
 const TIPO_BADGE = {
@@ -100,6 +101,7 @@ export default function Contabilidad() {
       {tab === 'conciliacion' && <TabConciliacion C={C} fi={fi} />}
       {tab === 'monedas' && <TabMonedas C={C} fi={fi} />}
       {tab === 'consolidado' && <TabConsolidado C={C} fi={fi} />}
+      {tab === 'config-cuentas' && <TabConfigCuentas C={C} fi={fi} />}
     </div>
   )
 }
@@ -2685,6 +2687,118 @@ function TabConsolidado({ C, fi }) {
             Seleccione una fecha y presione "Generar Consolidado" para ver el balance consolidado
           </div>
         )}
+      </div>
+    </div>
+  )
+}
+
+/* ════════════════════════════════════════════════════════════
+   Tab: Configurar Cuentas Contables
+════════════════════════════════════════════════════════════ */
+const GRUPOS_CONFIG = {
+  ventas:    { label: 'Ventas / Ingresos',   color: '#10B981' },
+  compras:   { label: 'Compras / Costos',    color: '#F59E0B' },
+  nomina:    { label: 'Nomina / RRHH',       color: '#8B5CF6' },
+  bancos:    { label: 'Caja y Bancos',       color: '#3B82F6' },
+  impuestos: { label: 'Impuestos / Retenciones', color: '#EF4444' },
+}
+
+function TabConfigCuentas({ C, fi }) {
+  const [config, setConfig] = useState({})
+  const [campos, setCampos] = useState([])
+  const [cuentas, setCuentas] = useState([])
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+
+  useEffect(() => {
+    api.get('/contabilidad/config-cuentas').then(r => {
+      setConfig(r.data.config || {})
+      setCampos(r.data.campos || [])
+      setCuentas(r.data.cuentas_movimiento || [])
+    }).catch(() => {})
+  }, [])
+
+  const handleChange = (campo, val) => {
+    setConfig(p => ({ ...p, [campo]: val || null }))
+    setSaved(false)
+  }
+
+  const save = async () => {
+    setSaving(true)
+    try {
+      await api.put('/contabilidad/config-cuentas', config)
+      setSaved(true)
+      setTimeout(() => setSaved(false), 3000)
+    } catch (e) {
+      alert(e.response?.data?.detail || 'Error al guardar')
+    }
+    setSaving(false)
+  }
+
+  // Agrupar campos por grupo
+  const grupos = {}
+  campos.forEach(([campo, label, grupo]) => {
+    if (!grupos[grupo]) grupos[grupo] = []
+    grupos[grupo].push({ campo, label })
+  })
+
+  return (
+    <div>
+      {/* Info */}
+      <div style={{ background: 'rgba(59,130,246,.08)', border: '1px solid rgba(59,130,246,.2)',
+        borderRadius: 10, padding: '12px 16px', marginBottom: 20, fontSize: 12, color: C.blue }}>
+        <strong>¿Para qué sirve esto?</strong> — Define qué cuenta del plan de cuentas corresponde a cada tipo
+        de transaccion. Una vez configurado, el sistema genera asientos contables automaticamente
+        en estado <strong>BORRADOR</strong> cada vez que creas una factura, compra o apruebas la nomina.
+        El contador solo revisa y aprueba.
+      </div>
+
+      {Object.entries(grupos).map(([grupo, items]) => {
+        const g = GRUPOS_CONFIG[grupo] || { label: grupo, color: C.blue }
+        return (
+          <div key={grupo} style={{ background: C.surface, borderRadius: 12,
+            border: `1px solid ${C.border}`, padding: 20, marginBottom: 16 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: g.color,
+              marginBottom: 16, paddingBottom: 8, borderBottom: `2px solid ${g.color}33` }}>
+              {g.label}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 12 }}>
+              {items.map(({ campo, label }) => (
+                <div key={campo}>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: C.muted,
+                    display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '.05em' }}>
+                    {label}
+                  </label>
+                  <select
+                    value={config[campo] || ''}
+                    onChange={e => handleChange(campo, e.target.value)}
+                    style={{ ...fi, width: '100%' }}
+                  >
+                    <option value="">— Sin configurar —</option>
+                    {cuentas.map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.codigo} — {c.nombre}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      })}
+
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 8 }}>
+        {saved && (
+          <span style={{ color: '#10B981', fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
+            ✓ Configuracion guardada
+          </span>
+        )}
+        <button onClick={save} disabled={saving}
+          style={{ padding: '10px 24px', borderRadius: 8, border: 'none',
+            background: '#10B981', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+          {saving ? 'Guardando...' : 'Guardar Configuracion'}
+        </button>
       </div>
     </div>
   )

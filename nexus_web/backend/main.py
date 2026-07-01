@@ -589,6 +589,38 @@ def run_migrations():
         ) AS t(nombre, tipo, contenido)
         WHERE NOT EXISTS (SELECT 1 FROM sys_whatsapp_plantillas LIMIT 1)""",
         "ALTER TABLE nom_permisos ALTER COLUMN modalidad TYPE VARCHAR(20)",
+        """CREATE TABLE IF NOT EXISTS cont_config_cuentas (
+            id SERIAL PRIMARY KEY,
+            -- Ventas / Ingresos
+            ventas_ingreso_id INTEGER REFERENCES cont_plan_cuentas(id),
+            ventas_iva_cobrado_id INTEGER REFERENCES cont_plan_cuentas(id),
+            ventas_cxc_id INTEGER REFERENCES cont_plan_cuentas(id),
+            ventas_caja_id INTEGER REFERENCES cont_plan_cuentas(id),
+            ventas_banco_id INTEGER REFERENCES cont_plan_cuentas(id),
+            ventas_descuento_id INTEGER REFERENCES cont_plan_cuentas(id),
+            -- Compras
+            compras_inventario_id INTEGER REFERENCES cont_plan_cuentas(id),
+            compras_iva_pagado_id INTEGER REFERENCES cont_plan_cuentas(id),
+            compras_cxp_id INTEGER REFERENCES cont_plan_cuentas(id),
+            compras_costo_ventas_id INTEGER REFERENCES cont_plan_cuentas(id),
+            -- Nomina
+            nomina_sueldos_gasto_id INTEGER REFERENCES cont_plan_cuentas(id),
+            nomina_sueldos_pagar_id INTEGER REFERENCES cont_plan_cuentas(id),
+            nomina_iess_patronal_gasto_id INTEGER REFERENCES cont_plan_cuentas(id),
+            nomina_iess_pagar_id INTEGER REFERENCES cont_plan_cuentas(id),
+            nomina_decimos_pagar_id INTEGER REFERENCES cont_plan_cuentas(id),
+            nomina_fondos_reserva_id INTEGER REFERENCES cont_plan_cuentas(id),
+            -- Caja y Bancos
+            caja_id INTEGER REFERENCES cont_plan_cuentas(id),
+            banco_id INTEGER REFERENCES cont_plan_cuentas(id),
+            -- Retenciones
+            retencion_ir_id INTEGER REFERENCES cont_plan_cuentas(id),
+            retencion_iva_id INTEGER REFERENCES cont_plan_cuentas(id),
+            -- Impuestos
+            iva_por_pagar_id INTEGER REFERENCES cont_plan_cuentas(id),
+            updated_at TIMESTAMP DEFAULT NOW()
+        )""",
+        "INSERT INTO cont_config_cuentas (id) SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM cont_config_cuentas)",
     ]
     ALL_MIGRATIONS.extend(migrations)
     for sql in migrations:

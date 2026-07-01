@@ -99,6 +99,188 @@ class AsientoIn(BaseModel):
 
 
 # ═══════════════════════════════════════════════════════════
+# CONFIGURACION DE CUENTAS CONTABLES
+# ═══════════════════════════════════════════════════════════
+
+CAMPOS_CONFIG = [
+    # Ventas
+    ("ventas_ingreso_id",           "Cuenta de Ingresos por Ventas",         "ventas"),
+    ("ventas_iva_cobrado_id",       "IVA Cobrado (Pasivo)",                  "ventas"),
+    ("ventas_cxc_id",               "Cuentas por Cobrar (Venta Credito)",    "ventas"),
+    ("ventas_caja_id",              "Caja (Venta Contado/Efectivo)",          "ventas"),
+    ("ventas_banco_id",             "Banco (Venta con Transferencia)",        "ventas"),
+    ("ventas_descuento_id",         "Descuentos en Ventas",                  "ventas"),
+    # Compras
+    ("compras_inventario_id",       "Inventario / Mercaderia",               "compras"),
+    ("compras_iva_pagado_id",       "IVA Pagado (Activo)",                   "compras"),
+    ("compras_cxp_id",              "Cuentas por Pagar Proveedores",         "compras"),
+    ("compras_costo_ventas_id",     "Costo de Ventas",                       "compras"),
+    # Nomina
+    ("nomina_sueldos_gasto_id",     "Gasto Sueldos y Salarios",              "nomina"),
+    ("nomina_sueldos_pagar_id",     "Sueldos por Pagar (Pasivo)",            "nomina"),
+    ("nomina_iess_patronal_gasto_id","Gasto IESS Patronal",                  "nomina"),
+    ("nomina_iess_pagar_id",        "IESS por Pagar (Pasivo)",               "nomina"),
+    ("nomina_decimos_pagar_id",     "Decimos por Pagar (Pasivo)",            "nomina"),
+    ("nomina_fondos_reserva_id",    "Fondos de Reserva por Pagar",           "nomina"),
+    # Caja y Bancos
+    ("caja_id",                     "Caja General",                          "bancos"),
+    ("banco_id",                    "Banco Principal",                       "bancos"),
+    # Retenciones
+    ("retencion_ir_id",             "Retencion IR por Cobrar",               "impuestos"),
+    ("retencion_iva_id",            "Retencion IVA por Cobrar",              "impuestos"),
+    ("iva_por_pagar_id",            "IVA por Pagar / Liquidar",              "impuestos"),
+]
+
+@router.get("/config-cuentas")
+def get_config_cuentas(u=Depends(get_current_user)):
+    cfg = query_one("SELECT * FROM cont_config_cuentas LIMIT 1")
+    if not cfg:
+        return {"campos": CAMPOS_CONFIG, "config": {}}
+    cuentas_movimiento = query("""
+        SELECT id, codigo, nombre, tipo FROM cont_plan_cuentas
+        WHERE es_movimiento=true AND activa=true ORDER BY codigo
+    """)
+    return {
+        "campos": CAMPOS_CONFIG,
+        "config": {k: v for k, v in cfg.items() if k not in ('id', 'updated_at')},
+        "cuentas_movimiento": cuentas_movimiento,
+    }
+
+@router.put("/config-cuentas")
+def update_config_cuentas(data: dict, u=Depends(get_current_user)):
+    campos_validos = {c[0] for c in CAMPOS_CONFIG}
+    updates = []
+    params = []
+    for k, v in data.items():
+        if k in campos_validos:
+            updates.append(f"{k}=%s")
+            params.append(int(v) if v else None)
+    if not updates:
+        raise HTTPException(400, "No hay campos validos para actualizar")
+    execute(f"UPDATE cont_config_cuentas SET {', '.join(updates)}, updated_at=NOW()", params)
+    return {"msg": "Configuracion guardada correctamente"}
+
+
+def get_config():
+    """Obtiene la configuracion de cuentas contables como dict campo->id."""
+    cfg = query_one("SELECT * FROM cont_config_cuentas LIMIT 1")
+    return cfg or {}
+
+
+def generar_asiento_automatico(tipo: str, datos: dict):
+    """Genera asiento contable automatico segun el tipo de transaccion.
+    tipo: 'venta_contado'|'venta_credito'|'compra'|'nomina'|'cobro_cxc'|'pago_cxp'
+    datos: dict con montos y referencias
+    Retorna el id del asiento creado o None si no hay config suficiente."""
+    try:
+        cfg = get_config()
+        if not cfg:
+            return None
+
+        detalles = []
+        descripcion = ""
+        referencia = datos.get('referencia', '')
+
+        if tipo == 'venta_contado':
+            cuenta_caja = cfg.get('ventas_caja_id') or cfg.get('caja_id')
+            cuenta_ing = cfg.get('ventas_ingreso_id')
+            cuenta_iva = cfg.get('ventas_iva_cobrado_id')
+            if not (cuenta_caja and cuenta_ing): return None
+            descripcion = f"Venta contado {referencia}"
+            subtotal = float(datos.get('subtotal', 0))
+            iva = float(datos.get('iva', 0))
+            total = float(datos.get('total', 0))
+            detalles = [
+                {"cuenta_id": cuenta_caja, "descripcion": "Ingreso en caja", "debe": total, "haber": 0},
+                {"cuenta_id": cuenta_ing, "descripcion": "Ingreso por venta", "debe": 0, "haber": subtotal},
+            ]
+            if iva > 0 and cuenta_iva:
+                detalles.append({"cuenta_id": cuenta_iva, "descripcion": "IVA cobrado", "debe": 0, "haber": iva})
+
+        elif tipo == 'venta_credito':
+            cuenta_cxc = cfg.get('ventas_cxc_id')
+            cuenta_ing = cfg.get('ventas_ingreso_id')
+            cuenta_iva = cfg.get('ventas_iva_cobrado_id')
+            if not (cuenta_cxc and cuenta_ing): return None
+            descripcion = f"Venta credito {referencia}"
+            subtotal = float(datos.get('subtotal', 0))
+            iva = float(datos.get('iva', 0))
+            total = float(datos.get('total', 0))
+            detalles = [
+                {"cuenta_id": cuenta_cxc, "descripcion": "CXC por venta", "debe": total, "haber": 0},
+                {"cuenta_id": cuenta_ing, "descripcion": "Ingreso por venta", "debe": 0, "haber": subtotal},
+            ]
+            if iva > 0 and cuenta_iva:
+                detalles.append({"cuenta_id": cuenta_iva, "descripcion": "IVA cobrado", "debe": 0, "haber": iva})
+
+        elif tipo == 'compra':
+            cuenta_inv = cfg.get('compras_inventario_id')
+            cuenta_iva = cfg.get('compras_iva_pagado_id')
+            cuenta_cxp = cfg.get('compras_cxp_id')
+            if not (cuenta_inv and cuenta_cxp): return None
+            descripcion = f"Compra {referencia}"
+            subtotal = float(datos.get('subtotal', 0))
+            iva = float(datos.get('iva', 0))
+            total = float(datos.get('total', 0))
+            detalles = [
+                {"cuenta_id": cuenta_inv, "descripcion": "Inventario adquirido", "debe": subtotal, "haber": 0},
+                {"cuenta_id": cuenta_cxp, "descripcion": "CXP proveedor", "debe": 0, "haber": total},
+            ]
+            if iva > 0 and cuenta_iva:
+                detalles.append({"cuenta_id": cuenta_iva, "descripcion": "IVA pagado", "debe": iva, "haber": 0})
+
+        elif tipo == 'nomina':
+            cuenta_sueldo_g = cfg.get('nomina_sueldos_gasto_id')
+            cuenta_sueldo_p = cfg.get('nomina_sueldos_pagar_id')
+            cuenta_iess_g = cfg.get('nomina_iess_patronal_gasto_id')
+            cuenta_iess_p = cfg.get('nomina_iess_pagar_id')
+            if not (cuenta_sueldo_g and cuenta_sueldo_p): return None
+            descripcion = f"Nomina periodo {referencia}"
+            sueldos = float(datos.get('sueldos', 0))
+            iess_personal = float(datos.get('iess_personal', 0))
+            iess_patronal = float(datos.get('iess_patronal', 0))
+            neto = float(datos.get('neto', 0))
+            detalles = [
+                {"cuenta_id": cuenta_sueldo_g, "descripcion": "Gasto sueldos", "debe": sueldos, "haber": 0},
+                {"cuenta_id": cuenta_sueldo_p, "descripcion": "Sueldos por pagar (neto)", "debe": 0, "haber": neto},
+            ]
+            if iess_personal > 0 and cuenta_iess_p:
+                detalles.append({"cuenta_id": cuenta_iess_p, "descripcion": "IESS personal por pagar", "debe": 0, "haber": iess_personal})
+            if iess_patronal > 0 and cuenta_iess_g and cuenta_iess_p:
+                detalles.append({"cuenta_id": cuenta_iess_g, "descripcion": "Gasto IESS patronal", "debe": iess_patronal, "haber": 0})
+                detalles.append({"cuenta_id": cuenta_iess_p, "descripcion": "IESS patronal por pagar", "debe": 0, "haber": iess_patronal})
+
+        else:
+            return None
+
+        if not detalles:
+            return None
+
+        # Verificar partida doble
+        total_debe = sum(d['debe'] for d in detalles)
+        total_haber = sum(d['haber'] for d in detalles)
+        if abs(total_debe - total_haber) > 0.01:
+            return None
+
+        # Crear asiento
+        asiento_id = insert("""
+            INSERT INTO cont_asientos (numero, fecha, descripcion, tipo, estado, referencia, created_at)
+            VALUES (%s, CURRENT_DATE, %s, 'AUTOMATICO', 'BORRADOR', %s, NOW())
+        """, (f"AUTO-{tipo.upper()[:6]}", descripcion, referencia))
+
+        for d in detalles:
+            insert("""
+                INSERT INTO cont_asiento_detalles (asiento_id, cuenta_id, descripcion, debe, haber)
+                VALUES (%s,%s,%s,%s,%s)
+            """, (asiento_id, d['cuenta_id'], d['descripcion'], d['debe'], d['haber']))
+
+        return asiento_id
+
+    except Exception:
+        return None
+
+
+# ═══════════════════════════════════════════════════════════
 # PLAN DE CUENTAS
 # ═══════════════════════════════════════════════════════════
 

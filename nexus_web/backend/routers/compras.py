@@ -235,9 +235,17 @@ def crear_compra(f: CompraIn, u=Depends(get_current_user)):
         VALUES (%s,%s,%s,%s,%s,0,%s,'PENDIENTE')
     """, (compra_id, f.proveedor_id, fecha_emis, fecha_venc, total, total))
 
-    # Incrementar secuencial
-    # No hay secuencial en sys_sucursales para compras — se usa MAX(id)
-    pass
+    # Asiento contable automatico
+    try:
+        from routers.contabilidad import generar_asiento_automatico
+        generar_asiento_automatico('compra', {
+            "referencia": num_compra,
+            "subtotal": subtotal_0 + subtotal_iva,
+            "iva": iva_monto,
+            "total": total,
+        })
+    except Exception:
+        pass
 
     return {
         "id":            compra_id,
