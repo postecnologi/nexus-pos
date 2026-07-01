@@ -48,7 +48,6 @@ function ModalVendedor({vendedor, sucursales, onClose, onSaved}) {
   const C = useTheme()
   const esEdit = !!vendedor?.id
   const [form, setForm] = useState({
-    codigo:              vendedor?.codigo              ?? '',
     cedula:              vendedor?.cedula              ?? '',
     nombre:              vendedor?.nombre              ?? '',
     apellidos:           vendedor?.apellidos           ?? '',
@@ -67,7 +66,6 @@ function ModalVendedor({vendedor, sucursales, onClose, onSaved}) {
   const s=(k,v)=>setForm(f=>({...f,[k]:v}))
 
   async function guardar() {
-    if (!form.codigo.trim())  return setErr('El código es obligatorio')
     if (!form.cedula.trim()||!form.nombre.trim()) return setErr('Cédula y nombre son obligatorios')
     if (!form.sucursal_id) return setErr('Selecciona una sucursal')
     setSaving(true); setErr('')
@@ -107,7 +105,6 @@ function ModalVendedor({vendedor, sucursales, onClose, onSaved}) {
 
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
           {[
-            {k:'codigo',l:'Código',req:true,disabled:esEdit,placeholder:'Ej: V001'},
             {k:'cedula',l:'Cédula / RUC',req:true,disabled:esEdit},
             {k:'nombre',l:'Nombres',req:true},
             {k:'apellidos',l:'Apellidos'},

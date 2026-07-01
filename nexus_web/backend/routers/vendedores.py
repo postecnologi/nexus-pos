@@ -8,7 +8,7 @@ router = APIRouter(prefix="/api", tags=["Vendedores"])
 
 
 class VendedorIn(BaseModel):
-    codigo:           str
+    codigo:           Optional[str] = None
     nombre:           str
     apellidos:        Optional[str] = None
     cedula:           Optional[str] = None
@@ -89,10 +89,27 @@ def get_vendedor(vid: int, u=Depends(get_current_user)):
     return v
 
 
+def _generar_codigo(nombre: str, apellidos: str = "") -> str:
+    import re, unicodedata
+    def limpiar(s):
+        s = unicodedata.normalize('NFD', s or '')
+        s = ''.join(c for c in s if unicodedata.category(c) != 'Mn')
+        return re.sub(r'[^A-Z0-9]', '', s.upper())
+    partes = limpiar(nombre)[:3] + limpiar(apellidos)[:3]
+    base = partes[:6] if partes else "VEN"
+    # Buscar siguiente número disponible para evitar duplicados
+    n = 1
+    while True:
+        codigo = f"{base}{n:02d}"
+        if not query_one("SELECT id FROM ven_vendedores WHERE codigo=%s", (codigo,)):
+            return codigo
+        n += 1
+
 @router.post("/vendedores")
 def crear_vendedor(v: VendedorIn, u=Depends(get_current_user)):
+    codigo = (v.codigo or "").strip() or _generar_codigo(v.nombre, v.apellidos or "")
     existe = query_one(
-        "SELECT id FROM ven_vendedores WHERE codigo=%s", (v.codigo,))
+        "SELECT id FROM ven_vendedores WHERE codigo=%s", (codigo,))
     if existe: raise HTTPException(400, "Ya existe un vendedor con ese código")
     vid = insert("""
         INSERT INTO ven_vendedores
@@ -100,7 +117,7 @@ def crear_vendedor(v: VendedorIn, u=Depends(get_current_user)):
          direccion, ciudad, fecha_ingreso, fecha_nacimiento,
          sucursal_id, comision_pct, meta_mensual, observaciones, activo)
         VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-    """, (v.codigo, v.nombre, v.apellidos, v.cedula, v.telefono, v.email,
+    """, (codigo, v.nombre, v.apellidos, v.cedula, v.telefono, v.email,
           v.direccion, v.ciudad,
           v.fecha_ingreso or None, v.fecha_nacimiento or None,
           v.sucursal_id, v.comision_pct, v.meta_mensual,
