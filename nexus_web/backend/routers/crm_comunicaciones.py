@@ -40,6 +40,9 @@ def get_config(vendedor_id: int, u=Depends(get_current_user)):
                 "smtp_user": "", "smtp_tls": True, "smtp_from_nombre": "",
                 "wa_instancia": "", "wa_conectado": False, "wa_telefono": ""}
     safe = {k: v for k, v in cfg.items() if k not in ('smtp_password', 'evolution_key')}
+    # Devolver indicadores de si tienen valor (no el valor real por seguridad)
+    safe["smtp_password"] = "●●●●●●●●" if cfg.get("smtp_password") else ""
+    safe["evolution_key"] = cfg.get("evolution_key") or ""  # La URL no es secreta, la key sí pero la necesita
     safe["smtp_configurado"] = bool(cfg.get("smtp_host") and cfg.get("smtp_user"))
     safe["wa_configurado"] = bool(cfg.get("wa_instancia"))
     return safe
@@ -52,7 +55,14 @@ def save_config(vendedor_id: int, data: dict, u=Depends(get_current_user)):
         "smtp_tls", "smtp_from_nombre", "wa_instancia",
         "wa_telefono", "evolution_url", "evolution_key"
     }
-    filtered = {k: v for k, v in data.items() if k in campos_permitidos}
+    # No sobreescribir passwords con placeholder
+    filtered = {}
+    for k, v in data.items():
+        if k not in campos_permitidos:
+            continue
+        if k in ('smtp_password', 'evolution_key') and v and set(v) <= {'●', '•', '*'}:
+            continue  # Es placeholder, no actualizar
+        filtered[k] = v
     if not filtered:
         raise HTTPException(400, "No hay campos validos")
 
