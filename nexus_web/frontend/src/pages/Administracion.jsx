@@ -935,6 +935,34 @@ function TabAlertas() {
           </div>
         )}
 
+        {/* Backup automático */}
+        <div style={{marginTop:20,borderTop:`1px solid ${C.bord2}`,paddingTop:16}}>
+          <div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:12}}>
+            💾 Backup automático diario
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'auto 1fr 1fr',gap:12,alignItems:'end'}}>
+            <div style={{display:'flex',alignItems:'center',gap:8}}>
+              <input type="checkbox" checked={!!cfg.backup_auto}
+                onChange={e=>s('backup_auto',e.target.checked)}
+                style={{width:16,height:16,cursor:'pointer',accentColor:C.green}}/>
+              <label style={{fontSize:13,color:C.text,cursor:'pointer'}}>Activar</label>
+            </div>
+            <div>
+              <label style={lbl}>Hora del backup</label>
+              <input type="time" value={cfg.backup_hora||'03:00'}
+                onChange={e=>s('backup_hora',e.target.value)} style={{...fi,width:'100%'}}/>
+            </div>
+            <div>
+              <label style={lbl}>Notificar por email (opcional)</label>
+              <input value={cfg.backup_email||''} onChange={e=>s('backup_email',e.target.value)}
+                style={{...fi,width:'100%'}} placeholder="admin@empresa.com"/>
+            </div>
+          </div>
+          <div style={{fontSize:11,color:C.hint,marginTop:6}}>
+            Guarda automáticamente la base de datos cada día. Conserva los últimos 7 backups en el servidor.
+          </div>
+        </div>
+
         <div style={{display:'flex',gap:10,marginTop:20,flexWrap:'wrap'}}>
           <button onClick={probar} disabled={testing}
             style={{padding:'9px 18px',borderRadius:9,border:`1px solid ${C.bord2}`,

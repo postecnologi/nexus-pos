@@ -468,13 +468,18 @@ export default function CXC() {
   async function enviarRecordatorio() {
     if (selected.length===0) return
     setSendingRec(true); setMsgRecord('')
-    try {
-      const {data} = await api.post('/cxc/enviar-recordatorio', { cxc_ids: selected })
-      setMsgRecord(`✅ Recordatorio procesado para ${data.enviados} cliente(s)`)
-      setSelected([])
-    } catch(e) {
-      setMsgRecord('❌ '+(e.response?.data?.detail||e.message))
-    } finally { setSendingRec(false) }
+    let enviados = 0, errores = 0
+    for (const id of selected) {
+      try {
+        await api.post(`/alertas/recordatorio-cobro/${id}`)
+        enviados++
+      } catch(e) {
+        errores++
+      }
+    }
+    setMsgRecord(`✅ ${enviados} recordatorio(s) enviado(s)${errores>0?` · ${errores} sin email`:''}.`)
+    setSelected([])
+    setSendingRec(false)
   }
 
   const TH=(a='left')=>({padding:'10px 12px',fontSize:10,fontWeight:700,

@@ -396,9 +396,48 @@ export default function Clientes() {
             </select>
           </Field>
           <Field label="Número de identificación" required w="third">
-            <input value={form.identificacion}
-              onChange={e=>set('identificacion',e.target.value)}
-              placeholder="RUC, cédula o pasaporte" style={FI}/>
+            <div style={{display:'flex',gap:6}}>
+              <input value={form.identificacion}
+                onChange={e=>set('identificacion',e.target.value)}
+                onBlur={async e=>{
+                  const val = e.target.value.trim()
+                  if (val.length >= 10 && !form.razon_social) {
+                    try {
+                      const r = await api.get(`/sri/consulta-ruc/${val}`)
+                      const d = r.data
+                      if (d.razon_social) {
+                        set('razon_social', d.razon_social)
+                        if (d.tipo_contribuyente) set('tipo_contribuyente',
+                          d.tipo_contribuyente.includes('NATURAL')?'NATURAL':
+                          d.tipo_contribuyente.includes('JURIDICA')?'JURIDICA':'NATURAL')
+                        if (d.obligado_contabilidad !== undefined) set('obligado_contabilidad', d.obligado_contabilidad)
+                        if (d.direccion) set('direccion', d.direccion)
+                      }
+                    } catch {}
+                  }
+                }}
+                placeholder="RUC, cédula o pasaporte" style={{...FI,flex:1}}/>
+              <button type="button" onClick={async()=>{
+                  const val = form.identificacion.trim()
+                  if (!val) return
+                  try {
+                    const r = await api.get(`/sri/consulta-ruc/${val}`)
+                    const d = r.data
+                    if (d.razon_social) {
+                      set('razon_social', d.razon_social)
+                      if (d.tipo_contribuyente) set('tipo_contribuyente',
+                        d.tipo_contribuyente.includes('NATURAL')?'NATURAL':'JURIDICA')
+                      if (d.obligado_contabilidad !== undefined) set('obligado_contabilidad', d.obligado_contabilidad)
+                      if (d.direccion) set('direccion', d.direccion)
+                    } else { alert(d.mensaje || 'No se encontraron datos en el SRI') }
+                  } catch(e) { alert(e.response?.data?.detail || 'Error al consultar SRI') }
+                }}
+                style={{padding:'0 10px',borderRadius:7,border:`1px solid ${C.blue}44`,
+                  background:`rgba(59,130,246,.1)`,color:C.blue,cursor:'pointer',
+                  fontSize:11,fontWeight:700,whiteSpace:'nowrap'}}>
+                🔍 SRI
+              </button>
+            </div>
           </Field>
           <Field label="Tipo contribuyente" w="third">
             <select value={form.tipo_contribuyente}
@@ -593,7 +632,20 @@ export default function Clientes() {
               </div>
             ))}
 
-            <div style={{ display:'flex', gap:10, justifyContent:'flex-end', marginTop:18 }}>
+            <div style={{ display:'flex', gap:10, justifyContent:'flex-end', marginTop:18, flexWrap:'wrap' }}>
+              <button onClick={async()=>{
+                  try {
+                    const r = await api.post(`/portal-cliente/crear-acceso/${clienteVer.id}`)
+                    const url = `${window.location.origin}/portal-cliente/${r.data.token}`
+                    await navigator.clipboard.writeText(url)
+                    alert(`✅ Link del portal copiado al portapapeles:\n${url}`)
+                  } catch(e) { alert(e.response?.data?.detail||'Error') }
+                }}
+                style={{ padding:'9px 16px', borderRadius:9, border:`1px solid rgba(16,185,129,.4)`,
+                  background:'rgba(16,185,129,.1)', color:'#10B981', cursor:'pointer',
+                  fontSize:12, fontWeight:700, display:'flex', alignItems:'center', gap:6 }}>
+                🔗 Portal cliente
+              </button>
               <button onClick={()=>setModalVer(false)}
                 style={{ padding:'9px 20px', borderRadius:9, cursor:'pointer',
                   border:`1px solid ${C.bord2}`, background:'transparent',

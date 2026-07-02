@@ -46,6 +46,7 @@ import Registro from './pages/Registro'
 import Legal from './pages/Legal'
 import Manual from './pages/Manual'
 import PortalEmpleado from './pages/PortalEmpleado'
+import PortalCliente  from './pages/PortalCliente'
 
 function useAuth() {
   return !!localStorage.getItem('nexus_token')
@@ -86,6 +87,9 @@ export default function App() {
         <Route path="/portal-empleado" element={
           <PrivateRoute><PortalEmpleado /></PrivateRoute>
         } />
+
+        {/* Portal Cliente - público, acceso por token */}
+        <Route path="/portal-cliente/:token" element={<PortalCliente />} />
 
         {/* Print - outside Layout */}
         <Route path="/facturas/:id/print" element={

@@ -1,5 +1,6 @@
 """
-Formularios SRI Ecuador
+Formularios SRI Ecuador + Consulta RUC
+- Consulta RUC en tiempo real al SRI
 - Formulario 104: Declaración mensual de IVA
 - ATS: Anexo Transaccional Simplificado (mensual)
 - RDEP: Relación de dependencia (anual)
@@ -8,12 +9,96 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from database import query, query_one, execute, insert
 from auth import get_current_user
+import httpx, re
 from typing import Optional
 from datetime import date
 import io, openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
 router = APIRouter(prefix="/api/sri", tags=["SRI Formularios"])
+
+
+# ══════════════════════════════════════════════════════════════
+#  CONSULTA RUC / CÉDULA EN EL SRI
+# ══════════════════════════════════════════════════════════════
+
+@router.get("/consulta-ruc/{ruc}")
+async def consultar_ruc(ruc: str, u=Depends(get_current_user)):
+    """
+    Consulta los datos de un RUC o cédula en el SRI Ecuador.
+    Usa el portal público del SRI (consulta de contribuyentes).
+    """
+    ruc = ruc.strip()
+    if not re.match(r'^\d{10,13}$', ruc):
+        raise HTTPException(400, "RUC o cédula inválido — debe tener 10 o 13 dígitos")
+
+    # Primero buscar en la base de datos local (clientes/proveedores existentes)
+    if len(ruc) == 13:
+        local = query_one("""
+            SELECT identificacion as ruc, razon_social, direccion, email, telefono,
+                   tipo_contribuyente, obligado_contabilidad, 'cliente' as origen
+            FROM ven_clientes WHERE identificacion = %s
+            UNION ALL
+            SELECT identificacion, razon_social, direccion, email, telefono,
+                   tipo_contribuyente, obligado_contabilidad, 'proveedor' as origen
+            FROM com_proveedores WHERE identificacion = %s
+            LIMIT 1
+        """, (ruc, ruc))
+        if local:
+            return {**dict(local), "fuente": "sistema"}
+
+    # Consultar al SRI
+    try:
+        async with httpx.AsyncClient(timeout=10, verify=False) as client:
+            # Portal público SRI — consulta de RUC
+            url = f"https://srienlinea.sri.gob.ec/sri-en-linea/SriRucWeb/ConsultaRuc/Consultas/consultaRuc"
+            resp = await client.get(url, params={"ruc": ruc},
+                headers={"Accept": "application/json",
+                         "User-Agent": "Mozilla/5.0"})
+
+            if resp.status_code == 200:
+                try:
+                    data = resp.json()
+                    contribuyente = data.get("contribuyente") or data
+                    return {
+                        "ruc":                    ruc,
+                        "razon_social":           contribuyente.get("razonSocial", ""),
+                        "nombre_comercial":       contribuyente.get("nombreFantasia", ""),
+                        "tipo_contribuyente":     contribuyente.get("tipoContribuyente", ""),
+                        "obligado_contabilidad":  contribuyente.get("obligadoLlevarContabilidad","NO") == "SI",
+                        "estado":                 contribuyente.get("estado", ""),
+                        "actividad_principal":    contribuyente.get("actividadPrincipal", ""),
+                        "direccion":              contribuyente.get("direccionMatriz", ""),
+                        "fuente": "sri"
+                    }
+                except Exception:
+                    pass
+
+            # Fallback: scraping del portal público
+            resp2 = await client.get(
+                f"https://srienlinea.sri.gob.ec/facturacion-internet/pages/consultas/consulta-ruc.jsf",
+                params={"ruc": ruc})
+            # Extraer datos básicos del HTML
+            html = resp2.text
+            razon = re.search(r'Razón Social[:\s]*</[^>]+>\s*<[^>]+>([^<]+)', html)
+            return {
+                "ruc": ruc,
+                "razon_social": razon.group(1).strip() if razon else "",
+                "fuente": "sri_html",
+                "raw": len(html)
+            }
+
+    except httpx.TimeoutException:
+        raise HTTPException(504, "El SRI no respondió. Intente de nuevo en unos segundos.")
+    except Exception as e:
+        # Si falla la consulta al SRI, devolver vacío para que el usuario llene manual
+        return {
+            "ruc": ruc,
+            "razon_social": "",
+            "fuente": "sin_datos",
+            "mensaje": "No se pudo consultar el SRI. Ingresa los datos manualmente.",
+            "error": str(e)[:100]
+        }
 
 
 # ══════════════════════════════════════════════════════════════

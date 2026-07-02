@@ -15,7 +15,7 @@ from routers import (
     guias_remision, liquidaciones, nomina, admin, superadmin,
     whatsapp, depositos, notas_venta, ordenes_compra, crm_comunicaciones,
     biometrico, importar, importar_historicos, pos_terminal, horarios, alertas,
-    sri_formularios,
+    sri_formularios, portal_cliente,
 )
 
 app = FastAPI(title="NEXUS POS API", version="2.0.0")
@@ -116,22 +116,66 @@ def iniciar_scheduler():
     from datetime import datetime as _dt
 
     def _loop():
-        ultima_ejecucion = None
+        ultima_alertas = None
+        ultima_backup  = None
         while True:
             try:
                 from database import query_one as _qo
-                cfg = _qo("SELECT hora_envio, email_activo FROM sys_alertas_config LIMIT 1")
+                cfg   = _qo("SELECT * FROM sys_alertas_config LIMIT 1")
+                ahora = _dt.now()
+
+                # ── Alertas diarias ──────────────────────────
                 if cfg and cfg.get("email_activo"):
-                    hora_cfg = cfg.get("hora_envio", "07:00")
-                    ahora = _dt.now()
-                    clave_hoy = f"{ahora.date()}_{hora_cfg}"
-                    hora_parts = hora_cfg.split(":")
-                    if (ahora.hour == int(hora_parts[0]) and
-                            ahora.minute >= int(hora_parts[1]) and
-                            ultima_ejecucion != clave_hoy):
-                        ultima_ejecucion = clave_hoy
+                    hora_cfg  = cfg.get("hora_envio", "07:00")
+                    clave_hoy = f"{ahora.date()}_alertas_{hora_cfg}"
+                    h, m = map(int, hora_cfg.split(":"))
+                    if ahora.hour == h and ahora.minute >= m and ultima_alertas != clave_hoy:
+                        ultima_alertas = clave_hoy
                         from routers.alertas import _verificar_y_notificar
                         _verificar_y_notificar()
+
+                # ── Backup automático ─────────────────────────
+                if cfg and cfg.get("backup_auto"):
+                    hora_bk   = cfg.get("backup_hora", "03:00")
+                    clave_bk  = f"{ahora.date()}_backup_{hora_bk}"
+                    h, m = map(int, hora_bk.split(":"))
+                    if ahora.hour == h and ahora.minute >= m and ultima_backup != clave_bk:
+                        ultima_backup = clave_bk
+                        try:
+                            import subprocess, os
+                            from pathlib import Path
+                            from database import DB_CONFIG
+                            ts       = ahora.strftime("%Y%m%d_%H%M")
+                            bk_dir   = Path(__file__).parent.parent / "backups"
+                            bk_dir.mkdir(exist_ok=True)
+                            bk_file  = bk_dir / f"auto_backup_{ts}.sql"
+                            env      = os.environ.copy()
+                            env["PGPASSWORD"] = DB_CONFIG.get("password", "")
+                            result   = subprocess.run(
+                                ["pg_dump", "-h", DB_CONFIG["host"], "-p", str(DB_CONFIG["port"]),
+                                 "-U", DB_CONFIG["user"], DB_CONFIG["database"]],
+                                capture_output=True, env=env)
+                            if result.returncode == 0:
+                                bk_file.write_bytes(result.stdout)
+                                # Enviar por email si está configurado
+                                email_bk = cfg.get("backup_email", "")
+                                if email_bk:
+                                    from routers.alertas import _enviar_email_alerta
+                                    _enviar_email_alerta(
+                                        {"email_destino": email_bk},
+                                        f"✅ Backup automático NEXUS — {ahora.strftime('%d/%m/%Y')}",
+                                        f"<p>El backup automático se completó exitosamente.</p>"
+                                        f"<p>Archivo: <code>{bk_file.name}</code> "
+                                        f"({len(result.stdout)//1024} KB)</p>"
+                                        f"<p>El archivo está guardado en el servidor.</p>"
+                                    )
+                                # Mantener solo los últimos 7 backups automáticos
+                                autos = sorted(bk_dir.glob("auto_backup_*.sql"))
+                                for old in autos[:-7]:
+                                    old.unlink(missing_ok=True)
+                        except Exception as e:
+                            print(f"Error en backup automático: {e}")
+
             except Exception:
                 pass
             _time.sleep(60)  # Revisar cada minuto
@@ -680,6 +724,18 @@ def run_migrations():
         )""",
         "ALTER TABLE nom_asistencia ADD COLUMN IF NOT EXISTS minutos_retraso INTEGER DEFAULT 0",
         "ALTER TABLE nom_asistencia ADD COLUMN IF NOT EXISTS observacion TEXT",
+        """CREATE TABLE IF NOT EXISTS portal_clientes_acceso (
+            id SERIAL PRIMARY KEY,
+            cliente_id INTEGER NOT NULL REFERENCES ven_clientes(id) ON DELETE CASCADE,
+            token VARCHAR(64) NOT NULL UNIQUE,
+            activo BOOLEAN DEFAULT true,
+            created_at TIMESTAMP DEFAULT NOW(),
+            updated_at TIMESTAMP DEFAULT NOW(),
+            UNIQUE(cliente_id)
+        )""",
+        "ALTER TABLE sys_alertas_config ADD COLUMN IF NOT EXISTS backup_auto BOOLEAN DEFAULT false",
+        "ALTER TABLE sys_alertas_config ADD COLUMN IF NOT EXISTS backup_hora VARCHAR(5) DEFAULT '03:00'",
+        "ALTER TABLE sys_alertas_config ADD COLUMN IF NOT EXISTS backup_email VARCHAR(200) DEFAULT ''",
         """CREATE TABLE IF NOT EXISTS nom_bio_usuarios_cache (
             id SERIAL PRIMARY KEY,
             biometrico_id INTEGER REFERENCES nom_biometricos(id) ON DELETE CASCADE,
@@ -880,6 +936,7 @@ app.include_router(pos_terminal.router)
 app.include_router(horarios.router)
 app.include_router(alertas.router)
 app.include_router(sri_formularios.router)
+app.include_router(portal_cliente.router)
 importar_historicos  # registra endpoints históricos en importar.router
 if MULTI_TENANT:
     app.include_router(superadmin.router)

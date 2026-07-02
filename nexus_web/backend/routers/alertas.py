@@ -299,3 +299,112 @@ def _verificar_y_notificar():
         (tipo, total_items, email_enviado, detalle, created_at)
         VALUES ('DIARIO',%s,%s,%s,NOW())""",
         (total, enviado, f"Stock:{len(alertas['stock_bajo'])} Vencidos:{len(alertas['cobros_vencidos'])} PorVencer:{len(alertas['facturas_vencer'])} Cumples:{len(alertas['cumpleanos'])}"))
+
+
+# ══════════════════════════════════════════════════════════════
+#  RECORDATORIOS DE COBRO A CLIENTES
+# ══════════════════════════════════════════════════════════════
+
+@router.post("/recordatorio-cobro/{cxc_id}")
+def enviar_recordatorio_cobro(cxc_id: int, u=Depends(get_current_user)):
+    """Envía un recordatorio de pago al cliente por email."""
+    cxc = query_one("""
+        SELECT c.*, cl.razon_social, cl.email, cl.telefono
+        FROM fin_cxc c
+        JOIN ven_clientes cl ON cl.id = c.cliente_id
+        WHERE c.id = %s AND c.estado = 'PENDIENTE' AND c.saldo > 0
+    """, (cxc_id,))
+    if not cxc:
+        raise HTTPException(404, "Cuenta no encontrada o ya pagada")
+    if not cxc.get("email"):
+        raise HTTPException(400, "El cliente no tiene email registrado")
+
+    empresa = query_one("SELECT * FROM sys_empresas WHERE activa=true LIMIT 1") or {}
+    hoy     = date.today()
+    venc    = cxc.get("fecha_vencimiento")
+    dias    = (hoy - venc).days if venc and venc < hoy else 0
+    saldo   = float(cxc["saldo"])
+
+    if dias > 0:
+        asunto = f"⚠️ Recordatorio de pago vencido — {empresa.get('razon_social','')}"
+        color_alerta = "#EF4444"
+        msg_estado = f"Su cuenta tiene <strong>{dias} días de vencimiento</strong>."
+    else:
+        dias_para_vencer = (venc - hoy).days if venc else 0
+        asunto = f"🔔 Recordatorio de pago — vence en {dias_para_vencer} días"
+        color_alerta = "#F59E0B"
+        msg_estado = f"Su cuenta vence en <strong>{dias_para_vencer} días</strong>."
+
+    html = f"""
+    <div style="font-family:'Segoe UI',sans-serif;max-width:560px;margin:0 auto;background:#f8fafc;padding:20px">
+        <div style="background:#0F172A;color:white;padding:20px 24px;border-radius:10px 10px 0 0">
+            <h2 style="margin:0;font-size:18px">{empresa.get('razon_social','')}</h2>
+            <p style="margin:4px 0 0;color:#94A3B8;font-size:13px">Recordatorio de pago</p>
+        </div>
+        <div style="background:white;padding:24px;border-radius:0 0 10px 10px;border:1px solid #e2e8f0">
+            <p style="font-size:14px;color:#1e293b">Estimado/a <strong>{cxc['razon_social']}</strong>,</p>
+            <p style="font-size:13px;color:#475569">{msg_estado}</p>
+
+            <div style="background:{color_alerta}15;border:1px solid {color_alerta}44;
+                border-radius:10px;padding:16px 20px;margin:20px 0;text-align:center">
+                <div style="font-size:12px;color:{color_alerta};font-weight:700;text-transform:uppercase;margin-bottom:6px">
+                    Saldo pendiente
+                </div>
+                <div style="font-size:32px;font-weight:900;color:{color_alerta}">
+                    ${saldo:,.2f}
+                </div>
+                {f'<div style="font-size:11px;color:#6b7280;margin-top:4px">Venció el {str(venc)[:10]}</div>' if venc else ''}
+            </div>
+
+            <p style="font-size:13px;color:#475569">
+                Por favor regularice su cuenta a la brevedad posible.
+                Si ya realizó el pago, ignore este mensaje.
+            </p>
+            <p style="font-size:13px;color:#475569">
+                Para cualquier consulta comuníquese con nosotros:<br>
+                📞 {empresa.get('telefono','')}<br>
+                📧 {empresa.get('email','')}
+            </p>
+            <p style="font-size:11px;color:#94a3b8;margin-top:20px;border-top:1px solid #e2e8f0;padding-top:12px">
+                Este es un mensaje automático de {empresa.get('razon_social','')}.<br>
+                Powered by NEXUS POS
+            </p>
+        </div>
+    </div>"""
+
+    enviado = _enviar_email_alerta({"email_destino": cxc["email"]}, asunto, html)
+
+    if enviado:
+        execute("""INSERT INTO sys_alertas_log (tipo, total_items, email_enviado, detalle, created_at)
+            VALUES ('RECORDATORIO_COBRO',1,true,%s,NOW())""",
+            (f"CxC #{cxc_id} — {cxc['razon_social']} — ${saldo:.2f}",))
+        return {"msg": f"Recordatorio enviado a {cxc['email']}"}
+    else:
+        raise HTTPException(500, "No se pudo enviar el email. Verifica la configuración SMTP en Administración.")
+
+
+@router.post("/recordatorios-masivos")
+def enviar_recordatorios_masivos(data: dict, u=Depends(get_current_user)):
+    """Envía recordatorios a todos los clientes con cobros vencidos."""
+    dias_min = int(data.get("dias_vencido_min", 1))
+    cobros = query("""
+        SELECT c.id, c.saldo, c.fecha_vencimiento,
+               cl.razon_social, cl.email
+        FROM fin_cxc c
+        JOIN ven_clientes cl ON cl.id = c.cliente_id
+        WHERE c.estado = 'PENDIENTE' AND c.saldo > 0
+          AND c.fecha_vencimiento < CURRENT_DATE - (%s || ' days')::INTERVAL
+          AND cl.email IS NOT NULL AND cl.email != ''
+        ORDER BY c.fecha_vencimiento
+    """, (dias_min,))
+
+    enviados, sin_email = 0, 0
+    for c in cobros:
+        try:
+            enviar_recordatorio_cobro(c["id"], u)
+            enviados += 1
+        except Exception:
+            sin_email += 1
+
+    return {"enviados": enviados, "errores": sin_email,
+            "msg": f"{enviados} recordatorios enviados. {sin_email} sin email o con error."}
