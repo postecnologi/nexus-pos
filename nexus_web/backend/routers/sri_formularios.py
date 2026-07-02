@@ -22,83 +22,116 @@ router = APIRouter(prefix="/api/sri", tags=["SRI Formularios"])
 #  CONSULTA RUC / CÉDULA EN EL SRI
 # ══════════════════════════════════════════════════════════════
 
-@router.get("/consulta-ruc/{ruc}")
-async def consultar_ruc(ruc: str, u=Depends(get_current_user)):
+def _validar_cedula(cedula: str) -> bool:
+    """Valida cédula ecuatoriana con módulo 10."""
+    if len(cedula) != 10 or not cedula.isdigit():
+        return False
+    prov = int(cedula[:2])
+    if prov < 1 or prov > 24:
+        return False
+    total = 0
+    for i, d in enumerate(cedula[:9]):
+        n = int(d) * (2 if i % 2 == 0 else 1)
+        if n >= 10: n -= 9
+        total += n
+    verificador = (10 - total % 10) % 10
+    return verificador == int(cedula[9])
+
+
+def _analizar_ruc(ruc: str) -> dict:
     """
-    Consulta los datos de un RUC o cédula en el SRI Ecuador.
-    Usa el portal público del SRI (consulta de contribuyentes).
+    Analiza un RUC/cédula y devuelve el tipo de contribuyente
+    según las reglas del SRI Ecuador.
+    """
+    if not ruc.isdigit():
+        return {"valido": False, "mensaje": "Solo dígitos"}
+
+    prov = int(ruc[:2]) if len(ruc) >= 2 else 0
+    if prov < 1 or prov > 24:
+        return {"valido": False, "mensaje": "Provincia inválida (primeros 2 dígitos deben ser 01-24)"}
+
+    if len(ruc) == 10:
+        if not _validar_cedula(ruc):
+            return {"valido": False, "mensaje": "Cédula inválida (dígito verificador incorrecto)"}
+        return {"valido": True, "tipo": "NATURAL", "tipo_id": "CEDULA",
+                "descripcion": "Persona Natural"}
+
+    if len(ruc) == 13:
+        tercer = int(ruc[2])
+        if tercer < 6:
+            # Persona natural con RUC
+            if not _validar_cedula(ruc[:10]):
+                return {"valido": False, "mensaje": "RUC inválido (cédula base incorrecta)"}
+            if ruc[10:] != "001":
+                return {"valido": False, "mensaje": "RUC persona natural debe terminar en 001"}
+            return {"valido": True, "tipo": "NATURAL", "tipo_id": "RUC",
+                    "descripcion": "Persona Natural con RUC"}
+        elif tercer == 6:
+            # Entidad pública
+            return {"valido": True, "tipo": "PUBLICA", "tipo_id": "RUC",
+                    "descripcion": "Entidad del sector público"}
+        elif tercer == 9:
+            # Persona jurídica (sociedad)
+            return {"valido": True, "tipo": "JURIDICA", "tipo_id": "RUC",
+                    "descripcion": "Persona Jurídica / Sociedad"}
+        else:
+            return {"valido": False, "mensaje": f"Tercer dígito {tercer} no válido para RUC"}
+
+    return {"valido": False, "mensaje": f"Longitud incorrecta ({len(ruc)} dígitos, debe ser 10 o 13)"}
+
+
+@router.get("/consulta-ruc/{ruc}")
+def consultar_ruc(ruc: str, u=Depends(get_current_user)):
+    """
+    Consulta y valida un RUC o cédula.
+    1. Valida el formato con el algoritmo oficial del SRI Ecuador
+    2. Busca si ya existe en clientes o proveedores del sistema
+    3. Detecta tipo de contribuyente automáticamente
     """
     ruc = ruc.strip()
     if not re.match(r'^\d{10,13}$', ruc):
-        raise HTTPException(400, "RUC o cédula inválido — debe tener 10 o 13 dígitos")
+        raise HTTPException(400, "Debe tener 10 dígitos (cédula) o 13 dígitos (RUC)")
 
-    # Primero buscar en la base de datos local (clientes/proveedores existentes)
-    if len(ruc) == 13:
-        local = query_one("""
-            SELECT identificacion as ruc, razon_social, direccion, email, telefono,
-                   tipo_contribuyente, obligado_contabilidad, 'cliente' as origen
-            FROM ven_clientes WHERE identificacion = %s
-            UNION ALL
-            SELECT identificacion, razon_social, direccion, email, telefono,
-                   tipo_contribuyente, obligado_contabilidad, 'proveedor' as origen
-            FROM com_proveedores WHERE identificacion = %s
-            LIMIT 1
-        """, (ruc, ruc))
-        if local:
-            return {**dict(local), "fuente": "sistema"}
+    # 1. Validar con algoritmo SRI
+    analisis = _analizar_ruc(ruc)
+    if not analisis.get("valido"):
+        raise HTTPException(400, analisis.get("mensaje", "RUC/Cédula inválido"))
 
-    # Consultar al SRI
-    try:
-        async with httpx.AsyncClient(timeout=10, verify=False) as client:
-            # Portal público SRI — consulta de RUC
-            url = f"https://srienlinea.sri.gob.ec/sri-en-linea/SriRucWeb/ConsultaRuc/Consultas/consultaRuc"
-            resp = await client.get(url, params={"ruc": ruc},
-                headers={"Accept": "application/json",
-                         "User-Agent": "Mozilla/5.0"})
+    # 2. Buscar en base de datos local primero
+    local_cli = query_one("""
+        SELECT identificacion, razon_social, direccion, email, telefono,
+               tipo_contribuyente, obligado_contabilidad
+        FROM ven_clientes WHERE identificacion=%s AND activo=true LIMIT 1
+    """, (ruc,))
 
-            if resp.status_code == 200:
-                try:
-                    data = resp.json()
-                    contribuyente = data.get("contribuyente") or data
-                    return {
-                        "ruc":                    ruc,
-                        "razon_social":           contribuyente.get("razonSocial", ""),
-                        "nombre_comercial":       contribuyente.get("nombreFantasia", ""),
-                        "tipo_contribuyente":     contribuyente.get("tipoContribuyente", ""),
-                        "obligado_contabilidad":  contribuyente.get("obligadoLlevarContabilidad","NO") == "SI",
-                        "estado":                 contribuyente.get("estado", ""),
-                        "actividad_principal":    contribuyente.get("actividadPrincipal", ""),
-                        "direccion":              contribuyente.get("direccionMatriz", ""),
-                        "fuente": "sri"
-                    }
-                except Exception:
-                    pass
+    if local_cli:
+        return {**dict(local_cli), "fuente": "sistema_cliente",
+                "tipo": analisis["tipo"], "tipo_id": analisis["tipo_id"],
+                "descripcion": analisis["descripcion"]}
 
-            # Fallback: scraping del portal público
-            resp2 = await client.get(
-                f"https://srienlinea.sri.gob.ec/facturacion-internet/pages/consultas/consulta-ruc.jsf",
-                params={"ruc": ruc})
-            # Extraer datos básicos del HTML
-            html = resp2.text
-            razon = re.search(r'Razón Social[:\s]*</[^>]+>\s*<[^>]+>([^<]+)', html)
-            return {
-                "ruc": ruc,
-                "razon_social": razon.group(1).strip() if razon else "",
-                "fuente": "sri_html",
-                "raw": len(html)
-            }
+    local_prov = query_one("""
+        SELECT identificacion, razon_social, direccion, email, telefono,
+               tipo_contribuyente, obligado_contabilidad
+        FROM com_proveedores WHERE identificacion=%s AND activo=true LIMIT 1
+    """, (ruc,))
 
-    except httpx.TimeoutException:
-        raise HTTPException(504, "El SRI no respondió. Intente de nuevo en unos segundos.")
-    except Exception as e:
-        # Si falla la consulta al SRI, devolver vacío para que el usuario llene manual
-        return {
-            "ruc": ruc,
-            "razon_social": "",
-            "fuente": "sin_datos",
-            "mensaje": "No se pudo consultar el SRI. Ingresa los datos manualmente.",
-            "error": str(e)[:100]
-        }
+    if local_prov:
+        return {**dict(local_prov), "fuente": "sistema_proveedor",
+                "tipo": analisis["tipo"], "tipo_id": analisis["tipo_id"],
+                "descripcion": analisis["descripcion"]}
+
+    # 3. No está en el sistema — devolver info del análisis para autocompletar tipo
+    return {
+        "ruc":                  ruc,
+        "razon_social":         "",
+        "tipo":                 analisis["tipo"],
+        "tipo_id":              analisis["tipo_id"],
+        "tipo_contribuyente":   analisis["tipo"],
+        "obligado_contabilidad": analisis["tipo"] == "JURIDICA",
+        "descripcion":          analisis["descripcion"],
+        "fuente":               "validado",
+        "mensaje":              f"RUC válido ({analisis['descripcion']}). Ingresa la razón social."
+    }
 
 
 # ══════════════════════════════════════════════════════════════

@@ -384,14 +384,16 @@ export default function Proveedores() {
                   try {
                     const r = await api.get(`/sri/consulta-ruc/${val}`)
                     const d = r.data
+                    if (d.tipo_contribuyente) set('tipo_contribuyente', d.tipo_contribuyente)
+                    if (d.obligado_contabilidad !== undefined) set('obligado_contabilidad', d.obligado_contabilidad)
                     if (d.razon_social) {
                       set('razon_social', d.razon_social)
-                      if (d.tipo_contribuyente) set('tipo_contribuyente',
-                        d.tipo_contribuyente.includes('NATURAL')?'NATURAL':'JURIDICA')
-                      if (d.obligado_contabilidad !== undefined) set('obligado_contabilidad', d.obligado_contabilidad)
                       if (d.direccion) set('direccion', d.direccion)
-                    } else { alert(d.mensaje || 'No se encontraron datos en el SRI') }
-                  } catch(e) { alert(e.response?.data?.detail || 'Error al consultar SRI') }
+                      alert('✅ Datos cargados')
+                    } else {
+                      alert(`✅ ${d.descripcion || 'RUC válido'}\n\nIngresa la razón social manualmente.`)
+                    }
+                  } catch(e) { alert(e.response?.data?.detail || 'RUC/Cédula inválido') }
                 }}
                 style={{padding:'0 10px',borderRadius:7,border:`1px solid ${C.blue}44`,
                   background:`rgba(59,130,246,.1)`,color:C.blue,cursor:'pointer',
