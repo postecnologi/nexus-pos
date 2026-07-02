@@ -43,6 +43,16 @@ def plantilla_ventas(u=Depends(get_current_user)):
 async def importar_ventas(file: UploadFile = File(...), u=Depends(get_current_user)):
     headers, datos = _leer_excel(await file.read())
     ok, errores = 0, []
+
+    # Cachear recursos fijos una sola vez
+    suc = query_one("SELECT id FROM sys_sucursales WHERE es_principal=true AND activa=true LIMIT 1") \
+          or query_one("SELECT id FROM sys_sucursales WHERE activa=true LIMIT 1")
+    bod = query_one("SELECT id FROM inv_bodegas WHERE es_principal=true AND activa=true LIMIT 1") \
+          or query_one("SELECT id FROM inv_bodegas WHERE activa=true LIMIT 1")
+    consumidor = query_one("SELECT id FROM ven_clientes WHERE identificacion='9999999999999' LIMIT 1") \
+                 or query_one("SELECT id FROM ven_clientes LIMIT 1")
+    uid = u.get("id") or u.get("user_id") or 1
+
     for i, row in enumerate(datos, 4):
         try:
             numero = _val(row, "n° factura", "numero", "numero_factura", "factura", "comprobante")
@@ -51,14 +61,19 @@ async def importar_ventas(file: UploadFile = File(...), u=Depends(get_current_us
             if not numero or not fecha or total <= 0:
                 errores.append(f"Fila {i}: número, fecha y total son obligatorios"); continue
 
-            ident = _val(row, "ruc/cédula cliente", "ruc/cedula", "cliente_ruc", "cedula", "ruc")
+            ident = _val(row, "ruc/cédula cliente", "ruc/cedula", "cliente_ruc", "cedula", "ruc", "identificacion")
             cli   = query_one("SELECT id FROM ven_clientes WHERE identificacion=%s", (ident,)) if ident else None
+            if not cli:
+                cli = consumidor  # fallback a consumidor final si no hay cliente
+            if not cli:
+                errores.append(f"Fila {i}: no hay clientes en el sistema — importa clientes primero"); continue
+
             vend_cod = _val(row, "código vendedor", "vendedor_cod", "vendedor", "codigo_vendedor")
             vend  = query_one("SELECT id FROM ven_vendedores WHERE codigo=%s", (vend_cod,)) if vend_cod else None
             sub0  = _float(_val(row, "subtotal 0%", "subtotal_0", "base0"))
             subiva= _float(_val(row, "subtotal iva", "subtotal_iva", "baseiva"))
             iva   = _float(_val(row, "valor iva", "iva"))
-            obs   = _val(row, "observación", "observacion")
+            obs   = _val(row, "observacion", "observación")
 
             existe = query_one("SELECT id FROM ven_facturas WHERE numero_factura=%s", (numero,))
             if existe:
@@ -66,11 +81,12 @@ async def importar_ventas(file: UploadFile = File(...), u=Depends(get_current_us
 
             insert("""
                 INSERT INTO ven_facturas
-                    (numero_factura, cliente_id, vendedor_id, fecha, subtotal_0, subtotal_iva,
-                     total_iva, total, estado, observaciones)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,'HISTORICO',%s)
-            """, (numero, cli["id"] if cli else None, vend["id"] if vend else None,
-                  fecha, sub0, subiva, iva, total, obs))
+                    (numero_factura, cliente_id, vendedor_id, sucursal_id, bodega_id,
+                     usuario_id, fecha_emision, subtotal_0, subtotal_iva, iva, total, estado, observaciones)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'EMITIDA',%s)
+            """, (numero, cli["id"], vend["id"] if vend else None,
+                  suc["id"] if suc else None, bod["id"] if bod else None,
+                  uid, fecha, sub0, subiva, iva, total, obs))
             ok += 1
         except Exception as e:
             errores.append(f"Fila {i}: {str(e)[:80]}")
@@ -108,6 +124,11 @@ def plantilla_compras(u=Depends(get_current_user)):
 async def importar_compras(file: UploadFile = File(...), u=Depends(get_current_user)):
     headers, datos = _leer_excel(await file.read())
     ok, errores = 0, []
+    suc = query_one("SELECT id FROM sys_sucursales WHERE es_principal=true AND activa=true LIMIT 1") \
+          or query_one("SELECT id FROM sys_sucursales WHERE activa=true LIMIT 1")
+    bod = query_one("SELECT id FROM inv_bodegas WHERE es_principal=true AND activa=true LIMIT 1") \
+          or query_one("SELECT id FROM inv_bodegas WHERE activa=true LIMIT 1")
+    uid = u.get("id") or u.get("user_id") or 1
     for i, row in enumerate(datos, 4):
         try:
             numero = _val(row, "n° factura proveedor", "numero", "numero_factura", "comprobante")
@@ -117,21 +138,23 @@ async def importar_compras(file: UploadFile = File(...), u=Depends(get_current_u
                 errores.append(f"Fila {i}: número, fecha y total son obligatorios"); continue
 
             ruc_pr = _val(row, "ruc proveedor", "proveedor_ruc", "ruc", "proveedor")
-            prov   = query_one("SELECT id FROM inv_proveedores WHERE ruc=%s", (ruc_pr,)) if ruc_pr else None
-            sub    = _float(_val(row, "subtotal", "base"))
+            prov   = query_one("SELECT id FROM com_proveedores WHERE identificacion=%s", (ruc_pr,)) if ruc_pr else None
+            sub    = _float(_val(row, "subtotal", "base", "subtotal_0"))
             iva    = _float(_val(row, "valor iva", "iva"))
-            obs    = _val(row, "observación", "observacion")
+            obs    = _val(row, "observacion", "observación")
 
-            existe = query_one("SELECT id FROM com_compras WHERE numero_factura=%s", (numero,))
+            existe = query_one("SELECT id FROM com_compras WHERE numero_factura_prov=%s", (numero,))
             if existe:
                 errores.append(f"Fila {i}: compra {numero} ya existe"); continue
 
             insert("""
                 INSERT INTO com_compras
-                    (numero_factura, proveedor_id, fecha_emision,
-                     subtotal_0, total_iva, total, estado, observaciones)
-                VALUES (%s,%s,%s,%s,%s,%s,'HISTORICO',%s)
-            """, (numero, prov["id"] if prov else None, fecha, sub, iva, total, obs))
+                    (numero_factura_prov, num_documento, proveedor_id, sucursal_id, bodega_id,
+                     usuario_id, fecha, subtotal_0, iva, total, estado, observaciones)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'CONFIRMADA',%s)
+            """, (numero, numero, prov["id"] if prov else None,
+                  suc["id"] if suc else None, bod["id"] if bod else None,
+                  uid, fecha, sub, iva, total, obs))
             ok += 1
         except Exception as e:
             errores.append(f"Fila {i}: {str(e)[:80]}")
@@ -173,8 +196,8 @@ async def importar_cxc(file: UploadFile = File(...), u=Depends(get_current_user)
     ok, errores = 0, []
     for i, row in enumerate(datos, 4):
         try:
-            ident   = _val(row, "ruc/cédula", "ruc/cedula", "cliente_ruc", "cedula", "ruc")
-            fecha_e = _val(row, "fecha emisión", "fecha_emision", "fecha")
+            ident   = _val(row, "ruc/cédula", "ruc/cedula", "cliente_ruc", "cedula", "ruc", "identificacion")
+            fecha_e = _val(row, "fecha emision", "fecha_emision", "fecha emisión", "fecha")
             fecha_v = _val(row, "fecha vencimiento", "fecha_vencimiento", "vencimiento")
             total   = _float(_val(row, "valor total", "valor_total", "total", "monto"))
             if not ident or not fecha_e or not fecha_v or total <= 0:
@@ -243,7 +266,7 @@ async def importar_cxp(file: UploadFile = File(...), u=Depends(get_current_user)
             if not ruc or not fecha_e or not fecha_v or total <= 0:
                 errores.append(f"Fila {i}: RUC, fechas y valor son obligatorios"); continue
 
-            prov = query_one("SELECT id FROM inv_proveedores WHERE ruc=%s", (ruc,))
+            prov = query_one("SELECT id FROM com_proveedores WHERE identificacion=%s", (ruc,))
             if not prov:
                 errores.append(f"Fila {i}: proveedor {ruc} no encontrado — impórtalo primero"); continue
 

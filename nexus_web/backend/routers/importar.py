@@ -20,9 +20,34 @@ def _leer_excel(file_bytes: bytes):
     filas = list(ws.iter_rows(values_only=True))
     if not filas:
         raise HTTPException(400, "El archivo está vacío")
-    headers = [str(h).strip().lower() if h else "" for h in filas[0]]
+
+    # Detectar fila de cabeceras: primera fila con 2+ celdas no vacías
+    # (la fila de instrucción de nuestra plantilla tiene solo 1 celda merged)
+    header_idx = 0
+    for idx, fila in enumerate(filas):
+        no_vacias = [c for c in fila if c is not None and str(c).strip() != ""]
+        if len(no_vacias) >= 2:
+            header_idx = idx
+            break
+
+    # Limpiar headers: quitar " *" de campos obligatorios y normalizar
+    def _clean_header(h):
+        if not h:
+            return ""
+        s = str(h).strip().lower()
+        s = s.replace(" *", "").replace("*", "").strip()
+        return s
+
+    headers = [_clean_header(h) for h in filas[header_idx]]
+
+    # Calcular desde qué fila empiezan los datos reales
+    # Si había fila de instrucción (header_idx > 0), la siguiente fila es descripción → saltarla
+    data_start = header_idx + 1
+    if header_idx > 0:
+        data_start += 1  # saltar fila de descripciones de la plantilla
+
     datos = []
-    for fila in filas[1:]:
+    for fila in filas[data_start:]:
         if all(v is None or str(v).strip() == "" for v in fila):
             continue
         datos.append(dict(zip(headers, [str(v).strip() if v is not None else "" for v in fila])))
@@ -144,48 +169,44 @@ async def importar_productos(file: UploadFile = File(...), u=Depends(get_current
     for i, row in enumerate(datos, 4):
         try:
             codigo = _val(row, "código", "codigo", "code", "cod")
-            nombre = _val(row, "nombre", "name", "producto", "descripcion")
+            # inv_productos usa 'descripcion' como nombre del producto
+            nombre = _val(row, "nombre", "name", "producto", "descripción", "descripcion", "description")
             if not codigo or not nombre:
-                errores.append(f"Fila {i}: código y nombre son obligatorios")
-                continue
+                errores.append(f"Fila {i}: código y nombre son obligatorios"); continue
+
             precio = _float(_val(row, "precio venta", "precio_venta", "precio", "pvp", "price"))
-            costo  = _float(_val(row, "precio costo", "precio_costo", "costo", "cost"))
-            stock  = _float(_val(row, "stock", "stock inicial", "cantidad"))
-            stk_min = _float(_val(row, "stock mínimo", "stock_minimo", "minimo"))
+            stock  = _float(_val(row, "stock inicial", "stock", "cantidad"))
             iva    = _float(_val(row, "iva %", "iva", "impuesto"), 15.0)
-            unidad = _val(row, "unidad", "unit") or "UNIDAD"
-            categ  = _val(row, "categoría", "categoria", "category")
-            desc   = _val(row, "descripción", "descripcion", "description")
             activo = _bool(_val(row, "activo", "active", "estado") or "1")
 
             existe = query_one("SELECT id FROM inv_productos WHERE codigo=%s", (codigo,))
             if existe:
-                execute("""
-                    UPDATE inv_productos SET nombre=%s, descripcion=%s, categoria=%s,
-                        precio_venta=%s, precio_costo=%s, stock_minimo=%s,
-                        unidad=%s, iva_porcentaje=%s, activo=%s WHERE id=%s
-                """, (nombre, desc, categ, precio, costo, stk_min, unidad, iva, activo, existe["id"]))
-                # Actualizar stock en bodega principal si cambió
+                execute("UPDATE inv_productos SET descripcion=%s, iva_porcentaje=%s, activo=%s WHERE id=%s",
+                        (nombre, iva, activo, existe["id"]))
+                pid = existe["id"]
             else:
                 pid = insert("""
-                    INSERT INTO inv_productos (codigo, nombre, descripcion, categoria,
-                        precio_venta, precio_costo, stock_minimo, unidad, iva_porcentaje, activo)
-                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-                """, (codigo, nombre, desc, categ, precio, costo, stk_min, unidad, iva, activo))
+                    INSERT INTO inv_productos (codigo, descripcion, iva_porcentaje, activo, clase)
+                    VALUES (%s,%s,%s,%s,'MERCADERIA')
+                """, (codigo, nombre, iva, activo))
                 # Stock inicial en bodega principal
                 if stock > 0:
-                    bodega = query_one("SELECT id FROM inv_bodegas WHERE es_principal=true LIMIT 1")
-                    if bodega:
-                        existe_stock = query_one("SELECT id FROM inv_stock WHERE producto_id=%s AND bodega_id=%s", (pid, bodega["id"]))
-                        if existe_stock:
-                            execute("UPDATE inv_stock SET cantidad=%s WHERE id=%s", (stock, existe_stock["id"]))
-                        else:
-                            insert("INSERT INTO inv_stock (producto_id, bodega_id, cantidad) VALUES (%s,%s,%s)",
-                                   (pid, bodega["id"], stock))
+                    bod = query_one("SELECT id FROM inv_bodegas WHERE es_principal=true AND activa=true LIMIT 1")
+                    if bod:
+                        execute("INSERT INTO inv_stock (producto_id, bodega_id, cantidad) VALUES (%s,%s,%s) ON CONFLICT DO NOTHING",
+                                (pid, bod["id"], stock))
+                        execute("UPDATE inv_stock SET cantidad=%s WHERE producto_id=%s AND bodega_id=%s",
+                                (stock, pid, bod["id"]))
+
+            # Precio de venta en tabla inv_precios
+            if precio > 0:
+                execute("INSERT INTO inv_precios (producto_id, tipo_precio_id, precio, activo) VALUES (%s,1,%s,true) ON CONFLICT DO NOTHING",
+                        (pid, precio))
+                execute("UPDATE inv_precios SET precio=%s WHERE producto_id=%s AND tipo_precio_id=1",
+                        (precio, pid))
             ok += 1
         except Exception as e:
             errores.append(f"Fila {i}: {str(e)[:80]}")
-
     return {"importados": ok, "errores": errores,
             "msg": f"{ok} productos importados. {len(errores)} errores."}
 
@@ -224,16 +245,19 @@ async def importar_clientes(file: UploadFile = File(...), u=Depends(get_current_
     ok, errores = 0, []
     for i, row in enumerate(datos, 4):
         try:
-            ident = _val(row, "ruc / cédula", "ruc/cedula", "cedula", "ruc", "identificacion", "id")
-            nombre = _val(row, "razón social", "razon social", "nombre", "name")
+            ident  = _val(row, "ruc / cédula", "ruc/cédula", "ruc/cedula", "cedula", "ruc",
+                          "identificacion", "identificación", "id", "ruc / cedula")
+            nombre = _val(row, "razón social", "razon social", "razon_social", "nombre",
+                          "name", "empresa", "cliente")
             if not ident or not nombre:
                 errores.append(f"Fila {i}: identificación y nombre son obligatorios"); continue
-            tipo = _val(row, "tipo id", "tipo_id", "tipo") or ("RUC" if len(ident)==13 else "CEDULA")
-            email   = _val(row, "email", "correo")
-            tel     = _val(row, "teléfono", "telefono", "phone")
-            dir_    = _val(row, "dirección", "direccion", "address")
-            ciudad  = _val(row, "ciudad", "city")
-            activo  = _bool(_val(row, "activo", "active", "estado") or "1")
+            tipo   = _val(row, "tipo id", "tipo_id", "tipo id", "tipo_identificacion", "tipo") \
+                     or ("RUC" if len(ident) == 13 else "CEDULA")
+            email  = _val(row, "email", "correo")
+            tel    = _val(row, "teléfono", "telefono", "phone")
+            dir_   = _val(row, "dirección", "direccion", "address")
+            ciudad = _val(row, "ciudad", "city")
+            activo = _bool(_val(row, "activo", "active", "estado") or "1")
 
             existe = query_one("SELECT id FROM ven_clientes WHERE identificacion=%s", (ident,))
             if existe:
@@ -248,7 +272,6 @@ async def importar_clientes(file: UploadFile = File(...), u=Depends(get_current_
             ok += 1
         except Exception as e:
             errores.append(f"Fila {i}: {str(e)[:80]}")
-
     return {"importados": ok, "errores": errores,
             "msg": f"{ok} clientes importados. {len(errores)} errores."}
 
@@ -285,31 +308,32 @@ async def importar_proveedores(file: UploadFile = File(...), u=Depends(get_curre
     ok, errores = 0, []
     for i, row in enumerate(datos, 4):
         try:
-            ruc    = _val(row, "ruc", "identificacion", "id")
-            nombre = _val(row, "razón social", "razon social", "nombre", "name")
+            ruc    = _val(row, "ruc", "identificacion", "identificación", "id")
+            nombre = _val(row, "razón social", "razon social", "razon_social", "nombre", "name")
             if not ruc or not nombre:
                 errores.append(f"Fila {i}: RUC y nombre son obligatorios"); continue
-            email   = _val(row, "email", "correo")
-            tel     = _val(row, "teléfono", "telefono", "phone")
-            dir_    = _val(row, "dirección", "direccion")
-            ciudad  = _val(row, "ciudad", "city")
-            contacto = _val(row, "contacto", "contact")
-            activo  = _bool(_val(row, "activo") or "1")
+            email    = _val(row, "email", "correo")
+            tel      = _val(row, "teléfono", "telefono", "phone")
+            dir_     = _val(row, "dirección", "direccion")
+            ciudad   = _val(row, "ciudad", "city")
+            contacto = _val(row, "contacto", "contact", "contacto_nombre")
+            activo   = _bool(_val(row, "activo") or "1")
+            tipo     = "RUC" if len(ruc) == 13 else "CEDULA"
 
-            existe = query_one("SELECT id FROM inv_proveedores WHERE ruc=%s", (ruc,))
+            existe = query_one("SELECT id FROM com_proveedores WHERE identificacion=%s", (ruc,))
             if existe:
-                execute("""UPDATE inv_proveedores SET nombre=%s, email=%s, telefono=%s,
-                    direccion=%s, ciudad=%s, contacto=%s, activo=%s WHERE id=%s""",
+                execute("""UPDATE com_proveedores SET razon_social=%s, email=%s, telefono=%s,
+                    direccion=%s, ciudad=%s, contacto_nombre=%s, activo=%s WHERE id=%s""",
                     (nombre, email, tel, dir_, ciudad, contacto, activo, existe["id"]))
             else:
-                insert("""INSERT INTO inv_proveedores
-                    (ruc, nombre, email, telefono, direccion, ciudad, contacto, activo)
-                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s)""",
-                    (ruc, nombre, email, tel, dir_, ciudad, contacto, activo))
+                insert("""INSERT INTO com_proveedores
+                    (identificacion, tipo_identificacion, razon_social, email, telefono,
+                     direccion, ciudad, contacto_nombre, activo)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                    (ruc, tipo, nombre, email, tel, dir_, ciudad, contacto, activo))
             ok += 1
         except Exception as e:
             errores.append(f"Fila {i}: {str(e)[:80]}")
-
     return {"importados": ok, "errores": errores,
             "msg": f"{ok} proveedores importados. {len(errores)} errores."}
 
@@ -363,7 +387,9 @@ async def importar_empleados(file: UploadFile = File(...), u=Depends(get_current
             tel      = _val(row, "teléfono", "telefono")
             cargo    = _val(row, "cargo", "puesto", "position")
             depto    = _val(row, "departamento", "department")
-            fi       = _val(row, "fecha ingreso", "fecha_ingreso") or None
+            from datetime import date as _date
+            fi_raw   = _val(row, "fecha ingreso", "fecha_ingreso")
+            fi       = fi_raw if fi_raw else str(_date.today())  # hoy como fallback
             contrato = _val(row, "tipo contrato", "tipo_contrato") or "INDEFINIDO"
             region   = _val(row, "región", "region") or "SIERRA"
 
@@ -373,14 +399,14 @@ async def importar_empleados(file: UploadFile = File(...), u=Depends(get_current
                     telefono=%s, cargo=%s, departamento=%s, salario_base=%s,
                     fecha_ingreso=%s, tipo_contrato=%s, region=%s WHERE id=%s""",
                     (nombres, apellidos, email, tel, cargo, depto, salario,
-                     fi or None, contrato, region, existe["id"]))
+                     fi, contrato, region, existe["id"]))
             else:
                 insert("""INSERT INTO nom_empleados
                     (cedula, nombres, apellidos, email, telefono, cargo, departamento,
                      salario_base, fecha_ingreso, tipo_contrato, region, activo)
                     VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,true)""",
                     (cedula, nombres, apellidos, email, tel, cargo, depto,
-                     salario, fi or None, contrato, region))
+                     salario, fi, contrato, region))
             ok += 1
         except Exception as e:
             errores.append(f"Fila {i}: {str(e)[:80]}")

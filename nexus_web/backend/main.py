@@ -590,6 +590,9 @@ def run_migrations():
         ) AS t(nombre, tipo, contenido)
         WHERE NOT EXISTS (SELECT 1 FROM sys_whatsapp_plantillas LIMIT 1)""",
         "ALTER TABLE nom_permisos ALTER COLUMN modalidad TYPE VARCHAR(20)",
+        "ALTER TABLE fin_cxc ALTER COLUMN factura_id DROP NOT NULL",
+        "ALTER TABLE fin_cxp ALTER COLUMN compra_id DROP NOT NULL",
+        "ALTER TABLE ven_facturas ALTER COLUMN sucursal_id DROP NOT NULL",
         """CREATE TABLE IF NOT EXISTS cont_config_cuentas (
             id SERIAL PRIMARY KEY,
             -- Ventas / Ingresos
