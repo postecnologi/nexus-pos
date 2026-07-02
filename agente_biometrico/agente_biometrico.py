@@ -254,47 +254,67 @@ def guardar_ultima_sync(fecha: date):
     with open(SYNC_FILE, "w") as f:
         f.write(fecha.isoformat())
 
-def sincronizar(config, cliente: ClienteNexus, manual=False):
-    """Lee el biométrico y sube los registros a NEXUS."""
-    marca = config.get("marca", "ZKTECO")
-    desde = leer_ultima_sync() if not manual else date.today() - timedelta(days=30)
+def sincronizar_dispositivo(dispositivo: dict, cliente: ClienteNexus, desde: date):
+    """Sincroniza un solo biométrico."""
+    bio_id = dispositivo["biometrico_id"]
+    marca  = dispositivo.get("marca", "ZKTECO")
+    ip     = dispositivo["bio_ip"]
 
-    print(f"\n  ► Leyendo registros desde {desde}...")
+    print(f"\n  ► #{bio_id} {marca} ({ip}) — registros desde {desde}...")
 
     try:
+        # Pasar config del dispositivo específico
+        cfg_bio = {**dispositivo}
         if marca == "ZKTECO":
-            usuarios, registros = leer_asistencia_zkteco(config, desde)
+            usuarios, registros = leer_asistencia_zkteco(cfg_bio, desde)
         elif marca == "ANVIZ":
-            usuarios, registros = leer_asistencia_anviz(config, desde)
+            usuarios, registros = leer_asistencia_anviz(cfg_bio, desde)
         else:
-            print(f"  ❌ Marca '{marca}' no soportada")
-            return
+            print(f"  ❌ Marca '{marca}' no soportada"); return
 
-        print(f"  ✅ {len(registros)} registros leídos del biométrico")
+        print(f"     {len(registros)} marcaciones leídas")
 
         if not registros:
-            print("  ℹ️  Sin registros nuevos")
-            return
+            print("     Sin registros nuevos"); return
 
-        # Subir usuarios para mapeo
         if usuarios:
+            cliente.bio_id = bio_id
             cliente.subir_usuarios(usuarios)
 
-        # Subir registros de asistencia
+        cliente.bio_id = bio_id
         resultado = cliente.subir_registros(registros)
 
         if resultado.get("importados", 0) > 0:
-            print(f"  ✅ {resultado['importados']} registros guardados en NEXUS")
-            guardar_ultima_sync(date.today())
+            print(f"     ✅ {resultado['importados']} registros guardados")
         if resultado.get("sin_mapeo"):
-            print(f"  ⚠️  {len(resultado['sin_mapeo'])} empleados sin mapeo: {', '.join(resultado['sin_mapeo'][:5])}")
-            print("      Ve a Nómina → Asistencia → Mapeo empleados")
+            print(f"     ⚠️  Sin mapeo: {', '.join(resultado['sin_mapeo'][:3])}")
         if resultado.get("error"):
-            print(f"  ❌ Error: {resultado['error']}")
+            print(f"     ❌ {resultado['error']}")
 
     except Exception as e:
-        log.error(f"Error sincronizando: {e}")
-        print(f"  ❌ Error: {e}")
+        log.error(f"Error #{bio_id}: {e}")
+        print(f"     ❌ Error: {e}")
+
+
+def sincronizar(config, cliente: ClienteNexus, manual=False):
+    """Sincroniza TODOS los biométricos configurados."""
+    desde = leer_ultima_sync() if not manual else date.today() - timedelta(days=30)
+
+    # Soporte para config con lista de dispositivos (multi) o uno solo (legacy)
+    dispositivos = config.get("dispositivos")
+    if not dispositivos:
+        # Config antigua con un solo dispositivo
+        dispositivos = [{"biometrico_id": config["biometrico_id"],
+                         "marca": config.get("marca","ZKTECO"),
+                         "bio_ip": config["bio_ip"],
+                         "bio_puerto": config.get("bio_puerto", 4370)}]
+
+    total_imp = 0
+    for disp in dispositivos:
+        sincronizar_dispositivo(disp, cliente, desde)
+
+    guardar_ultima_sync(date.today())
+    print(f"\n  Sync completada — {datetime.now().strftime('%H:%M:%S')}")
 
 
 # ══════════════════════════════════════════════════════════════
@@ -372,41 +392,77 @@ def asistente_configuracion():
         bio_id = int(pedir("ID del biométrico"))
         marca  = pedir_opcion("Marca:", [("ZKTECO","ZKTeco"),("ANVIZ","Anviz")])
 
-    # Paso 3: IP del biométrico
+    # Paso 3: Agregar biométricos (pueden ser varios)
     limpiar()
-    titulo("PASO 3 DE 3 — Conexión al biométrico")
+    titulo("PASO 3 DE 3 — Biométricos en la red")
     print()
-    print("  El biométrico debe estar en la misma red que este PC.")
-    print("  Puedes ver la IP en el menú del equipo:")
+    print("  Este agente puede manejar TODOS los biométricos de la red.")
+    print("  Agrega cada uno con su IP. Puedes ver la IP en el equipo:")
     print("  ZKTeco: Menú → Comunicación → Ethernet → Dirección IP")
     print("  Anviz:  Menú → Config → Network → IP")
     print()
 
-    bio_ip    = pedir("IP del biométrico (ej: 192.168.1.100)")
-    puerto_d  = "4370" if marca == "ZKTECO" else "5005"
-    bio_puerto = pedir("Puerto", puerto_d)
+    dispositivos = []
+    # El primero ya está seleccionado del paso 2
+    primer_ip     = pedir("IP del primer biométrico (ej: 192.168.1.100)")
+    primer_puerto = pedir("Puerto", "4370" if marca == "ZKTECO" else "5005")
+    dispositivos.append({
+        "biometrico_id": bio_id,
+        "marca":         marca,
+        "bio_ip":        primer_ip,
+        "bio_puerto":    int(primer_puerto),
+    })
+    _probar_conexion(primer_ip, primer_puerto)
 
-    # Probar conexión
-    print(f"\n  Probando conexión a {bio_ip}:{bio_puerto}...", end="", flush=True)
-    import socket
-    try:
-        s = socket.socket()
-        s.settimeout(5)
-        s.connect((bio_ip, int(bio_puerto)))
-        s.close()
-        print(" ✅ Puerto accesible")
-    except Exception:
-        print(f" ⚠️  No se pudo conectar (verifica IP, puerto y que el equipo esté encendido)")
-        continuar = input("  ¿Continuar de todas formas? [s/N]: ").strip().lower()
-        if continuar != "s": return None
+    # Agregar más biométricos
+    while True:
+        print()
+        mas = input("  ¿Agregar otro biométrico? [s/N]: ").strip().lower()
+        if mas != "s":
+            break
 
-    # Intervalo de sync
+        print()
+        # Seleccionar el siguiente dispositivo del sistema
+        try:
+            res = requests.get(f"{NEXUS_URL_DEFAULT}/biometrico/dispositivos",
+                headers={"Authorization": f"Bearer {token}"}, timeout=10)
+            disp_sistema = [d for d in (res.json() if res.status_code == 200 else [])
+                            if not any(x["biometrico_id"] == d["id"] for x in dispositivos)]
+        except Exception:
+            disp_sistema = []
+
+        if disp_sistema:
+            opciones = [(str(d["id"]), f"{d['nombre']} — {d['marca']} · {d.get('sucursal_nombre','')}") for d in disp_sistema]
+            opciones.append(("0","Ingresar ID manualmente"))
+            sel2  = pedir_opcion("¿Cuál biométrico?", opciones)
+            if sel2 == "0":
+                bio_id2 = int(pedir("ID del biométrico"))
+                marca2  = pedir_opcion("Marca:", [("ZKTECO","ZKTeco"),("ANVIZ","Anviz")])
+            else:
+                bio_id2 = int(sel2)
+                d2 = next((d for d in disp_sistema if d["id"] == bio_id2), None)
+                marca2 = d2.get("marca","ZKTECO").upper() if d2 else "ZKTECO"
+        else:
+            bio_id2 = int(pedir("ID del biométrico"))
+            marca2  = pedir_opcion("Marca:", [("ZKTECO","ZKTeco"),("ANVIZ","Anviz")])
+
+        ip2     = pedir("IP del biométrico")
+        puerto2 = pedir("Puerto", "4370" if marca2 == "ZKTECO" else "5005")
+        dispositivos.append({
+            "biometrico_id": bio_id2,
+            "marca":         marca2,
+            "bio_ip":        ip2,
+            "bio_puerto":    int(puerto2),
+        })
+        _probar_conexion(ip2, puerto2)
+
+    # Intervalo
     print()
-    intervalo = pedir_opcion("¿Cada cuánto sincronizar automáticamente?", [
+    intervalo = pedir_opcion("¿Cada cuánto sincronizar?", [
         ("60",   "Cada hora"),
         ("30",   "Cada 30 minutos"),
         ("10",   "Cada 10 minutos"),
-        ("1440", "Una vez al día (medianoche)"),
+        ("1440", "Una vez al día"),
     ])
 
     # Resumen
@@ -415,26 +471,24 @@ def asistente_configuracion():
     print()
     print(f"  🌐  Sistema NEXUS  : {NEXUS_URL_DEFAULT}")
     print(f"  🏢  Empresa        : {empresa_codigo}")
-    print(f"  👤  Usuario        : {usuario}")
-    print(f"  🖥️   Biométrico ID  : {bio_id} ({marca})")
-    print(f"  📡  IP del equipo  : {bio_ip}:{bio_puerto}")
-    print(f"  ⏱️   Sincronizar    : cada {intervalo} minutos")
+    print(f"  ⏱️   Sync cada      : {intervalo} minutos")
+    print()
+    print(f"  📡  Biométricos ({len(dispositivos)}):")
+    for d in dispositivos:
+        print(f"      #{d['biometrico_id']} {d['marca']} — {d['bio_ip']}:{d['bio_puerto']}")
     print()
 
-    arranque = input("  ¿Iniciar automáticamente con Windows? [S/n]: ").strip().lower() != "n"
+    arranque  = input("  ¿Iniciar automáticamente con Windows? [S/n]: ").strip().lower() != "n"
     confirmar = input("  ¿Guardar y comenzar? [S/n]: ").strip().lower()
     if confirmar == "n": return None
 
     config = {
-        "nexus_url":       NEXUS_URL_DEFAULT,
-        "empresa_codigo":  empresa_codigo,
-        "usuario":         usuario,
-        "password":        password,
-        "biometrico_id":   bio_id,
-        "marca":           marca,
-        "bio_ip":          bio_ip,
-        "bio_puerto":      int(bio_puerto),
-        "intervalo_min":   int(intervalo),
+        "nexus_url":      NEXUS_URL_DEFAULT,
+        "empresa_codigo": empresa_codigo,
+        "usuario":        usuario,
+        "password":       password,
+        "dispositivos":   dispositivos,
+        "intervalo_min":  int(intervalo),
     }
 
     with open(CONFIG_FILE, "w") as f:
@@ -445,6 +499,17 @@ def asistente_configuracion():
 
     print("\n  ✅ Configuración guardada.\n")
     return config
+
+
+def _probar_conexion(ip, puerto):
+    import socket
+    print(f"  Probando {ip}:{puerto}...", end="", flush=True)
+    try:
+        s = socket.socket(); s.settimeout(4)
+        s.connect((ip, int(puerto))); s.close()
+        print(" ✅")
+    except Exception:
+        print(" ⚠️  (sin respuesta — verifica que el equipo esté encendido)")
 
 
 # ══════════════════════════════════════════════════════════════
@@ -484,9 +549,13 @@ def ejecutar_agente(config):
     print("  ║      NEXUS POS — Agente Biométrico activo     ║")
     print("  ╚═══════════════════════════════════════════════╝")
     print()
+    dispositivos = config.get("dispositivos") or [{"biometrico_id": config.get("biometrico_id"),
+        "marca": config.get("marca","ZKTECO"), "bio_ip": config.get("bio_ip",""),
+        "bio_puerto": config.get("bio_puerto",4370)}]
     print(f"  Empresa    : {config.get('empresa_codigo','—')}")
-    print(f"  Biométrico : #{config['biometrico_id']} {config['marca']} — {config['bio_ip']}:{config['bio_puerto']}")
-    print(f"  Sync cada  : {config['intervalo_min']} minutos")
+    print(f"  Sync cada  : {config.get('intervalo_min',60)} minutos")
+    for d in dispositivos:
+        print(f"  Biométrico : #{d['biometrico_id']} {d.get('marca','')} — {d.get('bio_ip','')}:{d.get('bio_puerto','')}")
     print()
     print("  Conectando a NEXUS...", end="", flush=True)
 
@@ -540,10 +609,13 @@ def menu_principal(config):
     print("  ║      NEXUS POS — Agente Biométrico            ║")
     print("  ╚═══════════════════════════════════════════════╝")
     print()
+    disps = config.get("dispositivos") or [{"biometrico_id": config.get("biometrico_id"),
+        "marca": config.get("marca",""), "bio_ip": config.get("bio_ip","")}]
     print(f"  Empresa    : {config.get('empresa_codigo','—')}")
-    print(f"  Biométrico : #{config['biometrico_id']} {config['marca']}")
-    print(f"  IP equipo  : {config['bio_ip']}:{config['bio_puerto']}")
-    print(f"  Sync cada  : {config['intervalo_min']} minutos")
+    print(f"  Sync cada  : {config.get('intervalo_min',60)} minutos")
+    print(f"  Dispositivos ({len(disps)}):")
+    for d in disps:
+        print(f"    #{d['biometrico_id']} {d.get('marca','')} — {d.get('bio_ip','')}:{d.get('bio_puerto','')}")
     print()
     print("  [1] Iniciar agente (sync automático)")
     print("  [2] Sincronizar ahora (manual)")
