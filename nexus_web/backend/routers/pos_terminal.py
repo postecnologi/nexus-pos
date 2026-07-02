@@ -8,12 +8,29 @@ Arquitectura:
 El agente local es un script Python que el comercio instala en el PC del cajero.
 """
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import FileResponse
 from database import query, query_one, execute, insert
 from auth import get_current_user
 from typing import Optional
 from datetime import datetime
+from pathlib import Path
 
 router = APIRouter(prefix="/api/pos", tags=["POS Terminal"])
+
+# Ruta al ejecutable del agente (relativa al backend)
+AGENTE_EXE = Path(__file__).resolve().parent.parent.parent.parent / "agente_pos" / "AgenteNexusPOS.exe"
+
+
+@router.get("/agente/descargar")
+def descargar_agente(u=Depends(get_current_user)):
+    """Descarga el ejecutable del agente para instalar en el PC de la caja."""
+    if not AGENTE_EXE.exists():
+        raise HTTPException(404, "El archivo del agente no está disponible en el servidor")
+    return FileResponse(
+        path=str(AGENTE_EXE),
+        filename="AgenteNexusPOS.exe",
+        media_type="application/octet-stream"
+    )
 
 
 # ══════════════════════════════════════════════════════════════

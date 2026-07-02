@@ -965,14 +965,37 @@ function PanelTerminales({ C, SI }) {
 
   return (
     <div>
-      {/* Info */}
-      <div style={{padding:'12px 16px',borderRadius:10,background:C.sur2,border:`1px solid ${C.bord2}`,marginBottom:20}}>
-        <div style={{fontWeight:700,fontSize:13,color:C.text,marginBottom:6}}>💳 Terminales de pago con tarjeta (Pinpad)</div>
-        <div style={{fontSize:12,color:C.muted,lineHeight:1.8}}>
-          Cada caja puede tener su propio terminal físico. Para usarlo:<br/>
-          1. Registra el terminal aquí y asígnalo a una caja<br/>
-          2. Instala el <strong style={{color:C.text}}>agente local</strong> en el PC de esa caja (archivo <code>agente_pos.py</code>)<br/>
-          3. El estado 🟢 / 🔴 indica si el agente está activo en tiempo real
+      {/* Info + Descarga */}
+      <div style={{padding:'16px 18px',borderRadius:10,background:C.sur2,border:`1px solid ${C.bord2}`,marginBottom:20}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:16,flexWrap:'wrap'}}>
+          <div style={{flex:1}}>
+            <div style={{fontWeight:700,fontSize:13,color:C.text,marginBottom:6}}>💳 Terminales de pago con tarjeta (Pinpad)</div>
+            <div style={{fontSize:12,color:C.muted,lineHeight:1.9}}>
+              Cada caja puede tener su propio terminal físico. Para usarlo:<br/>
+              <span style={{color:C.blue}}>1.</span> Registra el terminal aquí y asígnalo a una caja<br/>
+              <span style={{color:C.blue}}>2.</span> Descarga e instala el <strong style={{color:C.text}}>Agente NEXUS POS</strong> en el PC de esa caja<br/>
+              <span style={{color:C.blue}}>3.</span> El agente te guía para configurar el pinpad automáticamente<br/>
+              <span style={{color:C.blue}}>4.</span> El estado 🟢 / 🔴 indica si el agente está activo
+            </div>
+          </div>
+          <div style={{display:'flex',flexDirection:'column',gap:8,minWidth:200}}>
+            <button onClick={async ()=>{
+                try {
+                  const r = await api.get('/pos/agente/descargar',{responseType:'blob'})
+                  const url = URL.createObjectURL(new Blob([r.data]))
+                  const a = document.createElement('a')
+                  a.href=url; a.download='AgenteNexusPOS.exe'; a.click()
+                } catch(e){ alert('No se pudo descargar el agente') }
+              }}
+              style={{padding:'10px 16px',borderRadius:9,border:'none',cursor:'pointer',
+                background:'linear-gradient(135deg,#1D4ED8,#7C3AED)',color:'white',
+                fontWeight:700,fontSize:13,display:'flex',alignItems:'center',gap:8,justifyContent:'center'}}>
+              <Download size={15}/> Descargar Agente .exe
+            </button>
+            <div style={{fontSize:10,color:C.hint,textAlign:'center'}}>
+              Windows 10/11 · Solo necesita ejecutarse en el PC de la caja
+            </div>
+          </div>
         </div>
       </div>
 
