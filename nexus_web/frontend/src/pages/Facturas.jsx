@@ -665,6 +665,12 @@ function ModalCobro({total,pagos,setPagos,onConfirmar,onCancelar,cuentasBanc=[]}
                   background:C.sur3,borderColor:C.blue}}/>
 
               {p.metodo==='TARJETA'&&<>
+                {/* Botón pinpad */}
+                <PinpadBtn monto={p.monto} onAprobado={(res)=>{
+                  upd(p.uid,'num_tarjeta', res.tarjeta_ultimos4 ? `****${res.tarjeta_ultimos4}` : '')
+                  upd(p.uid,'autorizacion', res.codigo_autorizacion)
+                  upd(p.uid,'referencia', res.lote)
+                }} C={C} />
                 <div style={{marginTop:10}}>
                   <div style={{fontSize:10,color:C.muted,marginBottom:2,fontWeight:600}}>N° TARJETA (enmascarado)</div>
                   <input value={p.num_tarjeta||''} onChange={e=>upd(p.uid,'num_tarjeta',e.target.value)}
@@ -1881,5 +1887,257 @@ export default function Facturas({ modo = 'factura' }){
         ))}
       </div>
     </div>
+  )
+}
+
+// ══════════════════════════════════════════════════════════════
+//  COMPONENTE PINPAD — Cobro con terminal físico
+// ══════════════════════════════════════════════════════════════
+function PinpadBtn({ monto, onAprobado, C }) {
+  const [abierto, setAbierto] = useState(false)
+  const [terminales, setTerminales] = useState([])
+  const [terminalId, setTerminalId] = useState('')
+  const [diferidoTipo, setDiferidoTipo] = useState('')
+  const [diferidoCuotas, setDiferidoCuotas] = useState(0)
+  const [estado, setEstado] = useState('IDLE') // IDLE | ENVIANDO | ESPERANDO | APROBADO | RECHAZADO | ERROR
+  const [mensaje, setMensaje] = useState('')
+  const [transId, setTransId] = useState(null)
+  const pollingRef = useRef(null)
+
+  useEffect(() => {
+    if (abierto && terminales.length === 0) {
+      api.get('/pos/terminales').then(r => {
+        const activos = (r.data || []).filter(t => t.activo)
+        setTerminales(activos)
+        if (activos.length === 1) setTerminalId(activos[0].id)
+      }).catch(() => {})
+    }
+  }, [abierto])
+
+  useEffect(() => () => { if (pollingRef.current) clearInterval(pollingRef.current) }, [])
+
+  const iniciar = async () => {
+    if (!terminalId) return alert('Selecciona un terminal')
+    setEstado('ENVIANDO')
+    try {
+      const r = await api.post('/pos/cobro', {
+        terminal_id: parseInt(terminalId),
+        monto: parseFloat(monto),
+        diferido_tipo: diferidoTipo || null,
+        diferido_cuotas: parseInt(diferidoCuotas) || 0,
+      })
+      setTransId(r.data.id)
+      setEstado('ESPERANDO')
+      setMensaje('Esperando que el cliente pague en el terminal...')
+      // Polling cada 2 segundos para ver el resultado
+      pollingRef.current = setInterval(async () => {
+        try {
+          const res = await api.get(`/pos/cobro/${r.data.id}/estado`)
+          const t = res.data
+          if (t.estado === 'APROBADO') {
+            clearInterval(pollingRef.current)
+            setEstado('APROBADO')
+            setMensaje(`✅ Aprobado — Auth: ${t.codigo_autorizacion || '—'} · Tarjeta: ****${t.tarjeta_ultimos4 || '----'}`)
+            onAprobado(t)
+          } else if (t.estado === 'RECHAZADO' || t.estado === 'ERROR') {
+            clearInterval(pollingRef.current)
+            setEstado('RECHAZADO')
+            setMensaje(`❌ ${t.mensaje_respuesta || 'Transacción rechazada'}`)
+          } else if (t.estado === 'CANCELADA') {
+            clearInterval(pollingRef.current)
+            setEstado('IDLE')
+          }
+        } catch {}
+      }, 2000)
+    } catch(e) {
+      setEstado('ERROR')
+      setMensaje(e.response?.data?.detail || 'Error al conectar con el terminal')
+    }
+  }
+
+  const cancelar = async () => {
+    if (pollingRef.current) clearInterval(pollingRef.current)
+    if (transId) { try { await api.post(`/pos/cobro/${transId}/cancelar`) } catch {} }
+    setEstado('IDLE'); setTransId(null); setMensaje('')
+  }
+
+  const cerrar = () => {
+    cancelar()
+    setAbierto(false)
+    setEstado('IDLE')
+    setMensaje('')
+    setDiferidoTipo('')
+    setDiferidoCuotas(0)
+  }
+
+  const CUOTAS_OPCIONES = [3, 6, 9, 12, 18, 24]
+
+  return (
+    <>
+      <button onClick={() => setAbierto(true)}
+        style={{width:'100%',marginTop:8,padding:'10px',borderRadius:8,border:'none',
+          background:'linear-gradient(135deg,#1D4ED8,#7C3AED)',
+          color:'white',fontWeight:700,fontSize:13,cursor:'pointer',
+          display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
+        💳 Cobrar con Pinpad / Terminal
+      </button>
+
+      {abierto && (
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.8)',
+          display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999}}>
+          <div style={{background:C.surface,borderRadius:16,padding:28,width:420,
+            border:`1px solid ${C.border}`,boxShadow:'0 30px 80px rgba(0,0,0,.6)'}}>
+
+            {/* Header */}
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
+              <div>
+                <div style={{fontWeight:800,fontSize:16,color:C.text}}>💳 Cobro con Terminal</div>
+                <div style={{fontSize:12,color:C.muted,marginTop:2}}>
+                  Monto: <strong style={{color:C.green}}>${parseFloat(monto).toFixed(2)}</strong>
+                </div>
+              </div>
+              <button onClick={cerrar}
+                style={{background:'none',border:'none',color:C.muted,cursor:'pointer',fontSize:22}}>×</button>
+            </div>
+
+            {estado === 'IDLE' && (
+              <div style={{display:'flex',flexDirection:'column',gap:14}}>
+                {/* Seleccionar terminal */}
+                <div>
+                  <label style={{fontSize:11,fontWeight:700,color:C.muted,display:'block',marginBottom:4}}>
+                    TERMINAL
+                  </label>
+                  {terminales.length === 0
+                    ? <div style={{padding:'10px 14px',borderRadius:8,background:'rgba(245,158,11,.1)',
+                        border:'1px solid rgba(245,158,11,.3)',fontSize:12,color:'#F59E0B'}}>
+                        ⚠️ No hay terminales configurados. Ve a Configuración → Terminales POS.
+                      </div>
+                    : <select value={terminalId} onChange={e=>setTerminalId(e.target.value)}
+                        style={{width:'100%',padding:'9px 12px',borderRadius:8,fontSize:13,
+                          background:C.sur2,border:`1px solid ${C.border}`,color:C.text,outline:'none'}}>
+                        <option value="">— Seleccionar terminal —</option>
+                        {terminales.map(t=>(
+                          <option key={t.id} value={t.id}>
+                            {t.nombre} ({t.procesador}) {t.agente_activo ? '🟢' : '🔴'}
+                          </option>
+                        ))}
+                      </select>
+                  }
+                </div>
+
+                {/* Diferido */}
+                <div>
+                  <label style={{fontSize:11,fontWeight:700,color:C.muted,display:'block',marginBottom:4}}>
+                    FORMA DE PAGO
+                  </label>
+                  <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                    {[['','Contado'],['CIB','Con intereses banco (CIB)'],['MSI','Sin intereses']].map(([val,lab])=>(
+                      <button key={val} onClick={()=>{setDiferidoTipo(val);if(!val)setDiferidoCuotas(0)}}
+                        style={{padding:'6px 12px',borderRadius:7,border:'none',cursor:'pointer',fontSize:11,fontWeight:600,
+                          background:diferidoTipo===val?C.blue:'rgba(255,255,255,.08)',
+                          color:diferidoTipo===val?'#fff':C.muted}}>
+                        {lab}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Cuotas */}
+                {diferidoTipo && (
+                  <div>
+                    <label style={{fontSize:11,fontWeight:700,color:C.muted,display:'block',marginBottom:4}}>
+                      CUOTAS
+                    </label>
+                    <div style={{display:'flex',gap:6}}>
+                      {CUOTAS_OPCIONES.map(c=>(
+                        <button key={c} onClick={()=>setDiferidoCuotas(c)}
+                          style={{flex:1,padding:'8px 4px',borderRadius:7,border:'none',cursor:'pointer',
+                            fontSize:13,fontWeight:700,
+                            background:diferidoCuotas===c?C.blue:'rgba(255,255,255,.08)',
+                            color:diferidoCuotas===c?'#fff':C.muted}}>
+                          {c}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <button onClick={iniciar} disabled={!terminalId || (diferidoTipo && !diferidoCuotas)}
+                  style={{padding:'13px',borderRadius:10,border:'none',cursor:'pointer',fontWeight:800,fontSize:14,
+                    background:'linear-gradient(135deg,#1D4ED8,#7C3AED)',color:'white',
+                    opacity:(!terminalId || (diferidoTipo && !diferidoCuotas))?0.5:1}}>
+                  Enviar ${parseFloat(monto).toFixed(2)} al terminal →
+                </button>
+              </div>
+            )}
+
+            {/* Esperando pago */}
+            {estado === 'ESPERANDO' && (
+              <div style={{textAlign:'center',padding:'20px 0'}}>
+                <div style={{fontSize:48,marginBottom:16,animation:'spin 2s linear infinite',display:'inline-block'}}>💳</div>
+                <div style={{fontWeight:700,fontSize:15,color:C.text,marginBottom:8}}>
+                  Esperando pago del cliente...
+                </div>
+                <div style={{fontSize:12,color:C.muted,marginBottom:24}}>
+                  El cliente debe insertar/acercar su tarjeta al terminal
+                </div>
+                <div style={{padding:'10px',borderRadius:8,background:'rgba(59,130,246,.1)',
+                  border:'1px solid rgba(59,130,246,.3)',fontSize:12,color:C.blue,marginBottom:16}}>
+                  {diferidoTipo
+                    ? `Diferido ${diferidoTipo} · ${diferidoCuotas} cuotas`
+                    : 'Pago de contado'}
+                </div>
+                <button onClick={cancelar}
+                  style={{padding:'9px 20px',borderRadius:8,border:`1px solid ${C.border}`,
+                    background:'transparent',color:C.muted,cursor:'pointer',fontSize:13}}>
+                  Cancelar
+                </button>
+                <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
+              </div>
+            )}
+
+            {/* Aprobado */}
+            {estado === 'APROBADO' && (
+              <div style={{textAlign:'center',padding:'20px 0'}}>
+                <div style={{fontSize:56,marginBottom:12}}>✅</div>
+                <div style={{fontWeight:800,fontSize:18,color:C.green,marginBottom:8}}>¡Pago Aprobado!</div>
+                <div style={{fontSize:13,color:C.muted,marginBottom:24}}>{mensaje}</div>
+                <button onClick={cerrar}
+                  style={{padding:'11px 32px',borderRadius:10,border:'none',
+                    background:C.green,color:'white',fontWeight:700,fontSize:14,cursor:'pointer'}}>
+                  Continuar →
+                </button>
+              </div>
+            )}
+
+            {/* Rechazado / Error */}
+            {(estado === 'RECHAZADO' || estado === 'ERROR') && (
+              <div style={{textAlign:'center',padding:'20px 0'}}>
+                <div style={{fontSize:56,marginBottom:12}}>❌</div>
+                <div style={{fontWeight:800,fontSize:16,color:'#EF4444',marginBottom:8}}>
+                  {estado === 'RECHAZADO' ? 'Pago Rechazado' : 'Error de conexión'}
+                </div>
+                <div style={{fontSize:12,color:C.muted,marginBottom:24,padding:'10px',
+                  borderRadius:8,background:'rgba(239,68,68,.08)',border:'1px solid rgba(239,68,68,.2)'}}>
+                  {mensaje}
+                </div>
+                <div style={{display:'flex',gap:10,justifyContent:'center'}}>
+                  <button onClick={()=>setEstado('IDLE')}
+                    style={{padding:'10px 24px',borderRadius:9,border:'none',
+                      background:C.blue,color:'white',fontWeight:700,fontSize:13,cursor:'pointer'}}>
+                    Intentar de nuevo
+                  </button>
+                  <button onClick={cerrar}
+                    style={{padding:'10px 20px',borderRadius:9,border:`1px solid ${C.border}`,
+                      background:'transparent',color:C.muted,cursor:'pointer',fontSize:13}}>
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </>
   )
 }

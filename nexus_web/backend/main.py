@@ -14,7 +14,7 @@ from routers import (
     crm, retenciones, notas_debito, contabilidad,
     guias_remision, liquidaciones, nomina, admin, superadmin,
     whatsapp, depositos, notas_venta, ordenes_compra, crm_comunicaciones,
-    biometrico, importar, importar_historicos,
+    biometrico, importar, importar_historicos, pos_terminal,
 )
 
 app = FastAPI(title="NEXUS POS API", version="2.0.0")
@@ -590,6 +590,37 @@ def run_migrations():
         ) AS t(nombre, tipo, contenido)
         WHERE NOT EXISTS (SELECT 1 FROM sys_whatsapp_plantillas LIMIT 1)""",
         "ALTER TABLE nom_permisos ALTER COLUMN modalidad TYPE VARCHAR(20)",
+        # Terminales de pago (pinpad)
+        """CREATE TABLE IF NOT EXISTS pos_terminales (
+            id SERIAL PRIMARY KEY,
+            nombre VARCHAR(100) NOT NULL,
+            procesador VARCHAR(20) DEFAULT 'DATAFAST',
+            sucursal_id INTEGER REFERENCES sys_sucursales(id),
+            terminal_id VARCHAR(50) DEFAULT '',
+            activo BOOLEAN DEFAULT true,
+            agente_activo BOOLEAN DEFAULT false,
+            ultimo_heartbeat TIMESTAMP,
+            created_at TIMESTAMP DEFAULT NOW()
+        )""",
+        """CREATE TABLE IF NOT EXISTS pos_transacciones (
+            id SERIAL PRIMARY KEY,
+            terminal_id INTEGER REFERENCES pos_terminales(id),
+            procesador VARCHAR(20),
+            monto NUMERIC(10,2) NOT NULL,
+            diferido_tipo VARCHAR(10),
+            diferido_cuotas INTEGER DEFAULT 0,
+            factura_ref VARCHAR(50),
+            usuario_id INTEGER REFERENCES sys_usuarios(id),
+            estado VARCHAR(20) DEFAULT 'PENDIENTE',
+            codigo_autorizacion VARCHAR(50),
+            codigo_respuesta VARCHAR(10),
+            mensaje_respuesta TEXT,
+            tarjeta_ultimos4 VARCHAR(4),
+            tarjeta_tipo VARCHAR(30),
+            lote VARCHAR(20),
+            created_at TIMESTAMP DEFAULT NOW(),
+            updated_at TIMESTAMP DEFAULT NOW()
+        )""",
         "ALTER TABLE fin_cxc ALTER COLUMN factura_id DROP NOT NULL",
         "ALTER TABLE fin_cxp ALTER COLUMN compra_id DROP NOT NULL",
         "ALTER TABLE ven_facturas ALTER COLUMN sucursal_id DROP NOT NULL",
@@ -760,6 +791,7 @@ app.include_router(ordenes_compra.router)
 app.include_router(crm_comunicaciones.router)
 app.include_router(biometrico.router)
 app.include_router(importar.router)
+app.include_router(pos_terminal.router)
 importar_historicos  # registra endpoints históricos en importar.router
 if MULTI_TENANT:
     app.include_router(superadmin.router)

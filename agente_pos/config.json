@@ -1,0 +1,11 @@
+{
+  "nexus_url": "https://api.pos-tecnologi.com/api",
+  "terminal_id": 1,
+  "usuario": "admin",
+  "password": "admin123",
+  "pinpad_ip": "127.0.0.1",
+  "pinpad_puerto": 2020,
+  "procesador": "DATAFAST",
+  "polling_segundos": 2,
+  "timeout_pinpad": 120
+}
