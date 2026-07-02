@@ -276,6 +276,76 @@ function TabBackups() {
           </table>
         </div>
       )}
+
+      {/* ── Backup automático ─────────────────────────────── */}
+      <BackupAutoConfig C={C} />
+    </div>
+  )
+}
+
+function BackupAutoConfig({ C }) {
+  const [cfg, setCfg]     = useState(null)
+  const [saving, setSaving] = useState(false)
+  const [msg, setMsg]     = useState('')
+
+  useEffect(() => {
+    api.get('/alertas/config').then(r => setCfg(r.data)).catch(() => {})
+  }, [])
+
+  const guardar = async () => {
+    setSaving(true); setMsg('')
+    try {
+      await api.put('/alertas/config', cfg)
+      setMsg('✅ Configuración de backup guardada')
+    } catch(e) { setMsg('❌ ' + (e.response?.data?.detail || 'Error')) }
+    setSaving(false)
+  }
+
+  const fi = { background:C.sur2, border:`1px solid ${C.bord2}`, borderRadius:7,
+    padding:'8px 12px', color:C.text, fontSize:13, outline:'none', width:'100%' }
+  const lbl = { fontSize:11, fontWeight:600, color:C.muted, display:'block', marginBottom:4 }
+
+  if (!cfg) return null
+
+  return (
+    <div style={{marginTop:20, padding:16, borderRadius:12,
+      background:C.surface, border:`1px solid ${C.bord2}`}}>
+      <div style={{fontWeight:700, fontSize:14, color:C.text, marginBottom:14}}>
+        ⏰ Backup automático diario
+      </div>
+      <div style={{display:'grid', gridTemplateColumns:'auto 1fr 1fr', gap:12, alignItems:'end'}}>
+        <div style={{display:'flex', alignItems:'center', gap:8}}>
+          <input type="checkbox" checked={!!cfg.backup_auto}
+            onChange={e=>setCfg(p=>({...p,backup_auto:e.target.checked}))}
+            style={{width:17,height:17,cursor:'pointer',accentColor:C.green}}/>
+          <label style={{fontSize:13,color:C.text,cursor:'pointer',fontWeight:600}}>Activar</label>
+        </div>
+        <div>
+          <label style={lbl}>Hora del backup</label>
+          <input type="time" value={cfg.backup_hora||'03:00'}
+            onChange={e=>setCfg(p=>({...p,backup_hora:e.target.value}))} style={fi}/>
+        </div>
+        <div>
+          <label style={lbl}>Notificar al email (opcional)</label>
+          <input value={cfg.backup_email||''}
+            onChange={e=>setCfg(p=>({...p,backup_email:e.target.value}))}
+            style={fi} placeholder="admin@empresa.com"/>
+        </div>
+      </div>
+      <div style={{fontSize:11, color:C.hint, marginTop:8}}>
+        Guarda la base de datos automáticamente cada día a la hora indicada.
+        Se conservan los últimos 7 backups. Puedes descargarlo desde la lista de arriba.
+      </div>
+      {msg && <div style={{marginTop:10, fontSize:12,
+        color:msg.startsWith('✅')?'#10B981':'#EF4444'}}>{msg}</div>}
+      <div style={{marginTop:12}}>
+        <button onClick={guardar} disabled={saving}
+          style={{padding:'8px 20px', borderRadius:8, border:'none',
+            background:C.blue, color:'white', cursor:'pointer',
+            fontSize:12, fontWeight:700}}>
+          {saving ? 'Guardando...' : 'Guardar'}
+        </button>
+      </div>
     </div>
   )
 }
@@ -935,33 +1005,6 @@ function TabAlertas() {
           </div>
         )}
 
-        {/* Backup automático */}
-        <div style={{marginTop:20,borderTop:`1px solid ${C.bord2}`,paddingTop:16}}>
-          <div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:12}}>
-            💾 Backup automático diario
-          </div>
-          <div style={{display:'grid',gridTemplateColumns:'auto 1fr 1fr',gap:12,alignItems:'end'}}>
-            <div style={{display:'flex',alignItems:'center',gap:8}}>
-              <input type="checkbox" checked={!!cfg.backup_auto}
-                onChange={e=>s('backup_auto',e.target.checked)}
-                style={{width:16,height:16,cursor:'pointer',accentColor:C.green}}/>
-              <label style={{fontSize:13,color:C.text,cursor:'pointer'}}>Activar</label>
-            </div>
-            <div>
-              <label style={lbl}>Hora del backup</label>
-              <input type="time" value={cfg.backup_hora||'03:00'}
-                onChange={e=>s('backup_hora',e.target.value)} style={{...fi,width:'100%'}}/>
-            </div>
-            <div>
-              <label style={lbl}>Notificar por email (opcional)</label>
-              <input value={cfg.backup_email||''} onChange={e=>s('backup_email',e.target.value)}
-                style={{...fi,width:'100%'}} placeholder="admin@empresa.com"/>
-            </div>
-          </div>
-          <div style={{fontSize:11,color:C.hint,marginTop:6}}>
-            Guarda automáticamente la base de datos cada día. Conserva los últimos 7 backups en el servidor.
-          </div>
-        </div>
 
         <div style={{display:'flex',gap:10,marginTop:20,flexWrap:'wrap'}}>
           <button onClick={probar} disabled={testing}
