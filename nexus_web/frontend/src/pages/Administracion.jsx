@@ -6,7 +6,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import {
   Server, Database, HardDrive, Download, Upload, Trash2, RefreshCw,
   Shield, Search, Activity, AlertTriangle, CheckCircle, XCircle,
-  Clock, User, FileText, Plus, Monitor, Cpu, MemoryStick, Bell, BookOpen
+  Clock, User, FileText, Plus, Monitor, Cpu, MemoryStick, Bell
 } from 'lucide-react'
 import api from '../api'
 import { useTheme } from '../theme'
@@ -743,11 +743,10 @@ function TabSistema() {
 //  MAIN PAGE
 // ══════════════════════════════════════════════════════════════
 const TABS = [
-  { id: 'backups',    label: 'Backups',          icon: Database  },
-  { id: 'auditoria',  label: 'Auditoria',         icon: Shield    },
-  { id: 'alertas',    label: 'Alertas',           icon: Bell      },
-  { id: 'sri',        label: 'Formularios SRI',   icon: BookOpen  },
-  { id: 'sistema',    label: 'Sistema',           icon: Activity  },
+  { id: 'backups',    label: 'Backups',   icon: Database  },
+  { id: 'auditoria',  label: 'Auditoria', icon: Shield    },
+  { id: 'alertas',    label: 'Alertas',   icon: Bell      },
+  { id: 'sistema',    label: 'Sistema',   icon: Activity  },
 ]
 
 export default function Administracion() {
@@ -804,7 +803,6 @@ export default function Administracion() {
         {tab === 'backups'   && <TabBackups />}
         {tab === 'auditoria' && <TabAuditoria />}
         {tab === 'alertas'   && <TabAlertas />}
-        {tab === 'sri'       && <TabSRI />}
         {tab === 'sistema'   && <TabSistema />}
       </div>
     </div>

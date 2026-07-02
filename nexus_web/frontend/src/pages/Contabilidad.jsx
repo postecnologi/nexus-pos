@@ -5,7 +5,7 @@ import {
   Calculator, Plus, Search, X, Trash2, Eye, ChevronRight, ChevronDown,
   AlertCircle, Check, BookOpen, BarChart3, FileText, List, Download,
   RefreshCw, Lock, CheckCircle, Target, Layers, DollarSign, GitCompare,
-  Globe, Building2, Settings
+  Globe, Building2, Settings, Receipt
 } from 'lucide-react'
 
 const fmt$ = v => '$' + Number(v || 0).toLocaleString('es-EC', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -25,6 +25,7 @@ const TABS = [
   { key: 'monedas', label: 'Monedas', icon: Globe },
   { key: 'consolidado', label: 'Consolidado', icon: Building2 },
   { key: 'config-cuentas', label: 'Configurar Cuentas', icon: Settings },
+  { key: 'sri',            label: 'Formularios SRI',    icon: Receipt },
 ]
 
 const TIPO_BADGE = {
@@ -102,6 +103,7 @@ export default function Contabilidad() {
       {tab === 'monedas' && <TabMonedas C={C} fi={fi} />}
       {tab === 'consolidado' && <TabConsolidado C={C} fi={fi} />}
       {tab === 'config-cuentas' && <TabConfigCuentas C={C} fi={fi} />}
+      {tab === 'sri' && <TabSRIContabilidad C={C} fi={fi} />}
     </div>
   )
 }
@@ -2830,4 +2832,211 @@ function downloadBlob(blob, filename) {
   a.click()
   a.remove()
   window.URL.revokeObjectURL(url)
+}
+
+// ══════════════════════════════════════════════════════════════
+//  TAB FORMULARIOS SRI
+// ══════════════════════════════════════════════════════════════
+function TabSRIContabilidad({ C, fi }) {
+  const hoy = new Date()
+  const periodoActual = `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}`
+  const [periodo, setPeriodo] = useState(periodoActual)
+  const [anio, setAnio]       = useState(hoy.getFullYear())
+  const [datos104, setDatos104] = useState(null)
+  const [datosATS, setDatosATS] = useState(null)
+  const [loading104, setLoading104] = useState(false)
+  const [loadingATS, setLoadingATS] = useState(false)
+
+  const calcular104 = async () => {
+    setLoading104(true); setDatos104(null)
+    try { const r = await api.get('/sri/formulario104', { params: { periodo } }); setDatos104(r.data) }
+    catch(e) { alert(e.response?.data?.detail || 'Error al calcular') }
+    setLoading104(false)
+  }
+
+  const calcularATS = async () => {
+    setLoadingATS(true); setDatosATS(null)
+    try { const r = await api.get('/sri/ats', { params: { periodo } }); setDatosATS(r.data) }
+    catch(e) { alert(e.response?.data?.detail || 'Error al calcular') }
+    setLoadingATS(false)
+  }
+
+  const descargar = async (url, filename, params) => {
+    try {
+      const r = await api.get(url, { responseType: 'blob', params })
+      const link = document.createElement('a')
+      link.href = URL.createObjectURL(new Blob([r.data]))
+      link.download = filename; link.click()
+    } catch { alert('Error al descargar') }
+  }
+
+  const fmtN = v => `$${parseFloat(v||0).toLocaleString('es-EC',{minimumFractionDigits:2,maximumFractionDigits:2})}`
+
+  const card = { background: C.surface, borderRadius: 12, border: `1px solid ${C.border}`,
+    padding: 20, marginBottom: 16 }
+  const btn = (color='#3B82F6') => ({ padding:'9px 20px', borderRadius:8, border:'none',
+    background:color, color:'#fff', fontWeight:700, fontSize:12, cursor:'pointer',
+    display:'inline-flex', alignItems:'center', gap:6 })
+  const btnO = (color='#10B981') => ({ padding:'9px 18px', borderRadius:8,
+    border:`1px solid ${color}44`, background:`${color}15`, color,
+    fontWeight:700, fontSize:12, cursor:'pointer', display:'inline-flex', alignItems:'center', gap:6 })
+  const lbl = { fontSize:11, fontWeight:600, color:C.muted, display:'block', marginBottom:4 }
+
+  return (
+    <div>
+      {/* Selector período */}
+      <div style={{...card, display:'flex', gap:16, alignItems:'flex-end', flexWrap:'wrap'}}>
+        <div>
+          <label style={lbl}>Período mensual</label>
+          <input type="month" value={periodo} onChange={e=>setPeriodo(e.target.value)}
+            style={{...fi, width:160}} />
+        </div>
+        <div>
+          <label style={lbl}>Año (para RDEP)</label>
+          <input type="number" value={anio} onChange={e=>setAnio(parseInt(e.target.value))}
+            style={{...fi, width:100}} min="2020" max={hoy.getFullYear()+1} />
+        </div>
+        <div style={{marginLeft:'auto', fontSize:12, color:C.muted, padding:'8px 0'}}>
+          Basado en documentos registrados en el sistema
+        </div>
+      </div>
+
+      {/* Formulario 104 */}
+      <div style={card}>
+        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16}}>
+          <div>
+            <div style={{fontWeight:800, fontSize:15, color:C.text}}>📋 Formulario 104 — Declaración de IVA</div>
+            <div style={{fontSize:12, color:C.muted, marginTop:2}}>
+              IVA cobrado en ventas vs IVA pagado en compras — período {periodo}
+            </div>
+          </div>
+          <div style={{display:'flex', gap:8}}>
+            <button onClick={calcular104} disabled={loading104} style={btn()}>
+              {loading104 ? 'Calculando...' : 'Calcular'}
+            </button>
+            {datos104 && (
+              <button onClick={()=>descargar('/sri/formulario104/excel',`F104_${periodo}.xlsx`,{periodo})}
+                style={btnO()}>
+                <Download size={13}/> Excel
+              </button>
+            )}
+          </div>
+        </div>
+
+        {datos104 && (
+          <div>
+            <div style={{display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10, marginBottom:12}}>
+              {[
+                {l:'Ventas base 0%',       v:datos104.ventas_base_0,   col:C.muted},
+                {l:'Ventas base 15%',      v:datos104.ventas_base_iva, col:'#3B82F6'},
+                {l:'IVA cobrado',          v:datos104.ventas_iva,      col:'#3B82F6'},
+                {l:'Compras base 0%',      v:datos104.compras_base_0,  col:C.muted},
+                {l:'Compras base 15%',     v:datos104.compras_base_iva,col:'#8B5CF6'},
+                {l:'Crédito tributario',   v:datos104.credito_tributario,col:'#8B5CF6'},
+                {l:'Retenciones IVA recibidas',v:datos104.retenciones_recibidas,col:'#F59E0B'},
+              ].map((it,i)=>(
+                <div key={i} style={{padding:'10px 14px', borderRadius:9,
+                  background:C.sur2, border:`1px solid ${C.border}`}}>
+                  <div style={{fontSize:10, color:C.muted, fontWeight:700,
+                    textTransform:'uppercase', letterSpacing:'.04em', marginBottom:4}}>{it.l}</div>
+                  <div style={{fontSize:16, fontWeight:800, color:it.col}}>{fmtN(it.v)}</div>
+                </div>
+              ))}
+            </div>
+            {/* Resultado destacado */}
+            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:12}}>
+              <div style={{padding:'16px 20px', borderRadius:10,
+                background: datos104.iva_a_pagar > 0 ? 'rgba(239,68,68,.1)' : 'rgba(16,185,129,.06)',
+                border: `2px solid ${datos104.iva_a_pagar > 0 ? '#EF4444' : '#10B981'}`}}>
+                <div style={{fontSize:11, fontWeight:700, color:datos104.iva_a_pagar>0?'#EF4444':'#10B981',
+                  textTransform:'uppercase', marginBottom:4}}>
+                  {datos104.iva_a_pagar > 0 ? '⚠️ IVA A PAGAR' : '✅ Sin saldo a pagar'}
+                </div>
+                <div style={{fontSize:28, fontWeight:900,
+                  color:datos104.iva_a_pagar>0?'#EF4444':'#10B981'}}>
+                  {fmtN(datos104.iva_a_pagar)}
+                </div>
+              </div>
+              <div style={{padding:'16px 20px', borderRadius:10,
+                background:'rgba(16,185,129,.06)', border:'1px solid rgba(16,185,129,.2)'}}>
+                <div style={{fontSize:11, fontWeight:700, color:'#10B981',
+                  textTransform:'uppercase', marginBottom:4}}>Crédito a favor</div>
+                <div style={{fontSize:28, fontWeight:900, color:'#10B981'}}>
+                  {fmtN(datos104.credito_a_favor)}
+                </div>
+              </div>
+            </div>
+            <div style={{marginTop:10, fontSize:11, color:C.muted}}>
+              Basado en {datos104.num_facturas} facturas de venta y {datos104.num_compras} compras del período
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ATS */}
+      <div style={card}>
+        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16}}>
+          <div>
+            <div style={{fontWeight:800, fontSize:15, color:C.text}}>📑 ATS — Anexo Transaccional Simplificado</div>
+            <div style={{fontSize:12, color:C.muted, marginTop:2}}>
+              Detalle completo de ventas y compras para presentar al SRI — período {periodo}
+            </div>
+          </div>
+          <div style={{display:'flex', gap:8}}>
+            <button onClick={calcularATS} disabled={loadingATS} style={btn('#8B5CF6')}>
+              {loadingATS ? 'Calculando...' : 'Calcular'}
+            </button>
+            {datosATS && (
+              <button onClick={()=>descargar('/sri/ats/excel',`ATS_${periodo}.xlsx`,{periodo})}
+                style={btnO()}>
+                <Download size={13}/> Excel (2 hojas)
+              </button>
+            )}
+          </div>
+        </div>
+
+        {datosATS && (
+          <div style={{display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10}}>
+            {[
+              {l:'Facturas venta', v:datosATS.resumen?.total_ventas,       col:'#3B82F6', u:'documentos'},
+              {l:'Base IVA ventas',v:fmtN(datosATS.resumen?.base_iva_ventas), col:'#3B82F6', u:'gravado'},
+              {l:'Facturas compra',v:datosATS.resumen?.total_compras,      col:'#8B5CF6', u:'documentos'},
+              {l:'Base IVA compras',v:fmtN(datosATS.resumen?.base_iva_compras),col:'#8B5CF6',u:'gravado'},
+            ].map((it,i)=>(
+              <div key={i} style={{padding:'12px', borderRadius:9, textAlign:'center',
+                background:C.sur2, border:`1px solid ${C.border}`}}>
+                <div style={{fontSize:20, fontWeight:900, color:it.col}}>{it.v}</div>
+                <div style={{fontSize:11, fontWeight:700, color:C.muted, marginTop:4}}>{it.l}</div>
+                <div style={{fontSize:10, color:C.hint}}>{it.u}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* RDEP */}
+      <div style={card}>
+        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+          <div>
+            <div style={{fontWeight:800, fontSize:15, color:C.text}}>👔 RDEP — Relación de Dependencia</div>
+            <div style={{fontSize:12, color:C.muted, marginTop:2}}>
+              Reporte anual de ingresos por empleado — año {anio}
+            </div>
+          </div>
+          <button onClick={()=>descargar('/sri/rdep/excel',`RDEP_${anio}.xlsx`,{anio})}
+            style={btn('#F59E0B')}>
+            <Download size={13}/> Descargar RDEP {anio}
+          </button>
+        </div>
+      </div>
+
+      {/* Aviso */}
+      <div style={{padding:'12px 16px', borderRadius:10, fontSize:12, lineHeight:1.7,
+        background:'rgba(245,158,11,.06)', border:'1px solid rgba(245,158,11,.2)', color:'#F59E0B'}}>
+        ⚠️ <strong>Importante:</strong> Estos formularios son de apoyo para su contador.
+        Verifique los valores con un profesional contable antes de la declaración oficial al SRI.
+        Los resultados dependen de que todos los documentos estén correctamente ingresados.
+      </div>
+    </div>
+  )
 }
