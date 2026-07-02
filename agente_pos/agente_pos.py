@@ -87,23 +87,29 @@ def asistente_configuracion():
     print("  El sistema ya está configurado para conectarse a:")
     print(f"  🌐  {NEXUS_URL_DEFAULT}")
     print()
-    print("  Ingresa las credenciales de acceso:")
+    print("  Ingresa los datos de acceso de tu empresa:")
     print()
-    usuario  = pedir("Usuario (ej: admin)", "admin")
-    password = pedir("Contraseña")
+    empresa_codigo = pedir("Código de empresa (te lo dio NEXUS al registrarte, ej: FARMACIABC)")
+    usuario        = pedir("Usuario", "admin")
+    password       = pedir("Contraseña")
 
     # Verificar credenciales
     print()
     print("  Verificando credenciales...", end="", flush=True)
     try:
         r = requests.post(f"{NEXUS_URL_DEFAULT}/auth/login",
-            data={"username": usuario, "password": password}, timeout=10)
+            data={"username": usuario, "password": password,
+                  "empresa_codigo": empresa_codigo}, timeout=10)
         if r.status_code == 200:
             token = r.json().get("access_token")
-            print(" ✅ Conectado!")
+            empresa_nombre = r.json().get("empresa_nombre", empresa_codigo)
+            print(f" ✅ Conectado — {empresa_nombre}")
         else:
-            print(" ❌ Error")
-            print(f"\n  Credenciales incorrectas. Verifica usuario y contraseña.")
+            detalle = ""
+            try: detalle = r.json().get("detail","")
+            except: pass
+            print(f" ❌ Error")
+            print(f"\n  {detalle or 'Datos incorrectos. Verifica código de empresa, usuario y contraseña.'}")
             input("\n  Presiona Enter para salir...")
             return None
     except Exception as e:
@@ -196,6 +202,7 @@ def asistente_configuracion():
 
     config = {
         "nexus_url":        NEXUS_URL_DEFAULT,
+        "empresa_codigo":   empresa_codigo,
         "usuario":          usuario,
         "password":         password,
         "terminal_id":      terminal_id,
@@ -381,11 +388,14 @@ class ClienteNexus:
     def login(self):
         try:
             r = requests.post(f"{self.base}/auth/login",
-                data={"username": self.config["usuario"], "password": self.config["password"]},
+                data={"username":       self.config["usuario"],
+                      "password":       self.config["password"],
+                      "empresa_codigo": self.config.get("empresa_codigo", "")},
                 timeout=10)
             if r.status_code == 200:
                 self.token = r.json().get("access_token")
                 return True
+            log.error(f"Login rechazado: {r.text[:100]}")
         except Exception as e:
             log.error(f"Error login: {e}")
         return False
@@ -425,6 +435,8 @@ def menu_principal(config):
     print("  ║        NEXUS POS — Agente de Terminal         ║")
     print("  ╚═══════════════════════════════════════════════╝")
     print()
+    print(f"  Empresa     : {config.get('empresa_codigo','—')}")
+    print(f"  Usuario     : {config.get('usuario','—')}")
     print(f"  Terminal ID : {config['terminal_id']}")
     print(f"  Procesador  : {config['procesador']}")
     print(f"  Pinpad      : {config['pinpad_ip']}:{config['pinpad_puerto']}")
