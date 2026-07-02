@@ -39,7 +39,8 @@ def save_config(data: dict, u=Depends(get_current_user)):
     if existe:
         campos = ["email_destino","email_activo","alerta_stock_bajo","stock_dias_revision",
                   "alerta_facturas_vencer","facturas_dias_aviso","alerta_cobros_vencidos",
-                  "cobros_dias_gracia","alerta_cumpleanos","hora_envio"]
+                  "cobros_dias_gracia","alerta_cumpleanos","hora_envio",
+                  "backup_auto","backup_hora","backup_email"]
         sets = ",".join(f"{c}=%s" for c in campos if c in data)
         vals = [data[c] for c in campos if c in data]
         if sets:
@@ -48,13 +49,16 @@ def save_config(data: dict, u=Depends(get_current_user)):
         insert("""INSERT INTO sys_alertas_config
             (email_destino,email_activo,alerta_stock_bajo,stock_dias_revision,
              alerta_facturas_vencer,facturas_dias_aviso,alerta_cobros_vencidos,
-             cobros_dias_gracia,alerta_cumpleanos,hora_envio)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+             cobros_dias_gracia,alerta_cumpleanos,hora_envio,
+             backup_auto,backup_hora,backup_email)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
             (data.get("email_destino",""), data.get("email_activo",False),
              data.get("alerta_stock_bajo",True), data.get("stock_dias_revision",1),
              data.get("alerta_facturas_vencer",True), data.get("facturas_dias_aviso",3),
              data.get("alerta_cobros_vencidos",True), data.get("cobros_dias_gracia",1),
-             data.get("alerta_cumpleanos",True), data.get("hora_envio","07:00")))
+             data.get("alerta_cumpleanos",True), data.get("hora_envio","07:00"),
+             data.get("backup_auto",False), data.get("backup_hora","03:00"),
+             data.get("backup_email","")))
     return {"msg": "Configuración guardada"}
 
 
