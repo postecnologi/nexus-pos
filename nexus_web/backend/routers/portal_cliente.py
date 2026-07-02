@@ -82,7 +82,7 @@ def portal_datos(token: str):
     """Retorna los datos del portal del cliente (sin autenticación — token en URL)."""
     acceso = _get_cliente_by_token(token)
     cliente_id = acceso["cliente_id"]
-    empresa = query_one("SELECT razon_social, logo_url, telefono, email FROM sys_empresas WHERE activa=true LIMIT 1") or {}
+    empresa = query_one("SELECT razon_social, telefono, email FROM sys_empresas WHERE activa=true LIMIT 1") or {}
 
     # Facturas
     facturas = query("""

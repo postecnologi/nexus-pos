@@ -71,10 +71,8 @@ export default function PortalCliente() {
         padding:'16px 24px',display:'flex',justifyContent:'space-between',
         alignItems:'center',flexWrap:'wrap',gap:12}}>
         <div style={{display:'flex',alignItems:'center',gap:14}}>
-          {empresa.logo_url && (
-            <img src={empresa.logo_url} alt="Logo"
-              style={{height:40,objectFit:'contain',borderRadius:6}}/>
-          )}
+          <div style={{width:40,height:40,borderRadius:8,background:'rgba(59,130,246,.2)',
+            display:'flex',alignItems:'center',justifyContent:'center',fontSize:20}}>🏢</div>
           <div>
             <div style={{fontWeight:800,fontSize:16,color:C.text}}>{empresa.razon_social}</div>
             <div style={{fontSize:11,color:C.muted}}>📞 {empresa.telefono} · ✉️ {empresa.email}</div>
