@@ -94,66 +94,78 @@ def _recopilar_alertas() -> dict:
 
     # ── Stock bajo ─────────────────────────────────────────────
     if cfg.get("alerta_stock_bajo", True):
-        productos = query("""
-            SELECT p.codigo, p.descripcion as nombre,
-                   COALESCE(SUM(s.cantidad),0) as stock_actual,
-                   p.stock_minimo
-            FROM inv_productos p
-            LEFT JOIN inv_stock s ON s.producto_id = p.id
-            WHERE p.activo = true AND p.stock_minimo > 0
-            GROUP BY p.id, p.codigo, p.descripcion, p.stock_minimo
-            HAVING COALESCE(SUM(s.cantidad),0) <= p.stock_minimo
-            ORDER BY p.descripcion
-        """)
-        alertas["stock_bajo"] = [dict(p) for p in productos]
+        try:
+            productos = query("""
+                SELECT p.codigo, p.descripcion as nombre,
+                       COALESCE(SUM(s.cantidad),0) as stock_actual,
+                       MAX(s.cantidad_minima) as stock_minimo
+                FROM inv_productos p
+                JOIN inv_stock s ON s.producto_id = p.id
+                WHERE p.activo = true AND s.cantidad_minima > 0
+                GROUP BY p.id, p.codigo, p.descripcion
+                HAVING COALESCE(SUM(s.cantidad),0) <= MAX(s.cantidad_minima)
+                ORDER BY p.descripcion
+            """)
+            alertas["stock_bajo"] = [dict(p) for p in productos]
+        except Exception:
+            alertas["stock_bajo"] = []
 
     # ── Facturas por vencer ────────────────────────────────────
     if cfg.get("alerta_facturas_vencer", True):
-        dias = int(cfg.get("facturas_dias_aviso", 3))
-        limite = hoy + timedelta(days=dias)
-        facturas = query("""
-            SELECT c.id, c.saldo, c.fecha_vencimiento,
-                   cl.razon_social as cliente, cl.email as cliente_email,
-                   cl.telefono as cliente_telefono
-            FROM fin_cxc c
-            JOIN ven_clientes cl ON cl.id = c.cliente_id
-            WHERE c.estado = 'PENDIENTE'
-              AND c.saldo > 0
-              AND c.fecha_vencimiento BETWEEN %s AND %s
-            ORDER BY c.fecha_vencimiento
-        """, (hoy, limite))
-        alertas["facturas_vencer"] = [dict(f) for f in facturas]
+        try:
+            dias = int(cfg.get("facturas_dias_aviso", 3))
+            limite = hoy + timedelta(days=dias)
+            facturas = query("""
+                SELECT c.id, c.saldo, c.fecha_vencimiento,
+                       cl.razon_social as cliente, cl.email as cliente_email,
+                       cl.telefono as cliente_telefono
+                FROM fin_cxc c
+                JOIN ven_clientes cl ON cl.id = c.cliente_id
+                WHERE c.estado = 'PENDIENTE'
+                  AND c.saldo > 0
+                  AND c.fecha_vencimiento BETWEEN %s AND %s
+                ORDER BY c.fecha_vencimiento
+            """, (hoy, limite))
+            alertas["facturas_vencer"] = [dict(f) for f in facturas]
+        except Exception:
+            alertas["facturas_vencer"] = []
 
     # ── Cobros vencidos ────────────────────────────────────────
     if cfg.get("alerta_cobros_vencidos", True):
-        gracia = int(cfg.get("cobros_dias_gracia", 1))
-        limite_venc = hoy - timedelta(days=gracia)
-        cobros = query("""
-            SELECT c.id, c.saldo, c.fecha_vencimiento,
-                   cl.razon_social as cliente, cl.email as cliente_email,
-                   cl.telefono as cliente_telefono,
-                   (CURRENT_DATE - c.fecha_vencimiento) as dias_vencido
-            FROM fin_cxc c
-            JOIN ven_clientes cl ON cl.id = c.cliente_id
-            WHERE c.estado = 'PENDIENTE'
-              AND c.saldo > 0
-              AND c.fecha_vencimiento < %s
-            ORDER BY c.fecha_vencimiento
-        """, (limite_venc,))
-        alertas["cobros_vencidos"] = [dict(c) for c in cobros]
+        try:
+            gracia = int(cfg.get("cobros_dias_gracia", 1))
+            limite_venc = hoy - timedelta(days=gracia)
+            cobros = query("""
+                SELECT c.id, c.saldo, c.fecha_vencimiento,
+                       cl.razon_social as cliente, cl.email as cliente_email,
+                       cl.telefono as cliente_telefono,
+                       (CURRENT_DATE - c.fecha_vencimiento) as dias_vencido
+                FROM fin_cxc c
+                JOIN ven_clientes cl ON cl.id = c.cliente_id
+                WHERE c.estado = 'PENDIENTE'
+                  AND c.saldo > 0
+                  AND c.fecha_vencimiento < %s
+                ORDER BY c.fecha_vencimiento
+            """, (limite_venc,))
+            alertas["cobros_vencidos"] = [dict(c) for c in cobros]
+        except Exception:
+            alertas["cobros_vencidos"] = []
 
     # ── Cumpleaños clientes ────────────────────────────────────
     if cfg.get("alerta_cumpleanos", True):
-        manana = hoy + timedelta(days=1)
-        cumples = query("""
-            SELECT id, razon_social as nombre, email, telefono, fecha_nacimiento
-            FROM ven_clientes
-            WHERE activo = true
-              AND fecha_nacimiento IS NOT NULL
-              AND EXTRACT(MONTH FROM fecha_nacimiento) = %s
-              AND EXTRACT(DAY FROM fecha_nacimiento) IN (%s, %s)
-        """, (hoy.month, hoy.day, manana.day))
-        alertas["cumpleanos"] = [dict(c) for c in cumples]
+        try:
+            manana = hoy + timedelta(days=1)
+            cumples = query("""
+                SELECT id, razon_social as nombre, email, telefono
+                FROM ven_clientes
+                WHERE activo = true
+                  AND fecha_nacimiento IS NOT NULL
+                  AND EXTRACT(MONTH FROM fecha_nacimiento) = %s
+                  AND EXTRACT(DAY FROM fecha_nacimiento) IN (%s, %s)
+            """, (hoy.month, hoy.day, manana.day))
+            alertas["cumpleanos"] = [dict(c) for c in cumples]
+        except Exception:
+            alertas["cumpleanos"] = []  # columna no existe en esta BD
 
     return alertas
 
