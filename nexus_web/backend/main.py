@@ -146,7 +146,7 @@ def iniciar_scheduler():
                             from pathlib import Path
                             from database import DB_CONFIG
                             ts       = ahora.strftime("%Y%m%d_%H%M")
-                            bk_dir   = Path(__file__).parent.parent / "backups"
+                            bk_dir   = Path(__file__).resolve().parent.parent.parent / "backups"
                             bk_dir.mkdir(exist_ok=True)
                             bk_file  = bk_dir / f"auto_backup_{ts}.sql"
                             env      = os.environ.copy()
