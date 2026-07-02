@@ -190,6 +190,9 @@ export default function Dashboard() {
     ventas_por_hora=[], comparativo_mes={},
     rentabilidad=[], alertas_stock=[],
     cotizaciones_pendientes=0,
+    vendedores_mes=[], top_clientes=[],
+    tendencia_anual=[], cobros_vencidos={},
+    nomina_mes={},
   } = data||{}
 
   const COLORS_BAR = ['#3B82F6','#10B981','#8B5CF6','#F59E0B','#EF4444']
@@ -526,6 +529,113 @@ export default function Dashboard() {
           )}
         </div>
       </div>
+
+      {/* ── KPIs adicionales: cobros vencidos + nómina ────── */}
+      <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:14,marginTop:24}}>
+        <KpiCard icon="🔴" title="Cobros vencidos" color={C.red}
+          value={fmt$(cobros_vencidos?.total)}
+          subtitle={`${cobros_vencidos?.cuentas||0} cuenta(s) por gestionar`}/>
+        <KpiCard icon="👔" title="Nómina del mes" color={C.purple}
+          value={fmt$(nomina_mes?.total_neto)}
+          subtitle={`${nomina_mes?.empleados||0} empleado(s) aprobados`}/>
+        <KpiCard icon="📝" title="Cotizaciones pendientes" color={C.cyan}
+          value={cotizaciones_pendientes||0}
+          subtitle="Sin convertir a factura"/>
+      </div>
+
+      {/* ── Tendencia anual + Vendedores vs Meta ─────────── */}
+      <div style={{display:'grid',gridTemplateColumns:'3fr 2fr',gap:16,marginTop:24}}>
+
+        {/* Tendencia 12 meses */}
+        <div style={{background:C.surface,borderRadius:14,padding:'18px 20px',
+          border:`1px solid ${C.bord2}`}}>
+          <div style={{fontSize:14,fontWeight:700,color:C.text,marginBottom:16}}>
+            📊 Tendencia últimos 12 meses
+          </div>
+          {tendencia_anual.length === 0
+            ? <div style={{color:C.hint,textAlign:'center',padding:'40px 0',fontSize:13}}>Sin datos históricos</div>
+            : <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={tendencia_anual}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={C.bord2}/>
+                  <XAxis dataKey="mes" tick={{fontSize:9,fill:C.hint}}
+                    tickFormatter={v=>v.slice(5)} stroke={C.bord2}/>
+                  <YAxis tick={{fontSize:9,fill:C.hint}}
+                    tickFormatter={v=>'$'+Number(v/1000).toFixed(0)+'k'} stroke={C.bord2}/>
+                  <Tooltip content={<DarkTooltip/>}/>
+                  <Bar dataKey="total" radius={[4,4,0,0]}>
+                    {tendencia_anual.map((_,i)=>(
+                      <Cell key={i} fill={i===tendencia_anual.length-1?C.blue:C.sur3}/>
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+          }
+        </div>
+
+        {/* Vendedores vs Meta */}
+        <div style={{background:C.surface,borderRadius:14,padding:'18px 20px',
+          border:`1px solid ${C.bord2}`}}>
+          <div style={{fontSize:14,fontWeight:700,color:C.text,marginBottom:16}}>
+            🎯 Vendedores vs Meta (mes)
+          </div>
+          {vendedores_mes.length === 0
+            ? <div style={{color:C.hint,textAlign:'center',padding:'30px 0',fontSize:13}}>Sin vendedores</div>
+            : <div style={{display:'flex',flexDirection:'column',gap:10}}>
+                {vendedores_mes.slice(0,6).map((v,i)=>{
+                  const pct = Math.min(100,Number(v.pct_meta||0))
+                  const col = pct>=100?C.green:pct>=70?C.amber:C.red
+                  return (
+                    <div key={i}>
+                      <div style={{display:'flex',justifyContent:'space-between',
+                        fontSize:11,marginBottom:4}}>
+                        <span style={{color:C.text,fontWeight:600,
+                          overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:'60%'}}>
+                          {v.vendedor.trim()}
+                        </span>
+                        <span style={{color:col,fontWeight:700,flexShrink:0}}>
+                          {fmt$(v.ventas)} {v.meta_mensual>0?`(${pct}%)`:''}</span>
+                      </div>
+                      {Number(v.meta_mensual||0)>0 && (
+                        <div style={{height:6,borderRadius:3,background:C.sur2,overflow:'hidden'}}>
+                          <div style={{height:'100%',borderRadius:3,background:col,
+                            width:`${pct}%`,transition:'width .5s'}}/>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+          }
+        </div>
+      </div>
+
+      {/* ── Top Clientes + Resumen nómina ─────────────────── */}
+      {top_clientes.length > 0 && (
+        <div style={{background:C.surface,borderRadius:14,padding:'18px 20px',
+          border:`1px solid ${C.bord2}`,marginTop:16}}>
+          <div style={{fontSize:14,fontWeight:700,color:C.text,marginBottom:12}}>
+            ⭐ Top 5 Clientes del mes
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:10}}>
+            {top_clientes.map((cl,i)=>(
+              <div key={i} style={{padding:'12px',borderRadius:10,
+                background:C.sur2,border:`1px solid ${C.bord2}`,textAlign:'center'}}>
+                <div style={{fontSize:20,marginBottom:6}}>
+                  {['🥇','🥈','🥉','4️⃣','5️⃣'][i]}
+                </div>
+                <div style={{fontSize:11,fontWeight:700,color:C.text,
+                  overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                  {cl.cliente}
+                </div>
+                <div style={{fontSize:13,fontWeight:900,color:C.green,marginTop:4}}>
+                  {fmt$(cl.total)}
+                </div>
+                <div style={{fontSize:10,color:C.hint}}>{cl.facturas} factura(s)</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ── Row: Cotizaciones Pendientes ──────────────────── */}
       {cotizaciones_pendientes > 0 && (

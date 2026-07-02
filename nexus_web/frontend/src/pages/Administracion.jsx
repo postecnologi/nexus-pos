@@ -6,7 +6,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import {
   Server, Database, HardDrive, Download, Upload, Trash2, RefreshCw,
   Shield, Search, Activity, AlertTriangle, CheckCircle, XCircle,
-  Clock, User, FileText, Plus, Monitor, Cpu, MemoryStick
+  Clock, User, FileText, Plus, Monitor, Cpu, MemoryStick, Bell, BookOpen
 } from 'lucide-react'
 import api from '../api'
 import { useTheme } from '../theme'
@@ -743,9 +743,11 @@ function TabSistema() {
 //  MAIN PAGE
 // ══════════════════════════════════════════════════════════════
 const TABS = [
-  { id: 'backups',    label: 'Backups',    icon: Database },
-  { id: 'auditoria',  label: 'Auditoria',  icon: Shield },
-  { id: 'sistema',    label: 'Sistema',    icon: Activity },
+  { id: 'backups',    label: 'Backups',          icon: Database  },
+  { id: 'auditoria',  label: 'Auditoria',         icon: Shield    },
+  { id: 'alertas',    label: 'Alertas',           icon: Bell      },
+  { id: 'sri',        label: 'Formularios SRI',   icon: BookOpen  },
+  { id: 'sistema',    label: 'Sistema',           icon: Activity  },
 ]
 
 export default function Administracion() {
@@ -799,9 +801,421 @@ export default function Administracion() {
       {/* Tab Content */}
       <div style={{ background: C.surface, borderRadius: 12, padding: 20,
         border: `1px solid ${C.bord2}`, minHeight: 400 }}>
-        {tab === 'backups' && <TabBackups />}
+        {tab === 'backups'   && <TabBackups />}
         {tab === 'auditoria' && <TabAuditoria />}
-        {tab === 'sistema' && <TabSistema />}
+        {tab === 'alertas'   && <TabAlertas />}
+        {tab === 'sri'       && <TabSRI />}
+        {tab === 'sistema'   && <TabSistema />}
+      </div>
+    </div>
+  )
+}
+
+// ══════════════════════════════════════════════════════════════
+//  TAB ALERTAS AUTOMÁTICAS
+// ══════════════════════════════════════════════════════════════
+function TabAlertas() {
+  const C = useTheme()
+  const hoy = new Date().toISOString().slice(0,7)
+  const [cfg, setCfg] = useState(null)
+  const [saving, setSaving] = useState(false)
+  const [testing, setTesting] = useState(false)
+  const [historial, setHistorial] = useState([])
+  const [preview, setPreview] = useState(null)
+  const [msg, setMsg] = useState(null)
+
+  useEffect(() => {
+    api.get('/alertas/config').then(r => setCfg(r.data)).catch(() => {})
+    api.get('/alertas/historial?limite=10').then(r => setHistorial(r.data||[])).catch(() => {})
+  }, [])
+
+  const guardar = async () => {
+    setSaving(true); setMsg(null)
+    try {
+      await api.put('/alertas/config', cfg)
+      setMsg({ ok: true, text: 'Configuración guardada' })
+    } catch(e) { setMsg({ ok: false, text: e.response?.data?.detail || 'Error' }) }
+    setSaving(false)
+  }
+
+  const probar = async () => {
+    setTesting(true); setMsg(null)
+    try {
+      const r = await api.get('/alertas/preview')
+      setPreview(r.data)
+    } catch(e) { setMsg({ ok: false, text: 'Error al obtener preview' }) }
+    setTesting(false)
+  }
+
+  const enviarAhora = async () => {
+    try {
+      await api.post('/alertas/verificar')
+      setMsg({ ok: true, text: 'Verificación iniciada — revisa tu email en unos segundos' })
+      setTimeout(() => api.get('/alertas/historial?limite=10').then(r=>setHistorial(r.data||[])), 3000)
+    } catch(e) { setMsg({ ok: false, text: 'Error' }) }
+  }
+
+  const s = (k, v) => setCfg(p => ({ ...p, [k]: v }))
+  const fi = { background:C.sur2, border:`1px solid ${C.bord2}`, borderRadius:7,
+    padding:'8px 12px', color:C.text, fontSize:13, outline:'none', boxSizing:'border-box' }
+  const lbl = { fontSize:11, fontWeight:600, color:C.muted, display:'block', marginBottom:4 }
+  const card = { background:C.surface, borderRadius:12, border:`1px solid ${C.bord2}`,
+    padding:20, marginBottom:16 }
+
+  if (!cfg) return <div style={{color:C.muted,padding:20}}>Cargando...</div>
+
+  return (
+    <div>
+      <div style={card}>
+        <div style={{fontWeight:700,fontSize:15,color:C.text,marginBottom:4}}>🔔 Alertas automáticas por email</div>
+        <div style={{fontSize:12,color:C.muted,marginBottom:20}}>
+          Cada día a la hora configurada el sistema revisa el negocio y envía un resumen por email.
+        </div>
+
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
+          <div style={{gridColumn:'1/-1',display:'flex',alignItems:'center',gap:12,padding:'12px 16px',
+            borderRadius:10,background:cfg.email_activo?'rgba(16,185,129,.08)':'rgba(100,116,139,.08)',
+            border:`1px solid ${cfg.email_activo?'rgba(16,185,129,.3)':C.bord2}`}}>
+            <input type="checkbox" checked={!!cfg.email_activo} onChange={e=>s('email_activo',e.target.checked)}
+              style={{width:18,height:18,cursor:'pointer',accentColor:C.green}}/>
+            <div>
+              <div style={{fontWeight:700,fontSize:13,color:cfg.email_activo?C.green:C.muted}}>
+                {cfg.email_activo ? '✅ Alertas activas' : '⭕ Alertas desactivadas'}
+              </div>
+              <div style={{fontSize:11,color:C.hint}}>El email se envía automáticamente cada día</div>
+            </div>
+          </div>
+
+          <div>
+            <label style={lbl}>Email destinatario (gerente/admin)</label>
+            <input value={cfg.email_destino||''} onChange={e=>s('email_destino',e.target.value)}
+              style={{...fi,width:'100%'}} placeholder="gerente@empresa.com" />
+          </div>
+          <div>
+            <label style={lbl}>Hora de envío diario</label>
+            <input type="time" value={cfg.hora_envio||'07:00'} onChange={e=>s('hora_envio',e.target.value)}
+              style={{...fi,width:'100%'}} />
+          </div>
+        </div>
+
+        <div style={{marginTop:20,display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:12}}>
+          {[
+            ['alerta_stock_bajo','⚠️ Stock bajo','Cuando un producto baja del mínimo','stock_dias_revision','Revisar cada (días)'],
+            ['alerta_facturas_vencer','🟡 Facturas por vencer','Días antes del vencimiento','facturas_dias_aviso','Avisar con (días) de anticipación'],
+            ['alerta_cobros_vencidos','🔴 Cobros vencidos','Cuentas que ya pasaron la fecha','cobros_dias_gracia','Días de gracia'],
+            ['alerta_cumpleanos','🎂 Cumpleaños clientes','Clientes que cumplen hoy o mañana',null,null],
+          ].map(([key,titulo,desc,keyNum,labelNum])=>(
+            <div key={key} style={{padding:'12px 16px',borderRadius:10,
+              background:cfg[key]?'rgba(59,130,246,.06)':C.sur2,
+              border:`1px solid ${cfg[key]?'rgba(59,130,246,.2)':C.bord2}`}}>
+              <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:keyNum?10:0}}>
+                <input type="checkbox" checked={!!cfg[key]} onChange={e=>s(key,e.target.checked)}
+                  style={{width:16,height:16,cursor:'pointer',accentColor:C.blue}}/>
+                <div>
+                  <div style={{fontWeight:700,fontSize:13,color:C.text}}>{titulo}</div>
+                  <div style={{fontSize:11,color:C.muted}}>{desc}</div>
+                </div>
+              </div>
+              {keyNum && cfg[key] && (
+                <div style={{marginTop:8}}>
+                  <label style={lbl}>{labelNum}</label>
+                  <input type="number" min="1" max="30" value={cfg[keyNum]||1}
+                    onChange={e=>s(keyNum,parseInt(e.target.value)||1)}
+                    style={{...fi,width:80}} />
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {msg && (
+          <div style={{marginTop:14,padding:'9px 14px',borderRadius:8,fontSize:13,
+            background:msg.ok?'rgba(16,185,129,.1)':'rgba(239,68,68,.1)',
+            border:`1px solid ${msg.ok?'#10B98133':'#EF444433'}`,
+            color:msg.ok?C.green:C.red}}>
+            {msg.ok?'✅':'❌'} {msg.text}
+          </div>
+        )}
+
+        <div style={{display:'flex',gap:10,marginTop:20,flexWrap:'wrap'}}>
+          <button onClick={probar} disabled={testing}
+            style={{padding:'9px 18px',borderRadius:9,border:`1px solid ${C.bord2}`,
+              background:C.sur2,color:C.text,cursor:'pointer',fontSize:13,fontWeight:600}}>
+            {testing?'Verificando...':'👁️ Ver preview'}
+          </button>
+          <button onClick={enviarAhora}
+            style={{padding:'9px 18px',borderRadius:9,border:'none',
+              background:'rgba(16,185,129,.2)',color:C.green,cursor:'pointer',fontSize:13,fontWeight:600}}>
+            📧 Enviar ahora
+          </button>
+          <button onClick={guardar} disabled={saving}
+            style={{padding:'9px 24px',borderRadius:9,border:'none',
+              background:C.blue,color:'white',cursor:'pointer',fontSize:13,fontWeight:700,marginLeft:'auto'}}>
+            {saving?'Guardando...':'Guardar configuración'}
+          </button>
+        </div>
+      </div>
+
+      {/* Preview */}
+      {preview && (
+        <div style={card}>
+          <div style={{fontWeight:700,fontSize:14,color:C.text,marginBottom:12}}>
+            👁️ Vista previa — qué se enviaría ahora
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10}}>
+            {[
+              ['⚠️','Stock bajo',preview.stock_bajo?.length||0,'productos',C.amber],
+              ['🔴','Cobros vencidos',preview.cobros_vencidos?.length||0,'cuentas',C.red],
+              ['🟡','Por vencer',preview.facturas_vencer?.length||0,'facturas',C.amber],
+              ['🎂','Cumpleaños',preview.cumpleanos?.length||0,'clientes',C.green],
+            ].map(([ico,lab,n,unit,col])=>(
+              <div key={lab} style={{padding:'12px',borderRadius:10,textAlign:'center',
+                background:n>0?`${col}15`:C.sur2,border:`1px solid ${n>0?col+'33':C.bord2}`}}>
+                <div style={{fontSize:24}}>{ico}</div>
+                <div style={{fontSize:22,fontWeight:900,color:n>0?col:C.muted}}>{n}</div>
+                <div style={{fontSize:11,color:C.muted}}>{lab}</div>
+                <div style={{fontSize:10,color:C.hint}}>{unit}</div>
+              </div>
+            ))}
+          </div>
+          {preview.cobros_vencidos?.length > 0 && (
+            <div style={{marginTop:12}}>
+              <div style={{fontSize:11,fontWeight:700,color:C.red,marginBottom:6}}>Cobros vencidos:</div>
+              {preview.cobros_vencidos.slice(0,3).map((c,i)=>(
+                <div key={i} style={{fontSize:12,color:C.muted,padding:'4px 0'}}>
+                  • {c.cliente} — <strong style={{color:C.red}}>${parseFloat(c.saldo).toFixed(2)}</strong>
+                  {' '}({c.dias_vencido} días vencido)
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Historial */}
+      {historial.length > 0 && (
+        <div style={card}>
+          <div style={{fontWeight:700,fontSize:14,color:C.text,marginBottom:12}}>
+            📋 Últimas 10 alertas enviadas
+          </div>
+          <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
+            <thead>
+              <tr style={{borderBottom:`1px solid ${C.bord2}`}}>
+                {['Fecha','Items','Email','Detalle'].map(h=>(
+                  <th key={h} style={{padding:'6px 10px',textAlign:'left',
+                    color:C.muted,fontWeight:700,fontSize:10,textTransform:'uppercase'}}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {historial.map(h=>(
+                <tr key={h.id} style={{borderBottom:`1px solid ${C.sur2}`}}>
+                  <td style={{padding:'8px 10px',color:C.text}}>
+                    {new Date(h.created_at).toLocaleString('es-EC')}
+                  </td>
+                  <td style={{padding:'8px 10px',color:C.blue,fontWeight:700}}>{h.total_items}</td>
+                  <td style={{padding:'8px 10px'}}>
+                    <span style={{padding:'2px 8px',borderRadius:6,fontSize:11,fontWeight:600,
+                      background:h.email_enviado?'rgba(16,185,129,.15)':'rgba(239,68,68,.15)',
+                      color:h.email_enviado?C.green:C.red}}>
+                      {h.email_enviado?'Enviado':'No enviado'}
+                    </span>
+                  </td>
+                  <td style={{padding:'8px 10px',color:C.muted,fontSize:11}}>{h.detalle}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ══════════════════════════════════════════════════════════════
+//  TAB FORMULARIOS SRI
+// ══════════════════════════════════════════════════════════════
+function TabSRI() {
+  const C = useTheme()
+  const hoy = new Date()
+  const periodoActual = `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}`
+  const [periodo, setPeriodo] = useState(periodoActual)
+  const [anio, setAnio] = useState(hoy.getFullYear())
+  const [datos104, setDatos104] = useState(null)
+  const [datosATS, setDatosATS] = useState(null)
+  const [loading104, setLoading104] = useState(false)
+  const [loadingATS, setLoadingATS] = useState(false)
+
+  const calcular104 = async () => {
+    setLoading104(true); setDatos104(null)
+    try {
+      const r = await api.get('/sri/formulario104', { params: { periodo } })
+      setDatos104(r.data)
+    } catch(e) { alert(e.response?.data?.detail || 'Error') }
+    setLoading104(false)
+  }
+
+  const calcularATS = async () => {
+    setLoadingATS(true); setDatosATS(null)
+    try {
+      const r = await api.get('/sri/ats', { params: { periodo } })
+      setDatosATS(r.data)
+    } catch(e) { alert(e.response?.data?.detail || 'Error') }
+    setLoadingATS(false)
+  }
+
+  const descargar = async (url, filename) => {
+    try {
+      const r = await api.get(url, { responseType: 'blob', params: url.includes('rdep') ? { anio } : { periodo } })
+      const link = document.createElement('a')
+      link.href = URL.createObjectURL(new Blob([r.data]))
+      link.download = filename; link.click()
+    } catch(e) { alert('Error al descargar') }
+  }
+
+  const fi = { background:C.sur2, border:`1px solid ${C.bord2}`, borderRadius:7,
+    padding:'8px 12px', color:C.text, fontSize:13, outline:'none' }
+  const card = { background:C.surface, borderRadius:12, border:`1px solid ${C.bord2}`, padding:20, marginBottom:16 }
+  const fmtN = v => `$${parseFloat(v||0).toLocaleString('es-EC',{minimumFractionDigits:2,maximumFractionDigits:2})}`
+
+  return (
+    <div>
+      <div style={{...card, display:'flex', gap:12, alignItems:'flex-end', flexWrap:'wrap'}}>
+        <div>
+          <label style={{fontSize:11,fontWeight:600,color:C.muted,display:'block',marginBottom:4}}>
+            Período (mes)
+          </label>
+          <input type="month" value={periodo} onChange={e=>setPeriodo(e.target.value)} style={fi} />
+        </div>
+        <div>
+          <label style={{fontSize:11,fontWeight:600,color:C.muted,display:'block',marginBottom:4}}>
+            Año (para RDEP)
+          </label>
+          <input type="number" value={anio} onChange={e=>setAnio(parseInt(e.target.value))}
+            style={{...fi,width:100}} min="2020" max={hoy.getFullYear()+1} />
+        </div>
+      </div>
+
+      {/* Formulario 104 */}
+      <div style={card}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
+          <div>
+            <div style={{fontWeight:700,fontSize:15,color:C.text}}>📋 Formulario 104 — Declaración IVA</div>
+            <div style={{fontSize:12,color:C.muted,marginTop:2}}>
+              Resumen mensual de IVA cobrado en ventas vs IVA pagado en compras
+            </div>
+          </div>
+          <div style={{display:'flex',gap:8}}>
+            <button onClick={calcular104} disabled={loading104}
+              style={{padding:'9px 18px',borderRadius:9,border:'none',
+                background:C.blue,color:'white',cursor:'pointer',fontSize:13,fontWeight:700}}>
+              {loading104?'Calculando...':'Calcular'}
+            </button>
+            {datos104 && (
+              <button onClick={()=>descargar('/sri/formulario104/excel',`F104_${periodo}.xlsx`)}
+                style={{padding:'9px 18px',borderRadius:9,border:`1px solid ${C.green}44`,
+                  background:'rgba(16,185,129,.1)',color:C.green,cursor:'pointer',fontSize:13,fontWeight:700}}>
+                ⬇️ Excel
+              </button>
+            )}
+          </div>
+        </div>
+
+        {datos104 && (
+          <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:12}}>
+            {[
+              {label:'Ventas base 0%',val:datos104.ventas_base_0,col:C.muted},
+              {label:'Ventas base IVA 15%',val:datos104.ventas_base_iva,col:C.blue},
+              {label:'IVA cobrado',val:datos104.ventas_iva,col:C.blue},
+              {label:'Compras base 0%',val:datos104.compras_base_0,col:C.muted},
+              {label:'Compras base IVA',val:datos104.compras_base_iva,col:C.purple},
+              {label:'Crédito tributario',val:datos104.credito_tributario,col:C.purple},
+              {label:'Retenciones recibidas',val:datos104.retenciones_recibidas,col:C.amber},
+              {label:'IVA A PAGAR',val:datos104.iva_a_pagar,col:C.red,grande:true},
+              {label:'Crédito a favor',val:datos104.credito_a_favor,col:C.green,grande:datos104.credito_a_favor>0},
+            ].map((item,i)=>(
+              <div key={i} style={{padding:'12px 16px',borderRadius:10,
+                background:C.sur2,border:`1px solid ${C.bord2}`}}>
+                <div style={{fontSize:10,fontWeight:700,color:C.muted,
+                  textTransform:'uppercase',letterSpacing:'.04em',marginBottom:4}}>
+                  {item.label}
+                </div>
+                <div style={{fontSize:item.grande?22:16,fontWeight:item.grande?900:700,color:item.col}}>
+                  {fmtN(item.val)}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ATS */}
+      <div style={card}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
+          <div>
+            <div style={{fontWeight:700,fontSize:15,color:C.text}}>📑 ATS — Anexo Transaccional</div>
+            <div style={{fontSize:12,color:C.muted,marginTop:2}}>
+              Detalle de todas las ventas y compras del período para declarar al SRI
+            </div>
+          </div>
+          <div style={{display:'flex',gap:8}}>
+            <button onClick={calcularATS} disabled={loadingATS}
+              style={{padding:'9px 18px',borderRadius:9,border:'none',
+                background:C.purple,color:'white',cursor:'pointer',fontSize:13,fontWeight:700}}>
+              {loadingATS?'Calculando...':'Calcular'}
+            </button>
+            {datosATS && (
+              <button onClick={()=>descargar('/sri/ats/excel',`ATS_${periodo}.xlsx`)}
+                style={{padding:'9px 18px',borderRadius:9,border:`1px solid ${C.green}44`,
+                  background:'rgba(16,185,129,.1)',color:C.green,cursor:'pointer',fontSize:13,fontWeight:700}}>
+                ⬇️ Excel
+              </button>
+            )}
+          </div>
+        </div>
+
+        {datosATS && (
+          <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10}}>
+            {[
+              {l:'Facturas de venta',v:datosATS.resumen?.total_ventas,col:C.blue,u:'documentos'},
+              {l:'Total ventas IVA',v:fmtN(datosATS.resumen?.base_iva_ventas),col:C.blue,u:'base gravada'},
+              {l:'Facturas de compra',v:datosATS.resumen?.total_compras,col:C.purple,u:'documentos'},
+              {l:'Total compras IVA',v:fmtN(datosATS.resumen?.base_iva_compras),col:C.purple,u:'base gravada'},
+            ].map((item,i)=>(
+              <div key={i} style={{padding:'12px',borderRadius:10,background:C.sur2,
+                border:`1px solid ${C.bord2}`,textAlign:'center'}}>
+                <div style={{fontSize:20,fontWeight:900,color:item.col}}>{item.v}</div>
+                <div style={{fontSize:11,fontWeight:700,color:C.muted,marginTop:4}}>{item.l}</div>
+                <div style={{fontSize:10,color:C.hint}}>{item.u}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* RDEP */}
+      <div style={card}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+          <div>
+            <div style={{fontWeight:700,fontSize:15,color:C.text}}>👔 RDEP — Relación de Dependencia</div>
+            <div style={{fontSize:12,color:C.muted,marginTop:2}}>
+              Reporte anual de ingresos de empleados en relación de dependencia
+            </div>
+          </div>
+          <button onClick={()=>descargar('/sri/rdep/excel',`RDEP_${anio}.xlsx`)}
+            style={{padding:'9px 18px',borderRadius:9,border:'none',
+              background:C.amber,color:'#000',cursor:'pointer',fontSize:13,fontWeight:700}}>
+            ⬇️ Descargar RDEP {anio}
+          </button>
+        </div>
+      </div>
+
+      <div style={{padding:'12px 16px',borderRadius:10,
+        background:'rgba(245,158,11,.06)',border:'1px solid rgba(245,158,11,.2)',
+        fontSize:12,color:C.amber,lineHeight:1.7}}>
+        ⚠️ <strong>Importante:</strong> Estos formularios son referenciales y de apoyo para su contador.
+        Siempre verifique los valores con un profesional contable antes de presentar la declaración oficial al SRI.
+        Los valores dependen de que todos los documentos estén correctamente ingresados en el sistema.
       </div>
     </div>
   )

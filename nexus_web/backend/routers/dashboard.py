@@ -183,6 +183,85 @@ def dashboard(u=Depends(get_current_user)):
     except Exception:
         cotizaciones_pendientes = 0
 
+    # ── Ventas por vendedor (meta vs real este mes) ─────────────
+    try:
+        vendedores_mes = query(f"""
+            SELECT v.nombre || ' ' || COALESCE(v.apellidos,'') as vendedor,
+                   v.meta_mensual,
+                   COALESCE(SUM(f.total),0) as ventas,
+                   CASE WHEN v.meta_mensual > 0
+                        THEN ROUND((COALESCE(SUM(f.total),0) / v.meta_mensual * 100)::numeric, 1)
+                        ELSE 0 END as pct_meta
+            FROM ven_vendedores v
+            LEFT JOIN ven_facturas f ON f.vendedor_id = v.id
+                AND f.estado = 'EMITIDA'
+                AND f.fecha_emision >= DATE_TRUNC('month', CURRENT_DATE)
+            WHERE v.activo = true
+            GROUP BY v.id, v.nombre, v.apellidos, v.meta_mensual
+            ORDER BY ventas DESC
+            LIMIT 10
+        """)
+    except Exception:
+        vendedores_mes = []
+
+    # ── Top 5 clientes del mes ───────────────────────────────
+    try:
+        top_clientes = query(f"""
+            SELECT cl.razon_social as cliente,
+                   COUNT(*) as facturas,
+                   SUM(f.total) as total
+            FROM ven_facturas f
+            JOIN ven_clientes cl ON cl.id = f.cliente_id
+            WHERE f.estado = 'EMITIDA'
+              AND f.fecha_emision >= DATE_TRUNC('month', CURRENT_DATE)
+              {suc_filter_v}
+            GROUP BY cl.razon_social
+            ORDER BY total DESC LIMIT 5
+        """, suc_params)
+    except Exception:
+        top_clientes = []
+
+    # ── Tendencia últimos 12 meses ───────────────────────────
+    try:
+        tendencia_anual = query(f"""
+            SELECT TO_CHAR(DATE_TRUNC('month', fecha_emision), 'YYYY-MM') as mes,
+                   COALESCE(SUM(total), 0) as total,
+                   COUNT(*) as facturas
+            FROM ven_facturas
+            WHERE estado = 'EMITIDA'
+              AND fecha_emision >= DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '11 months'
+              {suc_filter_v}
+            GROUP BY DATE_TRUNC('month', fecha_emision)
+            ORDER BY mes
+        """, suc_params)
+    except Exception:
+        tendencia_anual = []
+
+    # ── Cobros vencidos resumidos ────────────────────────────
+    try:
+        cobros_vencidos = query_one("""
+            SELECT COALESCE(SUM(saldo),0) as total,
+                   COUNT(*) as cuentas
+            FROM fin_cxc
+            WHERE estado = 'PENDIENTE' AND saldo > 0
+              AND fecha_vencimiento < CURRENT_DATE
+        """)
+    except Exception:
+        cobros_vencidos = {"total": 0, "cuentas": 0}
+
+    # ── Nómina del mes ───────────────────────────────────────
+    try:
+        nomina_mes = query_one("""
+            SELECT COALESCE(SUM(neto_a_pagar),0) as total_neto,
+                   COALESCE(SUM(total_ingresos),0) as total_ingresos,
+                   COUNT(*) as empleados
+            FROM nom_roles_pago
+            WHERE periodo = TO_CHAR(CURRENT_DATE, 'YYYY-MM')
+              AND estado = 'APROBADO'
+        """)
+    except Exception:
+        nomina_mes = {"total_neto": 0, "total_ingresos": 0, "empleados": 0}
+
     return {
         "ventas_hoy":      ventas_hoy,
         "ventas_mes":      ventas_mes,
@@ -194,9 +273,14 @@ def dashboard(u=Depends(get_current_user)):
         "top_productos":   top_productos,
         "sucursal_id":     suc_id,
         "sucursal_nombre": sucursal_nombre,
-        "ventas_por_hora":          ventas_por_hora,
-        "comparativo_mes":          comparativo_mes,
-        "rentabilidad":             rentabilidad,
-        "alertas_stock":            alertas_stock,
-        "cotizaciones_pendientes":  cotizaciones_pendientes,
+        "ventas_por_hora":         ventas_por_hora,
+        "comparativo_mes":         comparativo_mes,
+        "rentabilidad":            rentabilidad,
+        "alertas_stock":           alertas_stock,
+        "cotizaciones_pendientes": cotizaciones_pendientes,
+        "vendedores_mes":          vendedores_mes,
+        "top_clientes":            top_clientes,
+        "tendencia_anual":         tendencia_anual,
+        "cobros_vencidos":         cobros_vencidos,
+        "nomina_mes":              nomina_mes,
     }

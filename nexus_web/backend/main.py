@@ -14,7 +14,8 @@ from routers import (
     crm, retenciones, notas_debito, contabilidad,
     guias_remision, liquidaciones, nomina, admin, superadmin,
     whatsapp, depositos, notas_venta, ordenes_compra, crm_comunicaciones,
-    biometrico, importar, importar_historicos, pos_terminal, horarios,
+    biometrico, importar, importar_historicos, pos_terminal, horarios, alertas,
+    sri_formularios,
 )
 
 app = FastAPI(title="NEXUS POS API", version="2.0.0")
@@ -107,6 +108,37 @@ app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 
 # ── Migraciones automáticas ──────────────────────────────────
 ALL_MIGRATIONS = []
+
+@app.on_event("startup")
+def iniciar_scheduler():
+    """Inicia el scheduler de alertas automáticas diarias."""
+    import threading, time as _time
+    from datetime import datetime as _dt
+
+    def _loop():
+        ultima_ejecucion = None
+        while True:
+            try:
+                from database import query_one as _qo
+                cfg = _qo("SELECT hora_envio, email_activo FROM sys_alertas_config LIMIT 1")
+                if cfg and cfg.get("email_activo"):
+                    hora_cfg = cfg.get("hora_envio", "07:00")
+                    ahora = _dt.now()
+                    clave_hoy = f"{ahora.date()}_{hora_cfg}"
+                    hora_parts = hora_cfg.split(":")
+                    if (ahora.hour == int(hora_parts[0]) and
+                            ahora.minute >= int(hora_parts[1]) and
+                            ultima_ejecucion != clave_hoy):
+                        ultima_ejecucion = clave_hoy
+                        from routers.alertas import _verificar_y_notificar
+                        _verificar_y_notificar()
+            except Exception:
+                pass
+            _time.sleep(60)  # Revisar cada minuto
+
+    t = threading.Thread(target=_loop, daemon=True)
+    t.start()
+
 
 @app.on_event("startup")
 def run_migrations():
@@ -625,6 +657,27 @@ def run_migrations():
             UNIQUE(horario_id, dia_semana)
         )""",
         "ALTER TABLE nom_empleados ADD COLUMN IF NOT EXISTS horario_id INTEGER REFERENCES nom_horarios(id)",
+        """CREATE TABLE IF NOT EXISTS sys_alertas_config (
+            id SERIAL PRIMARY KEY,
+            email_destino VARCHAR(200) DEFAULT '',
+            email_activo BOOLEAN DEFAULT false,
+            alerta_stock_bajo BOOLEAN DEFAULT true,
+            stock_dias_revision INTEGER DEFAULT 1,
+            alerta_facturas_vencer BOOLEAN DEFAULT true,
+            facturas_dias_aviso INTEGER DEFAULT 3,
+            alerta_cobros_vencidos BOOLEAN DEFAULT true,
+            cobros_dias_gracia INTEGER DEFAULT 1,
+            alerta_cumpleanos BOOLEAN DEFAULT true,
+            hora_envio VARCHAR(5) DEFAULT '07:00'
+        )""",
+        """CREATE TABLE IF NOT EXISTS sys_alertas_log (
+            id SERIAL PRIMARY KEY,
+            tipo VARCHAR(50),
+            total_items INTEGER DEFAULT 0,
+            email_enviado BOOLEAN DEFAULT false,
+            detalle TEXT,
+            created_at TIMESTAMP DEFAULT NOW()
+        )""",
         "ALTER TABLE nom_asistencia ADD COLUMN IF NOT EXISTS minutos_retraso INTEGER DEFAULT 0",
         "ALTER TABLE nom_asistencia ADD COLUMN IF NOT EXISTS observacion TEXT",
         """CREATE TABLE IF NOT EXISTS nom_bio_usuarios_cache (
@@ -825,6 +878,8 @@ app.include_router(biometrico.router)
 app.include_router(importar.router)
 app.include_router(pos_terminal.router)
 app.include_router(horarios.router)
+app.include_router(alertas.router)
+app.include_router(sri_formularios.router)
 importar_historicos  # registra endpoints históricos en importar.router
 if MULTI_TENANT:
     app.include_router(superadmin.router)
