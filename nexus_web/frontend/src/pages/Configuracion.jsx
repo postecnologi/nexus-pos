@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import {
   Building, MapPin, Warehouse, Check, X,
   Plus, Edit2, ToggleLeft, ToggleRight, ChevronDown,
-  ChevronUp, Star, Package, Shield, Upload, FileCheck, AlertTriangle, Download
+  ChevronUp, Star, Package, Shield, Upload, FileCheck, AlertTriangle, Download, CreditCard, Trash2
 } from 'lucide-react'
 import api from '../api'
 import LogoUploader from '../components/LogoUploader'
@@ -86,11 +86,12 @@ const BLANK_BOD = {
   responsable:'',telefono:'',es_principal:false,activa:true
 }
 const TABS = [
-  {id:'empresa',   icon:Building,  label:'Empresa'   },
-  {id:'sucursales',icon:MapPin,    label:'Sucursales'},
-  {id:'bodegas',   icon:Warehouse, label:'Bodegas'   },
-  {id:'sri',       icon:Shield,    label:'Facturación Electrónica'},
-  {id:'importar',  icon:Upload,    label:'Importar datos'},
+  {id:'empresa',   icon:Building,    label:'Empresa'   },
+  {id:'sucursales',icon:MapPin,      label:'Sucursales'},
+  {id:'bodegas',   icon:Warehouse,   label:'Bodegas'   },
+  {id:'terminales',icon:CreditCard,  label:'Terminales POS'},
+  {id:'sri',       icon:Shield,      label:'Facturación Electrónica'},
+  {id:'importar',  icon:Upload,      label:'Importar datos'},
 ]
 
 export default function Configuracion() {
@@ -644,6 +645,9 @@ export default function Configuracion() {
           </div>
         )}
 
+        {/* ══════════ TERMINALES POS ══════════ */}
+        {tab==='terminales'&&<PanelTerminales C={C} SI={SI}/>}
+
         {/* ══════════ SRI ══════════ */}
         {tab==='sri'&&<PanelSRI msg={msg} setMsg={setMsg}/>}
 
@@ -906,6 +910,228 @@ export default function Configuracion() {
   )
 }
 
+
+// ══════════════════════════════════════════════════════════════
+//  PANEL TERMINALES POS
+// ══════════════════════════════════════════════════════════════
+function PanelTerminales({ C, SI }) {
+  const [terminales, setTerminales] = useState([])
+  const [sucursales, setSucursales] = useState([])
+  const [cajas, setCajas]           = useState([])
+  const [modal, setModal]           = useState(null) // null | {} | terminal
+  const [form, setForm]             = useState({nombre:'',procesador:'DATAFAST',sucursal_id:'',caja_id:'',terminal_id:''})
+  const [saving, setSaving]         = useState(false)
+  const [msg, setMsg]               = useState('')
+
+  const cargar = () => {
+    api.get('/pos/terminales').then(r=>setTerminales(r.data||[])).catch(()=>{})
+  }
+  useEffect(()=>{
+    cargar()
+    api.get('/sucursales').then(r=>setSucursales(r.data||[])).catch(()=>{})
+    api.get('/cajas').then(r=>setCajas(r.data||[])).catch(()=>{})
+  },[])
+
+  const abrirNuevo = () => { setForm({nombre:'',procesador:'DATAFAST',sucursal_id:'',caja_id:'',terminal_id:''}); setModal({}) }
+  const abrirEditar = t => { setForm({nombre:t.nombre,procesador:t.procesador,sucursal_id:t.sucursal_id||'',caja_id:t.caja_id||'',terminal_id:t.terminal_id||''}); setModal(t) }
+
+  const guardar = async () => {
+    if (!form.nombre) return setMsg('⚠️ El nombre es obligatorio')
+    setSaving(true); setMsg('')
+    try {
+      if (modal?.id) await api.put(`/pos/terminales/${modal.id}`, form)
+      else           await api.post('/pos/terminales', form)
+      setModal(null); cargar()
+    } catch(e) { setMsg('❌ '+(e.response?.data?.detail||e.message)) }
+    setSaving(false)
+  }
+
+  const toggle = async t => {
+    await api.patch(`/pos/terminales/${t.id}/toggle`).catch(()=>{})
+    cargar()
+  }
+
+  const cajasFiltradas = form.sucursal_id
+    ? cajas.filter(c=>String(c.sucursal_id)===String(form.sucursal_id))
+    : cajas
+
+  const PROCESADORES = [
+    {id:'DATAFAST', label:'Datafast', desc:'Banco del Austro, Bolivariano, Internacional, etc.'},
+    {id:'MEDIANET', label:'Medianet', desc:'Banco Pichincha'},
+  ]
+
+  const fi = {background:C.sur2,border:`1px solid ${C.bord2}`,borderRadius:7,padding:'8px 12px',color:C.text,fontSize:13,width:'100%',outline:'none',boxSizing:'border-box'}
+  const lbl = {fontSize:11,fontWeight:600,color:C.muted,display:'block',marginBottom:4}
+
+  return (
+    <div>
+      {/* Info */}
+      <div style={{padding:'12px 16px',borderRadius:10,background:C.sur2,border:`1px solid ${C.bord2}`,marginBottom:20}}>
+        <div style={{fontWeight:700,fontSize:13,color:C.text,marginBottom:6}}>💳 Terminales de pago con tarjeta (Pinpad)</div>
+        <div style={{fontSize:12,color:C.muted,lineHeight:1.8}}>
+          Cada caja puede tener su propio terminal físico. Para usarlo:<br/>
+          1. Registra el terminal aquí y asígnalo a una caja<br/>
+          2. Instala el <strong style={{color:C.text}}>agente local</strong> en el PC de esa caja (archivo <code>agente_pos.py</code>)<br/>
+          3. El estado 🟢 / 🔴 indica si el agente está activo en tiempo real
+        </div>
+      </div>
+
+      {msg && <div style={{padding:'9px 14px',borderRadius:8,marginBottom:12,fontSize:13,
+        color:msg.startsWith('❌')?C.red:C.amber,
+        background:msg.startsWith('❌')?C.redD:C.amberD,
+        border:`1px solid ${msg.startsWith('❌')?'#EF444444':'#F59E0B44'}`}}>{msg}</div>}
+
+      <div style={{display:'flex',justifyContent:'flex-end',marginBottom:14}}>
+        <button onClick={abrirNuevo}
+          style={{display:'flex',alignItems:'center',gap:6,padding:'9px 18px',borderRadius:9,
+            border:'none',background:C.blue,color:'white',fontWeight:700,fontSize:13,cursor:'pointer'}}>
+          <Plus size={14}/> Nuevo terminal
+        </button>
+      </div>
+
+      {terminales.length===0 ? (
+        <div style={{textAlign:'center',padding:40,color:C.hint,background:C.surface,
+          borderRadius:12,border:`1px solid ${C.bord2}`}}>
+          <CreditCard size={36} style={{opacity:.3,marginBottom:12}}/>
+          <div style={{fontSize:13}}>No hay terminales configurados</div>
+          <div style={{fontSize:11,marginTop:4}}>Agrega uno con el botón de arriba</div>
+        </div>
+      ) : (
+        <div style={{display:'flex',flexDirection:'column',gap:10}}>
+          {terminales.map(t=>(
+            <div key={t.id} style={{background:C.surface,borderRadius:12,
+              border:`1px solid ${t.activo?C.bord2:'rgba(100,116,139,.3)'}`,
+              padding:'14px 18px',display:'flex',alignItems:'center',gap:16,
+              opacity:t.activo?1:.6}}>
+
+              {/* Estado agente */}
+              <div style={{fontSize:24}}>{t.agente_activo ? '🟢' : '🔴'}</div>
+
+              {/* Info */}
+              <div style={{flex:1}}>
+                <div style={{fontWeight:700,fontSize:14,color:C.text}}>{t.nombre}</div>
+                <div style={{fontSize:11,color:C.muted,marginTop:2,display:'flex',gap:12}}>
+                  <span style={{padding:'2px 8px',borderRadius:6,fontWeight:600,fontSize:10,
+                    background:t.procesador==='DATAFAST'?'rgba(59,130,246,.15)':'rgba(139,92,246,.15)',
+                    color:t.procesador==='DATAFAST'?C.blue:C.purple}}>
+                    {t.procesador}
+                  </span>
+                  {t.sucursal_nombre && <span>🏢 {t.sucursal_nombre}</span>}
+                  {t.caja_nombre && <span>🖥️ {t.caja_nombre}</span>}
+                  {t.agente_activo
+                    ? <span style={{color:C.green}}>✅ Agente conectado</span>
+                    : <span style={{color:C.muted}}>⚠️ Agente desconectado</span>}
+                </div>
+              </div>
+
+              {/* Acciones */}
+              <div style={{display:'flex',gap:8}}>
+                <button onClick={()=>abrirEditar(t)}
+                  style={{padding:'6px 12px',borderRadius:7,border:`1px solid ${C.bord2}`,
+                    background:C.sur2,color:C.muted,cursor:'pointer',fontSize:12,
+                    display:'flex',alignItems:'center',gap:5}}>
+                  <Edit2 size={12}/> Editar
+                </button>
+                <button onClick={()=>toggle(t)}
+                  style={{padding:'6px 12px',borderRadius:7,border:'none',cursor:'pointer',fontSize:12,
+                    background:t.activo?'rgba(239,68,68,.15)':'rgba(16,185,129,.15)',
+                    color:t.activo?C.red:C.green}}>
+                  {t.activo ? 'Desactivar' : 'Activar'}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Modal nuevo / editar */}
+      {modal!==null && (
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.7)',
+          display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999}}>
+          <div style={{background:C.surface,borderRadius:16,border:`1px solid ${C.bord2}`,
+            padding:28,width:500,maxHeight:'90vh',overflowY:'auto'}}>
+
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
+              <div style={{fontWeight:800,fontSize:16,color:C.text}}>
+                {modal?.id ? '✏️ Editar terminal' : '➕ Nuevo terminal POS'}
+              </div>
+              <button onClick={()=>setModal(null)}
+                style={{background:'none',border:'none',color:C.muted,cursor:'pointer',fontSize:22}}>×</button>
+            </div>
+
+            <div style={{display:'flex',flexDirection:'column',gap:14}}>
+              <div>
+                <label style={lbl}>Nombre del terminal *</label>
+                <input value={form.nombre} onChange={e=>setForm(p=>({...p,nombre:e.target.value}))}
+                  style={fi} placeholder="Ej: Caja 1 — Datafast" />
+              </div>
+
+              <div>
+                <label style={lbl}>Procesador de pago *</label>
+                <div style={{display:'flex',gap:8}}>
+                  {PROCESADORES.map(p=>(
+                    <button key={p.id} onClick={()=>setForm(f=>({...f,procesador:p.id}))}
+                      style={{flex:1,padding:'10px 12px',borderRadius:9,cursor:'pointer',
+                        border:`2px solid ${form.procesador===p.id?C.blue:C.bord2}`,
+                        background:form.procesador===p.id?'rgba(59,130,246,.1)':C.sur2,
+                        textAlign:'left'}}>
+                      <div style={{fontWeight:700,fontSize:13,color:form.procesador===p.id?C.blue:C.text}}>{p.label}</div>
+                      <div style={{fontSize:10,color:C.muted,marginTop:2}}>{p.desc}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label style={lbl}>Sucursal</label>
+                <select value={form.sucursal_id} onChange={e=>setForm(f=>({...f,sucursal_id:e.target.value,caja_id:''}))} style={fi}>
+                  <option value="">— Seleccionar sucursal —</option>
+                  {sucursales.map(s=><option key={s.id} value={s.id}>{s.nombre}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label style={lbl}>Caja asignada</label>
+                <select value={form.caja_id} onChange={e=>setForm(f=>({...f,caja_id:e.target.value}))} style={fi}
+                  disabled={!form.sucursal_id}>
+                  <option value="">— Seleccionar caja —</option>
+                  {cajasFiltradas.map(c=><option key={c.id} value={c.id}>{c.nombre}</option>)}
+                </select>
+                {!form.sucursal_id && <div style={{fontSize:10,color:C.hint,marginTop:3}}>Selecciona primero la sucursal</div>}
+              </div>
+
+              <div>
+                <label style={lbl}>ID / Serial del terminal (opcional)</label>
+                <input value={form.terminal_id} onChange={e=>setForm(f=>({...f,terminal_id:e.target.value}))}
+                  style={fi} placeholder="Número de serie del equipo" />
+              </div>
+
+              <div style={{padding:'10px 14px',borderRadius:8,
+                background:'rgba(59,130,246,.06)',border:'1px solid rgba(59,130,246,.2)',fontSize:11,color:C.muted}}>
+                💡 Después de guardar, configura el <strong style={{color:C.text}}>agente local</strong> en el PC
+                de esta caja con el ID <strong style={{color:C.blue}}>{modal?.id || '(se asigna al guardar)'}</strong>
+              </div>
+            </div>
+
+            {msg && <div style={{marginTop:12,padding:'9px 14px',borderRadius:8,fontSize:13,
+              color:C.red,background:C.redD,border:'1px solid #EF444433'}}>{msg}</div>}
+
+            <div style={{display:'flex',gap:10,marginTop:20,justifyContent:'flex-end'}}>
+              <button onClick={()=>setModal(null)}
+                style={{padding:'9px 20px',borderRadius:9,border:`1px solid ${C.bord2}`,
+                  background:'transparent',color:C.muted,cursor:'pointer',fontSize:13}}>Cancelar</button>
+              <button onClick={guardar} disabled={saving}
+                style={{padding:'9px 24px',borderRadius:9,border:'none',
+                  background:C.blue,color:'white',cursor:'pointer',fontSize:13,fontWeight:700}}>
+                {saving?'Guardando...':'Guardar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 // ══════════════════════════════════════════════════════════════
 //  PANEL SRI — Facturación Electrónica
