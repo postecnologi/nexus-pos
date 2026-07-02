@@ -14,7 +14,7 @@ from routers import (
     crm, retenciones, notas_debito, contabilidad,
     guias_remision, liquidaciones, nomina, admin, superadmin,
     whatsapp, depositos, notas_venta, ordenes_compra, crm_comunicaciones,
-    biometrico, importar, importar_historicos, pos_terminal,
+    biometrico, importar, importar_historicos, pos_terminal, horarios,
 )
 
 app = FastAPI(title="NEXUS POS API", version="2.0.0")
@@ -604,6 +604,29 @@ def run_migrations():
             created_at TIMESTAMP DEFAULT NOW()
         )""",
         "ALTER TABLE pos_terminales ADD COLUMN IF NOT EXISTS caja_id INTEGER REFERENCES caj_cajas(id)",
+        # Horarios de trabajo
+        """CREATE TABLE IF NOT EXISTS nom_horarios (
+            id SERIAL PRIMARY KEY,
+            nombre VARCHAR(100) NOT NULL,
+            descripcion TEXT,
+            tolerancia_entrada_min INTEGER DEFAULT 5,
+            descanso_min INTEGER DEFAULT 30,
+            activo BOOLEAN DEFAULT true,
+            created_at TIMESTAMP DEFAULT NOW()
+        )""",
+        """CREATE TABLE IF NOT EXISTS nom_horario_detalle (
+            id SERIAL PRIMARY KEY,
+            horario_id INTEGER NOT NULL REFERENCES nom_horarios(id) ON DELETE CASCADE,
+            dia_semana SMALLINT NOT NULL,
+            hora_entrada TIME,
+            hora_salida TIME,
+            es_descanso BOOLEAN DEFAULT false,
+            horas_laborables NUMERIC(4,2) DEFAULT 8,
+            UNIQUE(horario_id, dia_semana)
+        )""",
+        "ALTER TABLE nom_empleados ADD COLUMN IF NOT EXISTS horario_id INTEGER REFERENCES nom_horarios(id)",
+        "ALTER TABLE nom_asistencia ADD COLUMN IF NOT EXISTS minutos_retraso INTEGER DEFAULT 0",
+        "ALTER TABLE nom_asistencia ADD COLUMN IF NOT EXISTS observacion TEXT",
         """CREATE TABLE IF NOT EXISTS nom_bio_usuarios_cache (
             id SERIAL PRIMARY KEY,
             biometrico_id INTEGER REFERENCES nom_biometricos(id) ON DELETE CASCADE,
@@ -801,6 +824,7 @@ app.include_router(crm_comunicaciones.router)
 app.include_router(biometrico.router)
 app.include_router(importar.router)
 app.include_router(pos_terminal.router)
+app.include_router(horarios.router)
 importar_historicos  # registra endpoints históricos en importar.router
 if MULTI_TENANT:
     app.include_router(superadmin.router)

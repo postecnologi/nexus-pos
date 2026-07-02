@@ -15,6 +15,7 @@ const TABS = [
   { id: 'empleados',   label: 'Empleados',    icon: Users },
   { id: 'roles',       label: 'Rol de Pagos', icon: Calculator },
   { id: 'asistencia',  label: 'Asistencia',   icon: Fingerprint },
+  { id: 'horarios',    label: 'Horarios',     icon: Clock },
   { id: 'prestamos',   label: 'Prestamos',    icon: CreditCard },
   { id: 'vacaciones',  label: 'Vacaciones',   icon: Calendar },
   { id: 'permisos',    label: 'Permisos',     icon: Clock },
@@ -104,6 +105,7 @@ export default function Nomina() {
       {tab === 'empleados' && <TabEmpleados sty={sty} t={t} />}
       {tab === 'roles' && <TabRoles sty={sty} t={t} />}
       {tab === 'asistencia' && <TabAsistencia sty={sty} t={t} />}
+      {tab === 'horarios'   && <TabHorarios   sty={sty} t={t} />}
       {tab === 'prestamos' && <TabPrestamos sty={sty} t={t} />}
       {tab === 'vacaciones' && <TabVacaciones sty={sty} t={t} />}
       {tab === 'permisos' && <TabPermisos sty={sty} t={t} />}
@@ -115,6 +117,381 @@ export default function Nomina() {
   )
 }
 
+
+// ══════════════════════════════════════════════════════════════════
+//  TAB HORARIOS
+// ══════════════════════════════════════════════════════════════════
+const DIAS_SEMANA = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo']
+
+function TabHorarios({ sty, t }) {
+  const [horarios, setHorarios]     = useState([])
+  const [empleados, setEmpleados]   = useState([])
+  const [modal, setModal]           = useState(null)
+  const [modalAsig, setModalAsig]   = useState(null)
+  const [loading, setLoading]       = useState(false)
+
+  const cargar = () => {
+    api.get('/horarios').then(r => setHorarios(r.data || [])).catch(() => {})
+  }
+  useEffect(() => {
+    cargar()
+    api.get('/nomina/empleados').then(r => setEmpleados(r.data || [])).catch(() => {})
+  }, [])
+
+  const eliminar = async (h) => {
+    if (!confirm(`¿Eliminar horario "${h.nombre}"?`)) return
+    try {
+      await api.delete(`/horarios/${h.id}`)
+      cargar()
+    } catch(e) { alert(e.response?.data?.detail || 'Error') }
+  }
+
+  const recalcular = async () => {
+    const desde = prompt('Desde (YYYY-MM-DD):', new Date().toISOString().slice(0,8)+'01')
+    if (!desde) return
+    const r = await api.post('/horarios/recalcular-asistencia', { desde, hasta: new Date().toISOString().slice(0,10) })
+    alert(r.data.msg)
+  }
+
+  const ESTADO_COLOR = { NORMAL:'#10B981', TARDE:'#F59E0B', FALTA:'#EF4444', DESCANSO:'#6B7280', MEDIO_DIA:'#06B6D4' }
+
+  return (
+    <div>
+      {/* Header */}
+      <div style={{...sty.card, display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:10}}>
+        <div>
+          <div style={{fontWeight:700,fontSize:15,color:t.text}}>🕐 Horarios de trabajo</div>
+          <div style={{fontSize:12,color:t.muted,marginTop:2}}>
+            Define los turnos de cada empleado para calcular retrasos y horas extras con precisión
+          </div>
+        </div>
+        <div style={{display:'flex',gap:8}}>
+          <button onClick={recalcular} style={{...sty.btnOutline(t.amber),fontSize:12}}>
+            <RefreshCw size={13}/> Recalcular asistencia
+          </button>
+          <button onClick={() => setModal({ nombre:'', descripcion:'', tolerancia_entrada_min:5, descanso_min:30,
+            detalle: DIAS_SEMANA.map((_,i) => ({
+              dia_semana:i, hora_entrada:'08:00', hora_salida:'17:00',
+              es_descanso: i>=5, horas_laborables:8
+            }))
+          })} style={sty.btn()}>
+            <Plus size={13}/> Nuevo horario
+          </button>
+        </div>
+      </div>
+
+      {/* Info */}
+      <div style={{padding:'10px 16px',borderRadius:8,background:'rgba(59,130,246,.06)',
+        border:'1px solid rgba(59,130,246,.15)',marginBottom:16,fontSize:12,color:t.muted,lineHeight:1.8}}>
+        💡 <strong style={{color:t.text}}>¿Cómo funciona?</strong><br/>
+        1. Crea los horarios (ej: Turno Mañana 8:00-17:00, Turno Tarde 14:00-22:00)<br/>
+        2. Asigna cada empleado a su horario<br/>
+        3. El sistema calcula automáticamente: retrasos, horas extras 50% y 100%, faltas<br/>
+        4. Al importar del biométrico los valores se recalculan con el horario real
+      </div>
+
+      {/* Lista de horarios */}
+      {horarios.length === 0 ? (
+        <div style={{...sty.card, textAlign:'center', padding:40, color:t.muted}}>
+          <Clock size={36} style={{opacity:.3, marginBottom:12}}/><br/>
+          No hay horarios configurados. Crea el primero con el botón de arriba.
+        </div>
+      ) : horarios.map(h => (
+        <div key={h.id} style={{...sty.card, marginBottom:12}}>
+          <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:14}}>
+            <div>
+              <div style={{fontWeight:700, fontSize:14, color:t.text}}>{h.nombre}</div>
+              <div style={{fontSize:11, color:t.muted, marginTop:2, display:'flex', gap:12}}>
+                {h.descripcion && <span>{h.descripcion}</span>}
+                <span>⏱️ Tolerancia: {h.tolerancia_entrada_min} min</span>
+                <span>🍽️ Almuerzo: {h.descanso_min} min</span>
+                <span style={{color:t.blue}}>👥 {h.empleados_asignados} empleado(s)</span>
+              </div>
+            </div>
+            <div style={{display:'flex', gap:6}}>
+              <button onClick={() => setModalAsig(h)}
+                style={{...sty.btnOutline(t.green), fontSize:11, padding:'5px 10px'}}>
+                👥 Asignar
+              </button>
+              <button onClick={() => setModal(h)}
+                style={{...sty.btnOutline(t.blue), fontSize:11, padding:'5px 10px'}}>
+                <Edit2 size={11}/> Editar
+              </button>
+              <button onClick={() => eliminar(h)}
+                style={{...sty.btnOutline(t.red), fontSize:11, padding:'5px 10px'}}>
+                <Trash2 size={11}/>
+              </button>
+            </div>
+          </div>
+
+          {/* Grilla de días */}
+          <div style={{display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:6}}>
+            {DIAS_SEMANA.map((dia, idx) => {
+              const det = (h.detalle || []).find(d => d.dia_semana === idx)
+              const descanso = !det || det.es_descanso
+              return (
+                <div key={idx} style={{padding:'8px 6px', borderRadius:8, textAlign:'center',
+                  background: descanso ? 'rgba(100,116,139,.1)' : 'rgba(59,130,246,.08)',
+                  border: `1px solid ${descanso ? t.bord2 : 'rgba(59,130,246,.2)'}` }}>
+                  <div style={{fontSize:10, fontWeight:700, color: descanso ? t.hint : t.blue, marginBottom:4}}>
+                    {dia.slice(0,3).toUpperCase()}
+                  </div>
+                  {descanso
+                    ? <div style={{fontSize:9, color:t.hint}}>Descanso</div>
+                    : <>
+                        <div style={{fontSize:11, fontWeight:600, color:t.text}}>
+                          {det?.hora_entrada?.slice(0,5)} - {det?.hora_salida?.slice(0,5)}
+                        </div>
+                        <div style={{fontSize:9, color:t.muted}}>{det?.horas_laborables}h</div>
+                      </>
+                  }
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      ))}
+
+      {/* Modal crear/editar horario */}
+      {modal && <ModalHorario sty={sty} t={t} horario={modal}
+        onClose={() => setModal(null)}
+        onSaved={() => { setModal(null); cargar() }} />}
+
+      {/* Modal asignar empleados */}
+      {modalAsig && <ModalAsignarHorario sty={sty} t={t} horario={modalAsig}
+        empleados={empleados}
+        onClose={() => setModalAsig(null)}
+        onSaved={() => { setModalAsig(null); cargar() }} />}
+    </div>
+  )
+}
+
+function ModalHorario({ sty, t, horario, onClose, onSaved }) {
+  const esEdit = !!horario?.id
+  const [form, setForm] = useState({
+    nombre:                  horario?.nombre || '',
+    descripcion:             horario?.descripcion || '',
+    tolerancia_entrada_min:  horario?.tolerancia_entrada_min ?? 5,
+    descanso_min:            horario?.descanso_min ?? 30,
+    detalle: horario?.detalle?.length
+      ? horario.detalle
+      : DIAS_SEMANA.map((_,i) => ({
+          dia_semana:i, hora_entrada:'08:00', hora_salida:'17:00',
+          es_descanso: i >= 5, horas_laborables:8
+        }))
+  })
+  const [saving, setSaving] = useState(false)
+
+  const setDia = (idx, campo, valor) => {
+    setForm(f => ({
+      ...f,
+      detalle: f.detalle.map(d => d.dia_semana === idx ? { ...d, [campo]: valor } : d)
+    }))
+  }
+
+  // Recalcular horas laborables al cambiar hora entrada/salida
+  const calcHoras = (entrada, salida) => {
+    try {
+      const [he, me] = entrada.split(':').map(Number)
+      const [hs, ms] = salida.split(':').map(Number)
+      const mins = (hs * 60 + ms) - (he * 60 + me)
+      return Math.max(0, Math.round((mins / 60) * 10) / 10)
+    } catch { return 8 }
+  }
+
+  const guardar = async () => {
+    if (!form.nombre) return alert('El nombre es obligatorio')
+    setSaving(true)
+    try {
+      if (esEdit) await api.put(`/horarios/${horario.id}`, form)
+      else        await api.post('/horarios', form)
+      onSaved()
+    } catch(e) { alert(e.response?.data?.detail || 'Error') }
+    setSaving(false)
+  }
+
+  const fi = { ...sty.input, padding:'6px 10px', fontSize:12 }
+
+  return (
+    <div style={sty.modal}>
+      <div style={{...sty.modalContent, maxWidth:700}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
+          <div style={{fontWeight:800,fontSize:16,color:t.text}}>
+            {esEdit ? '✏️ Editar horario' : '➕ Nuevo horario de trabajo'}
+          </div>
+          <button onClick={onClose} style={{background:'none',border:'none',cursor:'pointer',color:t.muted,fontSize:22}}>×</button>
+        </div>
+
+        {/* Datos generales */}
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12,marginBottom:20}}>
+          <div style={{gridColumn:'1/-1'}}>
+            <label style={sty.label}>Nombre del horario *</label>
+            <input value={form.nombre} onChange={e=>setForm(f=>({...f,nombre:e.target.value}))}
+              style={sty.input} placeholder="Ej: Turno General, Turno Mañana..." />
+          </div>
+          <div>
+            <label style={sty.label}>Tolerancia entrada (min)</label>
+            <input type="number" min="0" max="60" value={form.tolerancia_entrada_min}
+              onChange={e=>setForm(f=>({...f,tolerancia_entrada_min:parseInt(e.target.value)||0}))}
+              style={sty.input} />
+            <div style={{fontSize:10,color:t.muted,marginTop:2}}>Minutos de gracia antes de marcar TARDE</div>
+          </div>
+          <div>
+            <label style={sty.label}>Descanso / almuerzo (min)</label>
+            <input type="number" min="0" max="120" value={form.descanso_min}
+              onChange={e=>setForm(f=>({...f,descanso_min:parseInt(e.target.value)||0}))}
+              style={sty.input} />
+            <div style={{fontSize:10,color:t.muted,marginTop:2}}>Se descuenta de las horas trabajadas</div>
+          </div>
+          <div>
+            <label style={sty.label}>Descripción</label>
+            <input value={form.descripcion} onChange={e=>setForm(f=>({...f,descripcion:e.target.value}))}
+              style={sty.input} placeholder="Opcional" />
+          </div>
+        </div>
+
+        {/* Detalle por día */}
+        <div style={{fontSize:12,fontWeight:700,color:t.muted,marginBottom:8,textTransform:'uppercase',letterSpacing:'.05em'}}>
+          Horario por día de semana
+        </div>
+        <div style={{overflowX:'auto'}}>
+          <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
+            <thead>
+              <tr style={{background:t.sur2}}>
+                {['Día','Descanso','Hora entrada','Hora salida','Horas'].map(h=>(
+                  <th key={h} style={{padding:'8px 10px',textAlign:'left',color:t.muted,fontWeight:600,fontSize:11}}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {form.detalle.map((d,idx) => (
+                <tr key={d.dia_semana} style={{borderBottom:`1px solid ${t.border}`,
+                  opacity:d.es_descanso?.7:1}}>
+                  <td style={{padding:'6px 10px',fontWeight:600,color:t.text}}>
+                    {DIAS_SEMANA[d.dia_semana]}
+                  </td>
+                  <td style={{padding:'6px 10px'}}>
+                    <input type="checkbox" checked={!!d.es_descanso}
+                      onChange={e=>setDia(d.dia_semana,'es_descanso',e.target.checked)}
+                      style={{width:16,height:16,cursor:'pointer',accentColor:t.blue}}/>
+                  </td>
+                  <td style={{padding:'6px 10px'}}>
+                    <input type="time" value={d.hora_entrada||'08:00'}
+                      disabled={d.es_descanso}
+                      onChange={e=>{
+                        setDia(d.dia_semana,'hora_entrada',e.target.value)
+                        setDia(d.dia_semana,'horas_laborables',calcHoras(e.target.value,d.hora_salida||'17:00'))
+                      }}
+                      style={{...fi,width:100,opacity:d.es_descanso?.4:1}}/>
+                  </td>
+                  <td style={{padding:'6px 10px'}}>
+                    <input type="time" value={d.hora_salida||'17:00'}
+                      disabled={d.es_descanso}
+                      onChange={e=>{
+                        setDia(d.dia_semana,'hora_salida',e.target.value)
+                        setDia(d.dia_semana,'horas_laborables',calcHoras(d.hora_entrada||'08:00',e.target.value))
+                      }}
+                      style={{...fi,width:100,opacity:d.es_descanso?.4:1}}/>
+                  </td>
+                  <td style={{padding:'6px 10px',fontWeight:700,
+                    color:d.es_descanso?t.hint:t.blue}}>
+                    {d.es_descanso ? '—' : `${d.horas_laborables}h`}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div style={{display:'flex',gap:10,marginTop:20,justifyContent:'flex-end'}}>
+          <button onClick={onClose}
+            style={{...sty.btnOutline(t.muted),padding:'9px 20px'}}>Cancelar</button>
+          <button onClick={guardar} disabled={saving}
+            style={{...sty.btn(),padding:'9px 24px'}}>
+            {saving?'Guardando...':'Guardar horario'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ModalAsignarHorario({ sty, t, horario, empleados, onClose, onSaved }) {
+  const [seleccionados, setSeleccionados] = useState([])
+  const [saving, setSaving] = useState(false)
+  const [busqueda, setBusqueda] = useState('')
+
+  const filtrados = empleados.filter(e =>
+    e.activo &&
+    (`${e.nombres} ${e.apellidos} ${e.cedula}`).toLowerCase().includes(busqueda.toLowerCase())
+  )
+
+  const toggle = (id) => setSeleccionados(s =>
+    s.includes(id) ? s.filter(x=>x!==id) : [...s, id]
+  )
+
+  const guardar = async () => {
+    if (!seleccionados.length) return alert('Selecciona al menos un empleado')
+    setSaving(true)
+    try {
+      await api.post('/horarios/asignar', { horario_id: horario.id, empleado_ids: seleccionados })
+      onSaved()
+    } catch(e) { alert(e.response?.data?.detail || 'Error') }
+    setSaving(false)
+  }
+
+  return (
+    <div style={sty.modal}>
+      <div style={{...sty.modalContent, maxWidth:500}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
+          <div>
+            <div style={{fontWeight:800,fontSize:15,color:t.text}}>👥 Asignar empleados</div>
+            <div style={{fontSize:12,color:t.muted}}>Horario: {horario.nombre}</div>
+          </div>
+          <button onClick={onClose} style={{background:'none',border:'none',cursor:'pointer',color:t.muted,fontSize:22}}>×</button>
+        </div>
+
+        <input value={busqueda} onChange={e=>setBusqueda(e.target.value)}
+          style={{...sty.input,marginBottom:10}} placeholder="Buscar empleado..." />
+
+        <div style={{maxHeight:300,overflowY:'auto',border:`1px solid ${t.border}`,borderRadius:8}}>
+          {filtrados.map(e => (
+            <div key={e.id} onClick={()=>toggle(e.id)}
+              style={{padding:'10px 14px',cursor:'pointer',borderBottom:`1px solid ${t.border}`,
+                display:'flex',alignItems:'center',gap:10,
+                background:seleccionados.includes(e.id)?'rgba(59,130,246,.08)':'transparent'}}>
+              <input type="checkbox" readOnly checked={seleccionados.includes(e.id)}
+                style={{width:15,height:15,accentColor:t.blue}}/>
+              <div>
+                <div style={{fontSize:13,fontWeight:600,color:t.text}}>{e.apellidos} {e.nombres}</div>
+                <div style={{fontSize:11,color:t.muted}}>{e.cargo||'—'} · {e.cedula}</div>
+              </div>
+              {e.horario_id && (
+                <span style={{marginLeft:'auto',fontSize:10,color:t.amber,
+                  background:'rgba(245,158,11,.1)',padding:'2px 8px',borderRadius:6}}>
+                  Tiene horario
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+
+        <div style={{marginTop:10,fontSize:11,color:t.muted}}>
+          {seleccionados.length} empleado(s) seleccionado(s)
+        </div>
+
+        <div style={{display:'flex',gap:10,marginTop:16,justifyContent:'flex-end'}}>
+          <button onClick={onClose}
+            style={{...sty.btnOutline(t.muted),padding:'8px 16px'}}>Cancelar</button>
+          <button onClick={guardar} disabled={saving || !seleccionados.length}
+            style={{...sty.btn(t.green),padding:'8px 20px',opacity:!seleccionados.length?.5:1}}>
+            {saving?'Guardando...':'Asignar horario'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 // ══════════════════════════════════════════════════════════════════
 //  TAB ASISTENCIA (BIOMÉTRICO)
