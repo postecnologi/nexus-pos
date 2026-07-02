@@ -640,8 +640,25 @@ export default function Clientes() {
                   try {
                     const r = await api.post(`/portal-cliente/crear-acceso/${clienteVer.id}`)
                     const url = `${window.location.origin}/portal-cliente/${r.data.token}`
-                    await navigator.clipboard.writeText(url)
-                    alert(`✅ Link del portal copiado al portapapeles:\n${url}`)
+                    // Copiar al portapapeles con fallback universal
+                    try {
+                      await navigator.clipboard.writeText(url)
+                      alert(`✅ Link copiado al portapapeles.\n\nEnvíalo al cliente:\n${url}`)
+                    } catch {
+                      // Fallback para browsers que bloquean clipboard
+                      const ta = document.createElement('textarea')
+                      ta.value = url
+                      ta.style.position = 'fixed'
+                      ta.style.top = '0'
+                      ta.style.left = '0'
+                      ta.style.opacity = '0'
+                      document.body.appendChild(ta)
+                      ta.focus()
+                      ta.select()
+                      document.execCommand('copy')
+                      document.body.removeChild(ta)
+                      alert(`✅ Link generado.\n\nEnvíalo al cliente:\n${url}`)
+                    }
                   } catch(e) { alert(e.response?.data?.detail||'Error') }
                 }}
                 style={{ padding:'9px 16px', borderRadius:9, border:`1px solid rgba(16,185,129,.4)`,
