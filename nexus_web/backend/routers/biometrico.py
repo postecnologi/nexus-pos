@@ -283,6 +283,143 @@ async def importar_asistencia(
 
 
 # ══════════════════════════════════════════════════════════════
+#  ENDPOINTS PARA EL AGENTE LOCAL (sincronización directa)
+# ══════════════════════════════════════════════════════════════
+
+@router.post("/agente/sincronizar")
+def agente_sincronizar(data: dict, u=Depends(get_current_user)):
+    """
+    El agente biométrico envía los registros leídos directamente del dispositivo.
+    Se procesan igual que la importación CSV pero sin archivo.
+    """
+    biometrico_id = data.get("biometrico_id")
+    registros_raw = data.get("registros", [])
+
+    if not biometrico_id:
+        raise HTTPException(400, "biometrico_id requerido")
+
+    # Cargar mapeo bio_user_id → empleado_id
+    mapeos = {str(m["bio_user_id"]): m["empleado_id"]
+              for m in query("SELECT * FROM nom_bio_mapeo WHERE biometrico_id=%s", (biometrico_id,))}
+
+    from routers.biometrico import _calcular_horas
+    from collections import defaultdict
+
+    # Agrupar marcaciones por (bio_user_id, fecha)
+    agrupado: dict = defaultdict(lambda: {"entradas": [], "salidas": []})
+
+    for r in registros_raw:
+        bio_uid = str(r.get("bio_user_id", "")).strip()
+        fecha   = r.get("fecha", "")
+        hora    = r.get("hora", "00:00:00")
+        tipo    = int(r.get("tipo", 0))  # 0=entrada, 1=salida, 4=ot-in, 5=ot-out
+
+        if not bio_uid or not fecha:
+            continue
+
+        try:
+            from datetime import datetime as dt
+            dt_obj = dt.fromisoformat(r.get("datetime") or f"{fecha} {hora}")
+        except Exception:
+            continue
+
+        key = (bio_uid, fecha)
+        if tipo in (0, 4):  # Entrada / OT entrada
+            agrupado[key]["entradas"].append(dt_obj)
+        else:               # Salida / OT salida
+            agrupado[key]["salidas"].append(dt_obj)
+
+    importados = 0
+    sin_mapeo  = set()
+
+    for (bio_uid, fecha), data_dia in agrupado.items():
+        empleado_id = mapeos.get(bio_uid)
+        if not empleado_id:
+            sin_mapeo.add(bio_uid)
+            continue
+
+        entradas = sorted(data_dia["entradas"])
+        salidas  = sorted(data_dia["salidas"])
+        entrada  = entradas[0] if entradas else None
+        salida   = salidas[-1] if salidas else None
+
+        horas_trab, ext_50, ext_100 = _calcular_horas(entrada, salida)
+
+        estado = "FALTA"
+        if entrada:
+            limite = entrada.replace(hour=8, minute=15, second=0)
+            if entrada > limite:
+                estado = "TARDE"
+            elif horas_trab >= 7:
+                estado = "NORMAL"
+            elif horas_trab >= 4:
+                estado = "MEDIO_DIA"
+            else:
+                estado = "TARDE"
+
+        existe = query_one(
+            "SELECT id FROM nom_asistencia WHERE empleado_id=%s AND fecha=%s AND biometrico_id=%s",
+            (empleado_id, fecha, biometrico_id))
+
+        if existe:
+            execute("""
+                UPDATE nom_asistencia SET hora_entrada=%s, hora_salida=%s,
+                    horas_trabajadas=%s, horas_extras_50=%s, horas_extras_100=%s, estado=%s
+                WHERE id=%s
+            """, (entrada, salida, horas_trab, ext_50, ext_100, estado, existe["id"]))
+        else:
+            insert("""
+                INSERT INTO nom_asistencia
+                    (empleado_id, biometrico_id, fecha, hora_entrada, hora_salida,
+                     horas_trabajadas, horas_extras_50, horas_extras_100, estado)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            """, (empleado_id, biometrico_id, fecha, entrada, salida,
+                  horas_trab, ext_50, ext_100, estado))
+        importados += 1
+
+    return {"importados": importados, "sin_mapeo": list(sin_mapeo),
+            "msg": f"{importados} registros sincronizados. {len(sin_mapeo)} IDs sin mapeo."}
+
+
+@router.post("/agente/usuarios")
+def agente_usuarios(data: dict, u=Depends(get_current_user)):
+    """El agente sube la lista de usuarios del biométrico para facilitar el mapeo."""
+    biometrico_id = data.get("biometrico_id")
+    usuarios      = data.get("usuarios", [])
+    # Guardar temporalmente en la tabla de mapeo (sin empleado_id) para mostrar en UI
+    for usr in usuarios:
+        bio_uid = str(usr.get("id","")).strip()
+        nombre  = str(usr.get("nombre","")).strip()
+        if bio_uid:
+            execute("""
+                INSERT INTO nom_bio_usuarios_cache (biometrico_id, bio_user_id, nombre_bio)
+                VALUES (%s,%s,%s)
+                ON CONFLICT (biometrico_id, bio_user_id) DO UPDATE SET nombre_bio=%s
+            """, (biometrico_id, bio_uid, nombre, nombre))
+    return {"msg": f"{len(usuarios)} usuarios del biométrico actualizados"}
+
+
+@router.post("/agente/heartbeat")
+def agente_heartbeat(data: dict, u=Depends(get_current_user)):
+    bio_id = data.get("biometrico_id")
+    if bio_id:
+        execute("UPDATE nom_biometricos SET activo=true, updated_at=NOW() WHERE id=%s", (bio_id,))
+    return {"ok": True}
+
+
+@router.get("/agente/descargar")
+def descargar_agente_bio(u=Depends(get_current_user)):
+    """Descarga el ejecutable del agente biométrico."""
+    from fastapi.responses import FileResponse
+    from pathlib import Path
+    exe = Path(__file__).resolve().parent.parent.parent.parent / "agente_biometrico" / "AgenteBiometricoNexus.exe"
+    if not exe.exists():
+        raise HTTPException(404, "El ejecutable no está disponible aún. Contacta a soporte.")
+    return FileResponse(str(exe), filename="AgenteBiometricoNexus.exe",
+                        media_type="application/octet-stream")
+
+
+# ══════════════════════════════════════════════════════════════
 #  REGISTROS DE ASISTENCIA
 # ══════════════════════════════════════════════════════════════
 

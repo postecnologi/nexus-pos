@@ -203,6 +203,17 @@ function TabAsistencia({ sty, t }) {
       <div style={{...sty.card, display:'flex', gap:12, alignItems:'center', flexWrap:'wrap'}}>
         <Fingerprint size={20} style={{color:t.blue}} />
         <span style={{fontWeight:700,fontSize:15,color:t.text}}>Control de Asistencia</span>
+        <button onClick={async()=>{
+            try {
+              const r = await api.get('/biometrico/agente/descargar',{responseType:'blob'})
+              const url = URL.createObjectURL(new Blob([r.data]))
+              const a = document.createElement('a'); a.href=url
+              a.download='AgenteBiometricoNexus.exe'; a.click()
+            } catch(e){ alert('El ejecutable aún no está disponible. Contacta a soporte.') }
+          }}
+          style={{...sty.btn(t.purple),fontSize:12}}>
+          <Download size={13}/> Descargar Agente Biométrico
+        </button>
         <div style={{marginLeft:'auto',display:'flex',gap:8,flexWrap:'wrap'}}>
           <input type="month" value={periodo} onChange={e=>setPeriodo(e.target.value)} style={{...sty.input,width:160}} />
           <select value={bioSel} onChange={e=>setBioSel(e.target.value)} style={{...sty.select,width:180}}>

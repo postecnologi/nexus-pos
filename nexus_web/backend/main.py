@@ -604,6 +604,13 @@ def run_migrations():
             created_at TIMESTAMP DEFAULT NOW()
         )""",
         "ALTER TABLE pos_terminales ADD COLUMN IF NOT EXISTS caja_id INTEGER REFERENCES caj_cajas(id)",
+        """CREATE TABLE IF NOT EXISTS nom_bio_usuarios_cache (
+            id SERIAL PRIMARY KEY,
+            biometrico_id INTEGER REFERENCES nom_biometricos(id) ON DELETE CASCADE,
+            bio_user_id VARCHAR(50) NOT NULL,
+            nombre_bio VARCHAR(200),
+            UNIQUE(biometrico_id, bio_user_id)
+        )""",
         """CREATE TABLE IF NOT EXISTS pos_transacciones (
             id SERIAL PRIMARY KEY,
             terminal_id INTEGER REFERENCES pos_terminales(id),
