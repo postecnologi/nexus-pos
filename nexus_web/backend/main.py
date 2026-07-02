@@ -596,12 +596,14 @@ def run_migrations():
             nombre VARCHAR(100) NOT NULL,
             procesador VARCHAR(20) DEFAULT 'DATAFAST',
             sucursal_id INTEGER REFERENCES sys_sucursales(id),
+            caja_id INTEGER REFERENCES caj_cajas(id),
             terminal_id VARCHAR(50) DEFAULT '',
             activo BOOLEAN DEFAULT true,
             agente_activo BOOLEAN DEFAULT false,
             ultimo_heartbeat TIMESTAMP,
             created_at TIMESTAMP DEFAULT NOW()
         )""",
+        "ALTER TABLE pos_terminales ADD COLUMN IF NOT EXISTS caja_id INTEGER REFERENCES caj_cajas(id)",
         """CREATE TABLE IF NOT EXISTS pos_transacciones (
             id SERIAL PRIMARY KEY,
             terminal_id INTEGER REFERENCES pos_terminales(id),

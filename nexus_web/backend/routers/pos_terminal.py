@@ -21,31 +21,39 @@ router = APIRouter(prefix="/api/pos", tags=["POS Terminal"])
 # ══════════════════════════════════════════════════════════════
 
 @router.get("/terminales")
-def get_terminales(u=Depends(get_current_user)):
-    return query("""
-        SELECT t.*, s.nombre as sucursal_nombre
+def get_terminales(sucursal_id: Optional[int] = None, u=Depends(get_current_user)):
+    conds = ["1=1"]
+    params = []
+    if sucursal_id:
+        conds.append("t.sucursal_id=%s"); params.append(sucursal_id)
+    return query(f"""
+        SELECT t.*, s.nombre as sucursal_nombre, c.nombre as caja_nombre
         FROM pos_terminales t
         LEFT JOIN sys_sucursales s ON s.id = t.sucursal_id
-        ORDER BY s.nombre, t.nombre
-    """)
+        LEFT JOIN caj_cajas c ON c.id = t.caja_id
+        WHERE {' AND '.join(conds)}
+        ORDER BY s.nombre, c.nombre, t.nombre
+    """, params)
 
 @router.post("/terminales")
 def crear_terminal(data: dict, u=Depends(get_current_user)):
     tid = insert("""
         INSERT INTO pos_terminales
-            (nombre, procesador, sucursal_id, terminal_id, activo)
-        VALUES (%s,%s,%s,%s,true)
+            (nombre, procesador, sucursal_id, caja_id, terminal_id, activo)
+        VALUES (%s,%s,%s,%s,%s,true)
     """, (data["nombre"], data.get("procesador","DATAFAST"),
-          data.get("sucursal_id"), data.get("terminal_id","")))
+          data.get("sucursal_id"), data.get("caja_id") or None,
+          data.get("terminal_id","")))
     return {"id": tid, "msg": "Terminal registrado"}
 
 @router.put("/terminales/{tid}")
 def actualizar_terminal(tid: int, data: dict, u=Depends(get_current_user)):
     execute("""
         UPDATE pos_terminales SET nombre=%s, procesador=%s,
-            sucursal_id=%s, terminal_id=%s WHERE id=%s
+            sucursal_id=%s, caja_id=%s, terminal_id=%s WHERE id=%s
     """, (data["nombre"], data.get("procesador","DATAFAST"),
-          data.get("sucursal_id"), data.get("terminal_id",""), tid))
+          data.get("sucursal_id"), data.get("caja_id") or None,
+          data.get("terminal_id",""), tid))
     return {"msg": "Terminal actualizado"}
 
 @router.patch("/terminales/{tid}/toggle")
