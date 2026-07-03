@@ -204,12 +204,21 @@ function DetalleConciliacion({concId, onVolver}) {
     setFileSaving(true)
     try{
       const fd = new FormData(); fd.append('file',file)
-      const{data}=await api.post(`/conciliaciones/${concId}/importar-csv`,fd,
+      // Usar el nuevo endpoint inteligente que detecta el banco automáticamente
+      const{data}=await api.post(`/conciliaciones/${concId}/importar-banco`,fd,
         {headers:{'Content-Type':'multipart/form-data'}})
-      alert(`Importadas: ${data.importadas}${data.errores?.length?'\nErrores: '+data.errores.join('\n'):''}`)
+      alert(`✅ ${data.msg}`)
       cargar()
     }catch(e){ alert(e.response?.data?.detail||e.message) }
     finally{ setFileSaving(false); e.target.value='' }
+  }
+
+  async function autoConciliar() {
+    try{
+      const{data}=await api.post(`/conciliaciones/${concId}/auto-conciliar`)
+      alert(`✅ ${data.msg}`)
+      cargar()
+    }catch(e){ alert(e.response?.data?.detail||e.message) }
   }
 
   async function cerrar() {
@@ -339,12 +348,17 @@ function DetalleConciliacion({concId, onVolver}) {
                   style={{padding:'7px 14px',borderRadius:8,cursor:'pointer',
                     border:`1px solid ${C.bord2}`,background:C.sur2,
                     color:C.muted,fontSize:12,fontWeight:600}}>
-                  {fileSaving?'Importando...':'📄 Importar CSV'}
+                  {fileSaving?'Importando...':'📄 Importar estado de cuenta'}
                 </button>
-                <input ref={fileRef} type="file" accept=".csv"
+                <input ref={fileRef} type="file" accept=".csv,.txt,.xls,.xlsx"
                   onChange={importarCSV} style={{display:'none'}}/>
+                <button onClick={autoConciliar}
+                  style={{padding:'7px 14px',borderRadius:8,cursor:'pointer',border:'none',
+                    background:'rgba(16,185,129,.15)',color:'#10B981',fontSize:12,fontWeight:600}}>
+                  ⚡ Auto-conciliar
+                </button>
                 <span style={{fontSize:11,color:C.hint}}>
-                  CSV: fecha, descripcion, referencia, debito, credito, saldo
+                  Detecta automáticamente el formato de Pichincha, Guayaquil, Austro, etc.
                 </span>
               </>
             )}

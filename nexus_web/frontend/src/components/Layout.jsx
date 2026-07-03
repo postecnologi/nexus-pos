@@ -71,6 +71,7 @@ const grupos = [
     icon: ShoppingCart,
     items: [
       { to: '/caja',            icon: Landmark,      label: 'Caja'              },
+      { to: '/caja-chica',     icon: DollarSign,    label: 'Caja Chica'        },
       { to: '/facturas',        icon: FileText,      label: 'Facturas'          },
       { to: '/notas-venta',     icon: Receipt,       label: 'Notas de Venta'    },
       { to: '/devoluciones',    icon: RotateCcw,     label: 'Devoluciones'      },

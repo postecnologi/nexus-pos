@@ -1,8 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from database import query, query_one, execute, insert
 from auth import get_current_user
 from typing import Optional
 from pydantic import BaseModel
+import io, csv, re
+from datetime import datetime
 
 router = APIRouter(prefix="/api/conciliaciones", tags=["Conciliacion"])
 
@@ -249,3 +251,176 @@ def cerrar_conciliacion(cid: int, u=Depends(get_current_user)):
     """, (cid,))
 
     return {"msg": "Conciliacion cerrada", "diferencia": diferencia}
+
+
+# ══════════════════════════════════════════════════════════════
+#  IMPORTACIÓN INTELIGENTE — detecta formato del banco
+# ══════════════════════════════════════════════════════════════
+
+def _parsear_monto(v: str) -> float:
+    """Limpia y convierte un valor monetario a float."""
+    v = str(v).strip().replace('$','').replace(' ','').replace(',','')
+    if not v or v == '-': return 0.0
+    try: return abs(float(v))
+    except: return 0.0
+
+def _parsear_fecha(v: str) -> str:
+    """Convierte fechas en varios formatos a YYYY-MM-DD."""
+    v = v.strip()
+    for fmt in ('%d/%m/%Y','%Y-%m-%d','%d-%m-%Y','%m/%d/%Y',
+                '%d/%m/%y','%Y/%m/%d','%d.%m.%Y'):
+        try: return datetime.strptime(v, fmt).strftime('%Y-%m-%d')
+        except: continue
+    return v
+
+def _detectar_banco(headers: list) -> str:
+    """Detecta el banco por los nombres de columnas del CSV."""
+    h = ' '.join(str(x).lower() for x in headers)
+    if 'pichincha' in h or 'número de transacción' in h: return 'PICHINCHA'
+    if 'guayaquil' in h or 'numero de operacion' in h:   return 'GUAYAQUIL'
+    if 'austro' in h or 'comprobante' in h:               return 'AUSTRO'
+    if 'bolivariano' in h:                                return 'BOLIVARIANO'
+    if 'pacifico' in h:                                    return 'PACIFICO'
+    return 'GENERICO'
+
+def _parsear_csv_banco(contenido: bytes) -> list:
+    """
+    Parsea el estado de cuenta de cualquier banco ecuatoriano.
+    Retorna lista de dicts: {fecha, descripcion, referencia, debito, credito, saldo}
+    """
+    try:    texto = contenido.decode('utf-8-sig')
+    except: texto = contenido.decode('latin-1')
+
+    # Detectar delimitador
+    delim = ';' if texto.count(';') > texto.count(',') else ','
+    reader = list(csv.reader(io.StringIO(texto), delimiter=delim))
+
+    # Buscar la fila de cabeceras (primera con 4+ columnas no vacías)
+    header_idx = 0
+    for i, row in enumerate(reader):
+        if sum(1 for c in row if c.strip()) >= 4:
+            header_idx = i
+            break
+
+    headers = [c.strip().lower() for c in reader[header_idx]]
+    banco   = _detectar_banco(reader[header_idx])
+
+    # Mapeo de columnas por banco
+    MAPEOS = {
+        'PICHINCHA':    {'fecha':0,'desc':1,'ref':2,'deb':3,'cred':4,'saldo':5},
+        'GUAYAQUIL':    {'fecha':0,'desc':2,'ref':1,'deb':3,'cred':4,'saldo':5},
+        'AUSTRO':       {'fecha':0,'desc':1,'ref':3,'deb':4,'cred':5,'saldo':6},
+        'BOLIVARIANO':  {'fecha':0,'desc':1,'ref':2,'deb':3,'cred':4,'saldo':5},
+        'PACIFICO':     {'fecha':0,'desc':1,'ref':2,'deb':3,'cred':4,'saldo':5},
+    }
+
+    # Buscar índices de columnas en el header
+    def find_col(*keywords):
+        for k in keywords:
+            for i,h in enumerate(headers):
+                if k in h: return i
+        return -1
+
+    col_fecha = find_col('fecha','date')
+    col_desc  = find_col('descripcion','concepto','detalle','description','glosa')
+    col_ref   = find_col('referencia','numero','comprobante','transaccion','operacion')
+    col_deb   = find_col('debito','cargo','retiro','salida','debe')
+    col_cred  = find_col('credito','abono','deposito','entrada','haber')
+    col_saldo = find_col('saldo','balance')
+
+    if col_fecha == -1: col_fecha = 0
+    if col_desc  == -1: col_desc  = 1
+    if col_deb   == -1: col_deb   = 3
+    if col_cred  == -1: col_cred  = 4
+    if col_saldo == -1: col_saldo = 5
+
+    lineas = []
+    for row in reader[header_idx+1:]:
+        if not row or all(not c.strip() for c in row): continue
+        if len(row) <= max(col_fecha, col_desc, col_deb): continue
+        try:
+            fecha = _parsear_fecha(row[col_fecha]) if col_fecha < len(row) else ''
+            if not fecha or not re.match(r'\d{4}-\d{2}-\d{2}', fecha): continue
+            deb   = _parsear_monto(row[col_deb])   if col_deb   < len(row) else 0
+            cred  = _parsear_monto(row[col_cred])  if col_cred  < len(row) else 0
+            saldo = _parsear_monto(row[col_saldo]) if col_saldo < len(row) else 0
+            desc  = row[col_desc].strip()           if col_desc  < len(row) else ''
+            ref   = row[col_ref].strip()            if col_ref  != -1 and col_ref < len(row) else ''
+            if deb == 0 and cred == 0: continue  # saltar filas vacías
+            lineas.append({'fecha':fecha,'descripcion':desc,'referencia':ref,
+                           'debito':deb,'credito':cred,'saldo':saldo})
+        except Exception: continue
+
+    return lineas, banco
+
+
+@router.post("/{cid}/importar-banco")
+async def importar_banco(cid: int, file: UploadFile = File(...), u=Depends(get_current_user)):
+    """Importa estado de cuenta del banco detectando el formato automáticamente."""
+    contenido = await file.read()
+    lineas, banco = _parsear_csv_banco(contenido)
+
+    if not lineas:
+        raise HTTPException(400, f"No se pudieron leer líneas del archivo. Verifica que sea el estado de cuenta del banco en formato CSV.")
+
+    importadas = 0
+    for l in lineas:
+        try:
+            insert("""
+                INSERT INTO fin_estado_cuenta
+                    (conciliacion_id, fecha, descripcion, referencia,
+                     debito, credito, saldo, conciliado)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,false)
+            """, (cid, l['fecha'], l['descripcion'], l['referencia'],
+                  l['debito'], l['credito'], l['saldo']))
+            importadas += 1
+        except Exception: pass
+
+    return {"importadas": importadas, "banco": banco,
+            "msg": f"{importadas} movimientos importados desde estado de cuenta {banco}"}
+
+
+@router.post("/{cid}/auto-conciliar")
+def auto_conciliar(cid: int, u=Depends(get_current_user)):
+    """
+    Concilia automáticamente las líneas del estado de cuenta
+    buscando movimientos del sistema con igual monto y fecha cercana (±3 días).
+    """
+    conciliacion = query_one("SELECT * FROM fin_conciliaciones WHERE id=%s", (cid,))
+    if not conciliacion: raise HTTPException(404)
+
+    lineas = query("""
+        SELECT * FROM fin_estado_cuenta
+        WHERE conciliacion_id=%s AND conciliado=false
+        ORDER BY fecha
+    """, (cid,))
+
+    conciliadas = 0
+    for linea in lineas:
+        monto = float(linea['credito']) if float(linea.get('credito',0)) > 0 else float(linea.get('debito',0))
+        if monto == 0: continue
+
+        # Buscar movimiento bancario con mismo monto y fecha cercana
+        mov = query_one("""
+            SELECT m.id FROM fin_movimientos m
+            WHERE m.cuenta_id = %s
+              AND ABS(m.monto - %s) < 0.02
+              AND m.fecha BETWEEN %s::date - INTERVAL '3 days'
+                              AND %s::date + INTERVAL '3 days'
+              AND m.id NOT IN (
+                  SELECT movimiento_id FROM fin_estado_cuenta
+                  WHERE movimiento_id IS NOT NULL AND conciliacion_id=%s
+              )
+            LIMIT 1
+        """, (conciliacion.get('cuenta_id'), monto, linea['fecha'], linea['fecha'], cid))
+
+        if mov:
+            execute("""
+                UPDATE fin_estado_cuenta
+                SET conciliado=true, movimiento_id=%s WHERE id=%s
+            """, (mov['id'], linea['id']))
+            conciliadas += 1
+
+    total = len(lineas)
+    return {"conciliadas": conciliadas, "pendientes": total - conciliadas,
+            "msg": f"{conciliadas} de {total} líneas conciliadas automáticamente"}

@@ -461,9 +461,10 @@ def eliminar_cotizacion(cid: int, u=Depends(get_current_user)):
 # ══════════════════════════════════════════════════════════════
 
 @router.post("/{cid}/enviar-email")
-def enviar_email(cid: int, u=Depends(get_current_user)):
+def enviar_email(cid: int, data: dict = {}, u=Depends(get_current_user)):
     co = query_one("""
-        SELECT co.*, c.email AS cliente_email, c.razon_social AS cliente_nombre
+        SELECT co.*, c.email AS cliente_email, c.razon_social AS cliente_nombre,
+               c.telefono AS cliente_telefono
         FROM ven_cotizaciones co
         JOIN ven_clientes c ON c.id = co.cliente_id
         WHERE co.id=%s
@@ -471,42 +472,68 @@ def enviar_email(cid: int, u=Depends(get_current_user)):
     if not co:
         raise HTTPException(404, "Cotización no encontrada")
 
-    email_dest = co.get("cliente_email")
+    email_dest = data.get("email") or co.get("cliente_email")
     if not email_dest:
         raise HTTPException(400, "El cliente no tiene email registrado")
 
-    # Obtener config SMTP
     smtp_cfg = query_one("SELECT * FROM sys_config_smtp WHERE activo=true LIMIT 1")
     if not smtp_cfg:
-        raise HTTPException(400, "No hay configuración SMTP activa")
+        raise HTTPException(400, "No hay configuración SMTP. Configúralo en Administración → Sistema")
 
-    # Generar PDF
+    empresa = query_one("SELECT * FROM sys_empresas WHERE activa=true LIMIT 1") or {}
     pdf_bytes = _generar_pdf_cotizacion(cid)
 
-    # Enviar email
-    import smtplib
+    mensaje_extra = data.get("mensaje", "")
+    total_fmt = f"${float(co.get('total',0)):,.2f}"
+    validez = str(co.get('fecha_validez',''))[:10] if co.get('fecha_validez') else 'A convenir'
+
+    html_body = f"""
+    <div style="font-family:'Segoe UI',Arial,sans-serif;max-width:600px;margin:0 auto;background:#f8fafc">
+        <div style="background:#1D4ED8;padding:24px 28px;border-radius:10px 10px 0 0">
+            <h2 style="margin:0;color:white;font-size:20px">{empresa.get('razon_social','')}</h2>
+            <p style="margin:4px 0 0;color:#BFDBFE;font-size:13px">Cotización de servicios/productos</p>
+        </div>
+        <div style="background:white;padding:28px;border-radius:0 0 10px 10px;border:1px solid #e2e8f0">
+            <p style="font-size:14px;color:#1e293b">Estimado/a <strong>{co['cliente_nombre']}</strong>,</p>
+            <p style="font-size:13px;color:#475569">
+                Adjunto encontrará la <strong>Cotización {co['numero']}</strong> que hemos preparado para usted.
+            </p>
+            {f'<p style="font-size:13px;color:#475569;background:#f1f5f9;padding:12px;border-radius:8px">{mensaje_extra}</p>' if mensaje_extra else ''}
+            <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;padding:20px;margin:20px 0;text-align:center">
+                <div style="font-size:12px;color:#1D4ED8;font-weight:700;text-transform:uppercase;margin-bottom:6px">Total cotización</div>
+                <div style="font-size:36px;font-weight:900;color:#1D4ED8">{total_fmt}</div>
+                <div style="font-size:12px;color:#64748b;margin-top:6px">Válida hasta: {validez}</div>
+            </div>
+            <p style="font-size:13px;color:#475569">
+                El detalle completo se encuentra en el archivo PDF adjunto.<br>
+                Estamos a su disposición para cualquier consulta o ajuste.
+            </p>
+            <div style="border-top:1px solid #e2e8f0;margin-top:20px;padding-top:16px;font-size:12px;color:#94a3b8">
+                <strong style="color:#475569">{empresa.get('razon_social','')}</strong><br>
+                {f"📞 {empresa.get('telefono','')}" if empresa.get('telefono') else ''}
+                {f" · ✉️ {empresa.get('email','')}" if empresa.get('email') else ''}<br>
+                Powered by NEXUS POS
+            </div>
+        </div>
+    </div>"""
+
+    import smtplib, ssl
     from email.mime.multipart import MIMEMultipart
     from email.mime.base import MIMEBase
     from email.mime.text import MIMEText
     from email import encoders
 
-    msg = MIMEMultipart()
-    msg["From"]    = f"{smtp_cfg['smtp_from_name']} <{smtp_cfg['smtp_from_email']}>"
+    msg = MIMEMultipart("mixed")
+    from_name  = smtp_cfg.get('smtp_from_name') or empresa.get('razon_social','')
+    from_email = smtp_cfg.get('smtp_from_email') or smtp_cfg.get('smtp_user','')
+    msg["From"]    = f"{from_name} <{from_email}>"
     msg["To"]      = email_dest
-    msg["Subject"] = f"Cotización {co['numero']} - {smtp_cfg.get('smtp_from_name', '')}"
+    msg["Subject"] = f"Cotización {co['numero']} — {from_name} — {total_fmt}"
 
-    body = f"""
-Estimado/a {co['cliente_nombre']},
-
-Adjunto encontrará la cotización {co['numero']} por un total de ${float(co['total']):,.2f}.
-
-Validez hasta: {co.get('fecha_validez', 'N/A')}
-
-Quedamos atentos a sus comentarios.
-
-Saludos cordiales.
-"""
-    msg.attach(MIMEText(body, "plain"))
+    alt = MIMEMultipart("alternative")
+    alt.attach(MIMEText(f"Cotización {co['numero']} por {total_fmt}. Ver PDF adjunto.", "plain"))
+    alt.attach(MIMEText(html_body, "html"))
+    msg.attach(alt)
 
     attach = MIMEBase("application", "pdf")
     attach.set_payload(pdf_bytes)
@@ -515,22 +542,22 @@ Saludos cordiales.
     msg.attach(attach)
 
     try:
-        if smtp_cfg.get("smtp_use_tls"):
-            server = smtplib.SMTP(smtp_cfg["smtp_host"], smtp_cfg["smtp_port"])
-            server.starttls()
+        ctx = ssl.create_default_context()
+        if smtp_cfg.get("smtp_use_tls", True):
+            srv = smtplib.SMTP(smtp_cfg["smtp_host"], smtp_cfg.get("smtp_port", 587), timeout=15)
+            srv.starttls(context=ctx)
         else:
-            server = smtplib.SMTP(smtp_cfg["smtp_host"], smtp_cfg["smtp_port"])
-        server.login(smtp_cfg["smtp_user"], smtp_cfg["smtp_password"])
-        server.send_message(msg)
-        server.quit()
+            srv = smtplib.SMTP_SSL(smtp_cfg["smtp_host"], smtp_cfg.get("smtp_port", 465), context=ctx, timeout=15)
+        srv.login(smtp_cfg.get("smtp_user",""), smtp_cfg.get("smtp_password",""))
+        srv.sendmail(from_email, [email_dest], msg.as_string())
+        srv.quit()
     except Exception as e:
-        raise HTTPException(500, f"Error enviando email: {str(e)}")
+        raise HTTPException(500, f"Error SMTP: {str(e)}")
 
-    # Actualizar estado a ENVIADA si estaba en BORRADOR
     if co["estado"] == "BORRADOR":
         execute("UPDATE ven_cotizaciones SET estado='ENVIADA' WHERE id=%s", (cid,))
 
-    return {"msg": f"Email enviado a {email_dest}", "email": email_dest}
+    return {"msg": f"✅ Email enviado a {email_dest}", "email": email_dest}
 
 
 # ══════════════════════════════════════════════════════════════

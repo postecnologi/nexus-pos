@@ -15,7 +15,7 @@ from routers import (
     guias_remision, liquidaciones, nomina, admin, superadmin,
     whatsapp, depositos, notas_venta, ordenes_compra, crm_comunicaciones,
     biometrico, importar, importar_historicos, pos_terminal, horarios, alertas,
-    sri_formularios, portal_cliente,
+    sri_formularios, portal_cliente, caja_chica,
 )
 
 app = FastAPI(title="NEXUS POS API", version="2.0.0")
@@ -724,6 +724,44 @@ def run_migrations():
         )""",
         "ALTER TABLE nom_asistencia ADD COLUMN IF NOT EXISTS minutos_retraso INTEGER DEFAULT 0",
         "ALTER TABLE nom_asistencia ADD COLUMN IF NOT EXISTS observacion TEXT",
+        # Caja chica
+        """CREATE TABLE IF NOT EXISTS fin_caja_chica_fondos (
+            id SERIAL PRIMARY KEY,
+            nombre VARCHAR(100) NOT NULL,
+            sucursal_id INTEGER REFERENCES sys_sucursales(id),
+            responsable_id INTEGER REFERENCES sys_usuarios(id),
+            monto_asignado NUMERIC(10,2) DEFAULT 0,
+            descripcion TEXT,
+            activo BOOLEAN DEFAULT true,
+            created_at TIMESTAMP DEFAULT NOW()
+        )""",
+        """CREATE TABLE IF NOT EXISTS fin_caja_chica_gastos (
+            id SERIAL PRIMARY KEY,
+            fondo_id INTEGER NOT NULL REFERENCES fin_caja_chica_fondos(id),
+            fecha DATE NOT NULL DEFAULT CURRENT_DATE,
+            concepto VARCHAR(200) NOT NULL,
+            categoria VARCHAR(50) DEFAULT 'VARIOS',
+            monto NUMERIC(10,2) NOT NULL,
+            proveedor VARCHAR(200),
+            numero_recibo VARCHAR(50),
+            foto_recibo VARCHAR(300),
+            usuario_id INTEGER REFERENCES sys_usuarios(id),
+            estado VARCHAR(20) DEFAULT 'PENDIENTE',
+            aprobado_por INTEGER REFERENCES sys_usuarios(id),
+            aprobado_at TIMESTAMP,
+            reembolsado BOOLEAN DEFAULT false,
+            reembolsado_at TIMESTAMP,
+            observacion TEXT,
+            created_at TIMESTAMP DEFAULT NOW()
+        )""",
+        """CREATE TABLE IF NOT EXISTS fin_caja_chica_reembolsos (
+            id SERIAL PRIMARY KEY,
+            fondo_id INTEGER NOT NULL REFERENCES fin_caja_chica_fondos(id),
+            total_reembolsado NUMERIC(10,2) DEFAULT 0,
+            num_gastos INTEGER DEFAULT 0,
+            usuario_id INTEGER REFERENCES sys_usuarios(id),
+            created_at TIMESTAMP DEFAULT NOW()
+        )""",
         """CREATE TABLE IF NOT EXISTS portal_clientes_acceso (
             id SERIAL PRIMARY KEY,
             cliente_id INTEGER NOT NULL REFERENCES ven_clientes(id) ON DELETE CASCADE,
@@ -937,6 +975,7 @@ app.include_router(horarios.router)
 app.include_router(alertas.router)
 app.include_router(sri_formularios.router)
 app.include_router(portal_cliente.router)
+app.include_router(caja_chica.router)
 importar_historicos  # registra endpoints históricos en importar.router
 if MULTI_TENANT:
     app.include_router(superadmin.router)

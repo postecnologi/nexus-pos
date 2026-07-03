@@ -585,8 +585,9 @@ export default function Cotizaciones() {
   const [loading, setLoading] = useState(true)
   const [busqueda, setBusqueda] = useState('')
   const [filtroEstado, setFiltroEstado] = useState('')
-  const [modal, setModal] = useState(null) // null | 'new' | cotizacion object
+  const [modal, setModal] = useState(null)
   const [msg, setMsg] = useState('')
+  const [emailModal, setEmailModal] = useState(null) // cotizacion para enviar email
 
   async function cargar() {
     setLoading(true)
@@ -641,12 +642,8 @@ export default function Cotizaciones() {
     } catch(e) { flash('Error descargando PDF', true) }
   }
 
-  async function enviarEmail(cid) {
-    try {
-      const {data} = await api.post(`/cotizaciones/${cid}/enviar-email`)
-      flash(data.msg || 'Email enviado')
-      cargar()
-    } catch(e) { flash(e.response?.data?.detail || 'Error enviando email', true) }
+  async function enviarEmail(cot) {
+    setEmailModal(cot)
   }
 
   async function eliminar(cid) {
@@ -796,7 +793,7 @@ export default function Cotizaciones() {
                         onEstado={(est) => cambiarEstado(co.id, est)}
                         onFacturar={() => facturar(co.id)}
                         onPDF={() => descargarPDF(co.id, co.numero)}
-                        onEmail={() => enviarEmail(co.id)}
+                        onEmail={() => enviarEmail(co)}
                         onEditar={() => setModal(co)}
                         onEliminar={() => eliminar(co.id)}
                       />
@@ -809,7 +806,7 @@ export default function Cotizaciones() {
         )}
       </div>
 
-      {/* Modal */}
+      {/* Modal cotización */}
       {modal && (
         <ModalCotizacion
           cotizacion={modal === 'new' ? null : modal}
@@ -817,6 +814,97 @@ export default function Cotizaciones() {
           onSaved={() => { setModal(null); cargar() }}
         />
       )}
+
+      {/* Modal enviar email */}
+      {emailModal && (
+        <ModalEnviarEmail
+          cot={emailModal}
+          onClose={() => setEmailModal(null)}
+          onSent={(msg) => { setEmailModal(null); flash(msg); cargar() }}
+        />
+      )}
+    </div>
+  )
+}
+
+// ── Modal Enviar Email ────────────────────────────────────────
+function ModalEnviarEmail({ cot, onClose, onSent }) {
+  const C = useTheme()
+  const [email, setEmail]     = useState(cot.cliente_email || '')
+  const [mensaje, setMensaje] = useState('')
+  const [sending, setSending] = useState(false)
+  const [err, setErr]         = useState('')
+
+  const enviar = async () => {
+    if (!email) return setErr('Ingresa el email del destinatario')
+    setSending(true); setErr('')
+    try {
+      const r = await api.post(`/cotizaciones/${cot.id}/enviar-email`, { email, mensaje })
+      onSent(r.data.msg || '✅ Email enviado')
+    } catch(e) { setErr(e.response?.data?.detail || 'Error al enviar') }
+    setSending(false)
+  }
+
+  const fi = { background:C.sur2, border:`1px solid ${C.bord2}`, borderRadius:8,
+    padding:'9px 12px', color:C.text, fontSize:13, width:'100%', outline:'none', boxSizing:'border-box' }
+
+  return (
+    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.7)',
+      display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999}}>
+      <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.bord2}`,
+        padding:28,width:460,boxShadow:'0 25px 60px rgba(0,0,0,.5)'}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
+          <div>
+            <div style={{fontWeight:800,fontSize:16,color:C.text}}>✉️ Enviar cotización por email</div>
+            <div style={{fontSize:12,color:C.muted,marginTop:2}}>
+              {cot.numero} · ${parseFloat(cot.total||0).toLocaleString('es-EC',{minimumFractionDigits:2})}
+            </div>
+          </div>
+          <button onClick={onClose}
+            style={{background:'none',border:'none',cursor:'pointer',color:C.muted,fontSize:22}}>×</button>
+        </div>
+
+        <div style={{display:'flex',flexDirection:'column',gap:14}}>
+          <div>
+            <label style={{fontSize:11,fontWeight:700,color:C.muted,display:'block',marginBottom:4}}>
+              Email destinatario *
+            </label>
+            <input value={email} onChange={e=>setEmail(e.target.value)}
+              style={fi} placeholder="cliente@empresa.com" type="email"/>
+          </div>
+          <div>
+            <label style={{fontSize:11,fontWeight:700,color:C.muted,display:'block',marginBottom:4}}>
+              Mensaje personalizado (opcional)
+            </label>
+            <textarea value={mensaje} onChange={e=>setMensaje(e.target.value)}
+              style={{...fi,minHeight:80,resize:'vertical',fontFamily:'inherit'}}
+              placeholder="Estimado cliente, adjunto encontrará la cotización solicitada..."/>
+          </div>
+          <div style={{padding:'10px 14px',borderRadius:8,background:'rgba(59,130,246,.06)',
+            border:'1px solid rgba(59,130,246,.15)',fontSize:11,color:C.muted}}>
+            📎 Se adjunta automáticamente el PDF con el detalle completo de la cotización.
+            Al enviarlo, el estado cambia a <strong style={{color:C.blue}}>ENVIADA</strong>.
+          </div>
+        </div>
+
+        {err && <div style={{marginTop:12,padding:'9px 14px',borderRadius:8,fontSize:13,
+          background:'rgba(239,68,68,.1)',border:'1px solid rgba(239,68,68,.3)',
+          color:'#FCA5A5'}}>{err}</div>}
+
+        <div style={{display:'flex',gap:10,marginTop:20,justifyContent:'flex-end'}}>
+          <button onClick={onClose}
+            style={{padding:'9px 20px',borderRadius:9,border:`1px solid ${C.bord2}`,
+              background:'transparent',color:C.muted,cursor:'pointer',fontSize:13}}>
+            Cancelar
+          </button>
+          <button onClick={enviar} disabled={sending||!email}
+            style={{padding:'9px 24px',borderRadius:9,border:'none',
+              background:C.blue,color:'white',cursor:'pointer',fontSize:13,fontWeight:700,
+              opacity:!email?.5:1}}>
+            {sending ? 'Enviando...' : '✉️ Enviar'}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

@@ -17,6 +17,7 @@ import CXP from './pages/CXP'
 import Devoluciones from './pages/Devoluciones'
 import Transferencias from './pages/Transferencias'
 import Caja from './pages/Caja'
+import CajaChica from './pages/CajaChica'
 import Bancos from './pages/Bancos'
 import Conciliacion from './pages/Conciliacion'
 import Ajustes from './pages/Ajustes'
@@ -112,7 +113,8 @@ export default function App() {
           <Route path="/cxp-pagar"      element={<CXP />} />
           <Route path="/devoluciones"    element={<Devoluciones />} />
           <Route path="/transferencias"  element={<Transferencias />} />
-          <Route path="/caja"           element={<Caja />} />
+          <Route path="/caja"            element={<Caja />} />
+          <Route path="/caja-chica"     element={<CajaChica />} />
           <Route path="/bancos"         element={<Bancos />} />
           <Route path="/conciliacion"    element={<Conciliacion />} />
           <Route path="/ajustes"         element={<Ajustes />} />
