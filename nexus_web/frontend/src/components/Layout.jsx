@@ -14,6 +14,7 @@ import api from '../api'
 const pathToModule = {
   '/':                'dashboard',
   '/caja':            'caja',
+  '/caja-chica':      'caja',
   '/facturas':        'facturas',
   '/notas-venta':     'notas-venta',
   '/clientes':        'clientes',
