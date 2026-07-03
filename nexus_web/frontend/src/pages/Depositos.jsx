@@ -97,7 +97,7 @@ export default function Depositos() {
     <div style={{ padding: 24 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <div>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: C.tx }}>Depositos Bancarios</h1>
+          <h1 style={{ fontSize: 22, fontWeight: 800, color: C.text }}>Depositos Bancarios</h1>
           <p style={{ fontSize: 13, color: C.hint }}>Liquidacion de cobros: efectivo, voucher, transferencias</p>
         </div>
         {selected.length > 0 && (
@@ -111,15 +111,15 @@ export default function Depositos() {
       {/* KPIs */}
       {pendientes && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 12, marginBottom: 20 }}>
-          <div style={{ background: C.sur, borderRadius: 12, padding: 16, border: `1px solid ${C.bord}` }}>
+          <div style={{ background: C.sur2, borderRadius: 12, padding: 16, border: `1px solid ${C.bord2}` }}>
             <div style={{ fontSize: 12, color: C.hint, fontWeight: 600 }}>Pendiente de depositar</div>
             <div style={{ fontSize: 24, fontWeight: 800, color: C.amber }}>{fmt$(pendientes.total_pendiente)}</div>
             <div style={{ fontSize: 12, color: C.hint }}>{pendientes.total_transacciones} transacciones</div>
           </div>
           {pendientes.por_metodo.map(m => (
-            <div key={m.metodo} style={{ background: C.sur, borderRadius: 12, padding: 16, border: `1px solid ${C.bord}` }}>
+            <div key={m.metodo} style={{ background: C.sur2, borderRadius: 12, padding: 16, border: `1px solid ${C.bord2}` }}>
               <div style={{ fontSize: 12, color: C.hint, fontWeight: 600 }}>{m.metodo}</div>
-              <div style={{ fontSize: 20, fontWeight: 800, color: metodoColor[m.metodo] || C.tx }}>{fmt$(m.total)}</div>
+              <div style={{ fontSize: 20, fontWeight: 800, color: metodoColor[m.metodo] || C.text }}>{fmt$(m.total)}</div>
               <div style={{ fontSize: 12, color: C.hint }}>{m.cantidad} pagos</div>
             </div>
           ))}
@@ -132,27 +132,27 @@ export default function Depositos() {
           <button key={t.id} onClick={() => setTab(t.id)} style={{
             padding: '8px 20px', borderRadius: 8, border: 'none', cursor: 'pointer',
             fontWeight: 600, fontSize: 13,
-            background: tab === t.id ? C.blue : C.sur,
-            color: tab === t.id ? 'white' : C.tx,
+            background: tab === t.id ? C.blue : C.sur2,
+            color: tab === t.id ? 'white' : C.text,
           }}>{t.l}</button>
         ))}
       </div>
 
       {/* Pendientes */}
       {tab === 'pendientes' && (
-        <div style={{ background: C.sur, borderRadius: 14, border: `1px solid ${C.bord}`, overflow: 'hidden' }}>
-          <div style={{ padding: '12px 16px', borderBottom: `1px solid ${C.bord}`, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: C.tx }}>Filtrar:</span>
+        <div style={{ background: C.sur2, borderRadius: 14, border: `1px solid ${C.bord2}`, overflow: 'hidden' }}>
+          <div style={{ padding: '12px 16px', borderBottom: `1px solid ${C.bord2}`, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Filtrar:</span>
             {['', 'EFECTIVO', 'TARJETA', 'TRANSFERENCIA', 'DEPOSITO'].map(m => (
               <button key={m} onClick={() => setFiltroMetodo(m)} style={{
                 padding: '4px 12px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600,
-                background: filtroMetodo === m ? (metodoColor[m] || C.blue) : `${C.bord}`,
+                background: filtroMetodo === m ? (metodoColor[m] || C.blue) : `${C.bord2}`,
                 color: filtroMetodo === m ? 'white' : C.hint,
               }}>{m || 'Todos'}</button>
             ))}
             {pagosFiltrados.length > 0 && (
               <button onClick={() => selectAll(pagosFiltrados)} style={{
-                marginLeft: 'auto', padding: '4px 12px', borderRadius: 6, border: `1px solid ${C.bord}`,
+                marginLeft: 'auto', padding: '4px 12px', borderRadius: 6, border: `1px solid ${C.bord2}`,
                 background: 'transparent', cursor: 'pointer', fontSize: 12, color: C.hint,
               }}>Seleccionar todos</button>
             )}
@@ -162,7 +162,7 @@ export default function Depositos() {
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
-                <tr style={{ borderBottom: `1px solid ${C.bord}` }}>
+                <tr style={{ borderBottom: `1px solid ${C.bord2}` }}>
                   <th style={{ padding: '10px 12px', width: 30 }}></th>
                   <th style={{ padding: '10px 12px', textAlign: 'left', color: C.hint, fontSize: 11 }}>Fecha</th>
                   <th style={{ padding: '10px 12px', textAlign: 'left', color: C.hint, fontSize: 11 }}>Factura</th>
@@ -175,16 +175,16 @@ export default function Depositos() {
               <tbody>
                 {pagosFiltrados.map(p => (
                   <tr key={p.id} onClick={() => togglePago(p.id)} style={{
-                    borderBottom: `1px solid ${C.bord}`, cursor: 'pointer',
+                    borderBottom: `1px solid ${C.bord2}`, cursor: 'pointer',
                     background: selected.includes(p.id) ? `${C.blue}15` : 'transparent',
                   }}>
                     <td style={{ padding: '8px 12px', textAlign: 'center' }}>
                       <input type="checkbox" checked={selected.includes(p.id)} readOnly
                         style={{ cursor: 'pointer', accentColor: C.blue }} />
                     </td>
-                    <td style={{ padding: '8px 12px', color: C.tx }}>{String(p.fecha).slice(0, 10)}</td>
-                    <td style={{ padding: '8px 12px', fontWeight: 600, color: C.tx }}>{p.numero_factura}</td>
-                    <td style={{ padding: '8px 12px', color: C.tx }}>{p.cliente}</td>
+                    <td style={{ padding: '8px 12px', color: C.text }}>{String(p.fecha).slice(0, 10)}</td>
+                    <td style={{ padding: '8px 12px', fontWeight: 600, color: C.text }}>{p.numero_factura}</td>
+                    <td style={{ padding: '8px 12px', color: C.text }}>{p.cliente}</td>
                     <td style={{ padding: '8px 12px' }}>
                       <span style={{ padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700,
                         background: `${metodoColor[p.forma_pago] || C.hint}20`,
@@ -196,8 +196,8 @@ export default function Depositos() {
                 ))}
               </tbody>
               <tfoot>
-                <tr style={{ borderTop: `2px solid ${C.bord}` }}>
-                  <td colSpan={6} style={{ padding: '10px 12px', fontWeight: 700, color: C.tx }}>
+                <tr style={{ borderTop: `2px solid ${C.bord2}` }}>
+                  <td colSpan={6} style={{ padding: '10px 12px', fontWeight: 700, color: C.text }}>
                     {selected.length} seleccionados
                   </td>
                   <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 800, fontSize: 15, color: C.green }}>
@@ -212,13 +212,13 @@ export default function Depositos() {
 
       {/* Depositos */}
       {tab === 'depositos' && (
-        <div style={{ background: C.sur, borderRadius: 14, border: `1px solid ${C.bord}`, overflow: 'hidden' }}>
+        <div style={{ background: C.sur2, borderRadius: 14, border: `1px solid ${C.bord2}`, overflow: 'hidden' }}>
           {depositos.length === 0 ? (
             <div style={{ padding: 40, textAlign: 'center', color: C.hint }}>No hay depositos creados</div>
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
-                <tr style={{ borderBottom: `1px solid ${C.bord}` }}>
+                <tr style={{ borderBottom: `1px solid ${C.bord2}` }}>
                   {['#', 'Fecha', 'Cuenta', 'Metodos', 'Pagos', 'Total', 'Estado', 'Acciones'].map(h => (
                     <th key={h} style={{ padding: '10px 12px', textAlign: 'left', color: C.hint, fontSize: 11 }}>{h}</th>
                   ))}
@@ -226,17 +226,17 @@ export default function Depositos() {
               </thead>
               <tbody>
                 {depositos.map(d => (
-                  <tr key={d.id} style={{ borderBottom: `1px solid ${C.bord}` }}>
-                    <td style={{ padding: '8px 12px', fontWeight: 700, color: C.tx }}>{d.id}</td>
-                    <td style={{ padding: '8px 12px', color: C.tx }}>{String(d.fecha).slice(0, 10)}</td>
-                    <td style={{ padding: '8px 12px', color: C.tx }}>{d.cuenta_nombre} - {d.banco_nombre}</td>
+                  <tr key={d.id} style={{ borderBottom: `1px solid ${C.bord2}` }}>
+                    <td style={{ padding: '8px 12px', fontWeight: 700, color: C.text }}>{d.id}</td>
+                    <td style={{ padding: '8px 12px', color: C.text }}>{String(d.fecha).slice(0, 10)}</td>
+                    <td style={{ padding: '8px 12px', color: C.text }}>{d.cuenta_nombre} - {d.banco_nombre}</td>
                     <td style={{ padding: '8px 12px' }}>
                       {(d.metodos_pago || '').split(',').map(m => (
                         <span key={m} style={{ padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 700, marginRight: 4,
                           background: `${metodoColor[m] || C.hint}20`, color: metodoColor[m] || C.hint }}>{m}</span>
                       ))}
                     </td>
-                    <td style={{ padding: '8px 12px', color: C.tx, fontWeight: 600 }}>{d.cantidad_pagos}</td>
+                    <td style={{ padding: '8px 12px', color: C.text, fontWeight: 600 }}>{d.cantidad_pagos}</td>
                     <td style={{ padding: '8px 12px', fontWeight: 700, color: C.green }}>{fmt$(d.total)}</td>
                     <td style={{ padding: '8px 12px' }}>
                       <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700,
@@ -245,7 +245,7 @@ export default function Depositos() {
                     </td>
                     <td style={{ padding: '8px 12px' }}>
                       <div style={{ display: 'flex', gap: 4 }}>
-                        <button onClick={() => verDetalle(d.id)} style={{ padding: '3px 8px', borderRadius: 6, border: `1px solid ${C.bord}`, background: 'transparent', color: C.tx, cursor: 'pointer', fontSize: 11 }}>Ver</button>
+                        <button onClick={() => verDetalle(d.id)} style={{ padding: '3px 8px', borderRadius: 6, border: `1px solid ${C.bord2}`, background: 'transparent', color: C.text, cursor: 'pointer', fontSize: 11 }}>Ver</button>
                         {d.estado === 'PENDIENTE' && (
                           <>
                             <button onClick={() => confirmar(d.id)} style={{ padding: '3px 8px', borderRadius: 6, border: 'none', background: C.green, color: 'white', cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>Confirmar</button>
@@ -280,7 +280,7 @@ export default function Depositos() {
                 <label style={LBL}>Cuenta bancaria destino *</label>
                 <select value={crearForm.cuenta_bancaria_id} onChange={e => setCrearForm(f => ({ ...f, cuenta_bancaria_id: parseInt(e.target.value) }))}
                   style={{...FI}}>
-                  {cuentas.map(c => <option key={c.id} value={c.id} style={{background:C.sur,color:C.tx}}>{c.nombre} - {c.numero}</option>)}
+                  {cuentas.map(c => <option key={c.id} value={c.id} style={{background:C.sur2,color:C.text}}>{c.nombre} - {c.numero}</option>)}
                 </select>
               </div>
               <div>
@@ -313,20 +313,20 @@ export default function Depositos() {
       {detalle && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9000 }}
           onClick={() => setDetalle(null)}>
-          <div style={{ background: C.sur, borderRadius: 16, padding: 28, width: 560, maxHeight: '80vh', overflow: 'auto', border: `1px solid ${C.bord}`, boxShadow: '0 20px 60px rgba(0,0,0,.5)' }} onClick={e => e.stopPropagation()}>
-            <h3 style={{ color: C.tx, marginBottom: 16 }}>Deposito #{detalle.id}</h3>
+          <div style={{ background: C.sur2, borderRadius: 16, padding: 28, width: 560, maxHeight: '80vh', overflow: 'auto', border: `1px solid ${C.bord2}`, boxShadow: '0 20px 60px rgba(0,0,0,.5)' }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ color: C.text, marginBottom: 16 }}>Deposito #{detalle.id}</h3>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
-              <div><span style={{ fontSize: 12, color: C.hint }}>Cuenta</span><div style={{ fontWeight: 600, color: C.tx }}>{detalle.cuenta_nombre}</div></div>
-              <div><span style={{ fontSize: 12, color: C.hint }}>Banco</span><div style={{ fontWeight: 600, color: C.tx }}>{detalle.banco_nombre}</div></div>
-              <div><span style={{ fontSize: 12, color: C.hint }}>Fecha</span><div style={{ fontWeight: 600, color: C.tx }}>{String(detalle.fecha).slice(0, 10)}</div></div>
+              <div><span style={{ fontSize: 12, color: C.hint }}>Cuenta</span><div style={{ fontWeight: 600, color: C.text }}>{detalle.cuenta_nombre}</div></div>
+              <div><span style={{ fontSize: 12, color: C.hint }}>Banco</span><div style={{ fontWeight: 600, color: C.text }}>{detalle.banco_nombre}</div></div>
+              <div><span style={{ fontSize: 12, color: C.hint }}>Fecha</span><div style={{ fontWeight: 600, color: C.text }}>{String(detalle.fecha).slice(0, 10)}</div></div>
               <div><span style={{ fontSize: 12, color: C.hint }}>Estado</span><div style={{ fontWeight: 700, color: detalle.estado === 'CONFIRMADO' ? C.green : C.amber }}>{detalle.estado}</div></div>
               <div><span style={{ fontSize: 12, color: C.hint }}>Total</span><div style={{ fontSize: 20, fontWeight: 800, color: C.green }}>{fmt$(detalle.total)}</div></div>
-              <div><span style={{ fontSize: 12, color: C.hint }}>Referencia</span><div style={{ fontWeight: 600, color: C.tx }}>{detalle.referencia || '-'}</div></div>
+              <div><span style={{ fontSize: 12, color: C.hint }}>Referencia</span><div style={{ fontWeight: 600, color: C.text }}>{detalle.referencia || '-'}</div></div>
             </div>
-            <h4 style={{ fontSize: 13, fontWeight: 700, color: C.tx, marginBottom: 8 }}>Pagos incluidos ({detalle.pagos?.length || 0})</h4>
+            <h4 style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 8 }}>Pagos incluidos ({detalle.pagos?.length || 0})</h4>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
               <thead>
-                <tr style={{ borderBottom: `1px solid ${C.bord}` }}>
+                <tr style={{ borderBottom: `1px solid ${C.bord2}` }}>
                   {['Fecha', 'Factura', 'Cliente', 'Metodo', 'Monto'].map(h => (
                     <th key={h} style={{ padding: '6px 8px', textAlign: 'left', color: C.hint, fontSize: 11 }}>{h}</th>
                   ))}
@@ -334,10 +334,10 @@ export default function Depositos() {
               </thead>
               <tbody>
                 {(detalle.pagos || []).map(p => (
-                  <tr key={p.id} style={{ borderBottom: `1px solid ${C.bord}` }}>
-                    <td style={{ padding: '6px 8px', color: C.tx }}>{String(p.pago_fecha).slice(0, 10)}</td>
-                    <td style={{ padding: '6px 8px', fontWeight: 600, color: C.tx }}>{p.numero_factura}</td>
-                    <td style={{ padding: '6px 8px', color: C.tx }}>{p.cliente}</td>
+                  <tr key={p.id} style={{ borderBottom: `1px solid ${C.bord2}` }}>
+                    <td style={{ padding: '6px 8px', color: C.text }}>{String(p.pago_fecha).slice(0, 10)}</td>
+                    <td style={{ padding: '6px 8px', fontWeight: 600, color: C.text }}>{p.numero_factura}</td>
+                    <td style={{ padding: '6px 8px', color: C.text }}>{p.cliente}</td>
                     <td style={{ padding: '6px 8px' }}>
                       <span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 700,
                         background: `${metodoColor[p.forma_pago] || C.hint}20`, color: metodoColor[p.forma_pago] || C.hint }}>{p.forma_pago}</span>
@@ -347,7 +347,7 @@ export default function Depositos() {
                 ))}
               </tbody>
             </table>
-            <button onClick={() => setDetalle(null)} style={{ marginTop: 16, width: '100%', padding: '8px', borderRadius: 8, border: `1px solid ${C.bord}`, background: 'transparent', color: C.tx, cursor: 'pointer' }}>Cerrar</button>
+            <button onClick={() => setDetalle(null)} style={{ marginTop: 16, width: '100%', padding: '8px', borderRadius: 8, border: `1px solid ${C.bord2}`, background: 'transparent', color: C.text, cursor: 'pointer' }}>Cerrar</button>
           </div>
         </div>
       )}
