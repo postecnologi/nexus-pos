@@ -486,7 +486,9 @@ function AccionesDropdown({cot, onEstado, onFacturar, onPDF, onEmail, onEditar, 
   const C = useTheme()
   const FI={padding:'9px 12px',borderRadius:8,fontSize:13,border:`1px solid ${C.bord2}`,background:C.sur2,color:C.text,outline:'none',boxSizing:'border-box',width:'100%'}
   const [open, setOpen] = useState(false)
+  const [pos, setPos]   = useState({top:0, right:0})
   const ref = useRef()
+  const btnRef = useRef()
 
   useEffect(() => {
     const h = e => { if(ref.current && !ref.current.contains(e.target)) setOpen(false) }
@@ -494,18 +496,26 @@ function AccionesDropdown({cot, onEstado, onFacturar, onPDF, onEmail, onEditar, 
     return () => document.removeEventListener('mousedown', h)
   }, [])
 
+  const toggleOpen = () => {
+    if (!open && btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect()
+      setPos({ top: r.bottom + 4, right: window.innerWidth - r.right })
+    }
+    setOpen(o => !o)
+  }
+
   const estado = cot.estado
 
   return (
-    <div ref={ref} style={{position:'relative',display:'inline-block'}}>
-      <button onClick={()=>setOpen(!open)}
+    <div ref={ref} style={{display:'inline-block'}}>
+      <button ref={btnRef} onClick={toggleOpen}
         style={{padding:'5px 10px',borderRadius:6,border:`1px solid ${C.bord2}`,
           background:C.sur2,color:C.muted,cursor:'pointer',fontSize:11,fontWeight:600,
           display:'flex',alignItems:'center',gap:4}}>
         Acciones <ChevronDown size={12}/>
       </button>
       {open && (
-        <div style={{position:'absolute',right:0,top:'100%',marginTop:4,zIndex:500,
+        <div style={{position:'fixed',top:pos.top,right:pos.right,zIndex:9999,
           background:C.surface,border:`1px solid ${C.bord2}`,borderRadius:8,minWidth:170,
           boxShadow:'0 12px 32px rgba(0,0,0,.8)',overflow:'hidden'}}>
 
