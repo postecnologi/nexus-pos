@@ -72,7 +72,6 @@ const grupos = [
     icon: ShoppingCart,
     items: [
       { to: '/caja',            icon: Landmark,      label: 'Caja'              },
-      { to: '/caja-chica',     icon: DollarSign,    label: 'Caja Chica'        },
       { to: '/facturas',        icon: FileText,      label: 'Facturas'          },
       { to: '/notas-venta',     icon: Receipt,       label: 'Notas de Venta'    },
       { to: '/devoluciones',    icon: RotateCcw,     label: 'Devoluciones'      },
@@ -126,6 +125,7 @@ const grupos = [
     items: [
       { to: '/bancos',          icon: Building2,     label: 'Bancos'            },
       { to: '/depositos',       icon: ArrowUpCircle, label: 'Depósitos'         },
+      { to: '/caja-chica',      icon: DollarSign,    label: 'Caja Chica'        },
       { to: '/conciliacion',    icon: GitMerge,      label: 'Conciliación'      },
     ]
   },
