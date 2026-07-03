@@ -543,11 +543,6 @@ function AccionesDropdown({cot, onEstado, onFacturar, onPDF, onEmail, onEditar, 
               onClick={()=>{setOpen(false);onEstado('ENVIADA')}}/>
           )}
 
-          {estado === 'APROBADA' && (
-            <Item icon={<ShoppingCart size={13}/>} label="Facturar" color={C.purple}
-              onClick={()=>{setOpen(false);onFacturar()}}/>
-          )}
-
           <div style={{borderTop:`1px solid ${C.border}`}}/>
 
           <Item icon={<Download size={13}/>} label="Descargar PDF"

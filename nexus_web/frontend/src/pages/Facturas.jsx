@@ -822,8 +822,9 @@ export default function Facturas({ modo = 'factura' }){
   const [cuentasBanc,   setCuentasBanc]   = useState([])
   const [sucursalNombre, setSucursalNombre] = useState('')
   const [saldoFavorCli,  setSaldoFavorCli]  = useState(null)
-  const [modalBorradores,setModalBorradores] = useState(false)
+  const [modalBorradores,setModalBorradores]   = useState(false)
   const [modalRecurrentes,setModalRecurrentes] = useState(false)
+  const [modalCotizacion,setModalCotizacion]   = useState(false)
   const [clientePrecioTipo,setClientePrecioTipo] = useState(null)
 
   useEffect(()=>{
@@ -1487,6 +1488,12 @@ export default function Facturas({ modo = 'factura' }){
           )}
         </div>
         <div style={{display:'flex',gap:8}}>
+          {!esNotaVenta && <button onClick={()=>setModalCotizacion(true)}
+            style={{padding:'8px 14px',borderRadius:8,border:`1px solid ${C.purple}44`,
+              background:'rgba(139,92,246,.12)',color:C.purple,cursor:'pointer',fontSize:12,
+              display:'flex',alignItems:'center',gap:6,fontWeight:600}}>
+            📋 Desde cotización
+          </button>}
           {!esNotaVenta && <button onClick={()=>setModalBorradores(true)}
             style={{padding:'8px 14px',borderRadius:8,border:`1px solid ${C.amber}44`,
               background:C.amberD,color:C.amber,cursor:'pointer',fontSize:12,
@@ -1860,6 +1867,24 @@ export default function Facturas({ modo = 'factura' }){
         onImprimir={abrirImpresion} onSRI={enviarSRI} onRIDE={descargarRIDE}
         onXML={descargarXML} onEmail={enviarEmail} onTicket={descargarTicket}
         onDuplicar={id=>{duplicarFactura(id);setModalReimp(false)}} esNotaVenta={esNotaVenta}/>}
+      {modalCotizacion&&<ModalCargarCotizacion
+        C={C}
+        onCerrar={()=>setModalCotizacion(false)}
+        onCargar={cot=>{
+          setModalCotizacion(false)
+          // Cargar cliente y productos de la cotización
+          if(cot.cliente_id) setCliente({id:cot.cliente_id,razon_social:cot.cliente_nombre,identificacion:cot.cliente_ruc,email:cot.cliente_email||''})
+          if(cot.detalles?.length) setItems(cot.detalles.map((d,i)=>({
+            uid:Date.now()+i, producto_id:d.producto_id, descripcion:d.descripcion,
+            codigo:d.codigo||'', cantidad:d.cantidad, precio:d.precio_unitario,
+            iva:d.iva_pct||15, descuento:d.descuento_pct||0,
+            subtotal_0:0, subtotal_iva:0, total_iva:0, total:d.total||0,
+            bodega_id:'', lotes:[]
+          })))
+          setObs(cot.observaciones||'')
+          setMsg(`✅ Cotización ${cot.numero} cargada`)
+        }}
+      />}
       {modalBorradores&&<ModalBorradores onCerrar={()=>setModalBorradores(false)}
         onCargar={cargarBorrador}
         onEmitir={data=>{setUltimaFact({id:data.id,numero:data.numero_factura,total:0});
@@ -2139,5 +2164,101 @@ function PinpadBtn({ monto, onAprobado, C }) {
         </div>
       )}
     </>
+  )
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Modal: Cargar cotización aprobada en factura
+// ══════════════════════════════════════════════════════════════
+function ModalCargarCotizacion({ C, onCerrar, onCargar }) {
+  const [cots, setCots]       = useState([])
+  const [loading, setLoading] = useState(true)
+  const [busqueda, setBusqueda] = useState('')
+
+  useEffect(() => {
+    api.get('/cotizaciones', { params: { estado: 'APROBADA' } })
+      .then(r => setCots(r.data || []))
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [])
+
+  const cargar = async (cot) => {
+    try {
+      const r = await api.get(`/cotizaciones/${cot.id}`)
+      onCargar(r.data)
+    } catch(e) { alert(e.response?.data?.detail || 'Error al cargar cotización') }
+  }
+
+  const filtradas = cots.filter(c =>
+    !busqueda ||
+    c.numero?.toLowerCase().includes(busqueda.toLowerCase()) ||
+    c.cliente_nombre?.toLowerCase().includes(busqueda.toLowerCase())
+  )
+
+  const fmt$ = v => '$' + Number(v||0).toLocaleString('es-EC',{minimumFractionDigits:2,maximumFractionDigits:2})
+  const fi = { width:'100%', padding:'9px 12px', borderRadius:8, fontSize:13,
+    background:C.sur2, border:`1px solid ${C.bord2}`, color:C.text, outline:'none' }
+
+  return (
+    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.75)',
+      display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999}}>
+      <div style={{background:C.surface,borderRadius:14,border:`1px solid ${C.bord2}`,
+        padding:28,width:580,maxHeight:'80vh',display:'flex',flexDirection:'column',
+        boxShadow:'0 25px 60px rgba(0,0,0,.5)'}}>
+
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
+          <div>
+            <div style={{fontWeight:800,fontSize:16,color:C.text}}>📋 Cargar desde cotización</div>
+            <div style={{fontSize:12,color:C.muted,marginTop:2}}>
+              Solo se muestran cotizaciones aprobadas
+            </div>
+          </div>
+          <button onClick={onCerrar}
+            style={{background:'none',border:'none',cursor:'pointer',color:C.muted,fontSize:22}}>×</button>
+        </div>
+
+        <input value={busqueda} onChange={e=>setBusqueda(e.target.value)}
+          style={{...fi,marginBottom:12}} placeholder="Buscar por número o cliente..." />
+
+        <div style={{flex:1,overflowY:'auto'}}>
+          {loading ? (
+            <div style={{textAlign:'center',padding:30,color:C.muted}}>Cargando...</div>
+          ) : filtradas.length === 0 ? (
+            <div style={{textAlign:'center',padding:30,color:C.muted}}>
+              {busqueda ? 'No se encontraron cotizaciones' : 'No hay cotizaciones aprobadas disponibles'}
+            </div>
+          ) : filtradas.map(cot => (
+            <div key={cot.id}
+              onClick={() => cargar(cot)}
+              style={{padding:'12px 16px',borderRadius:10,marginBottom:8,cursor:'pointer',
+                background:C.sur2,border:`1px solid ${C.bord2}`,
+                display:'flex',justifyContent:'space-between',alignItems:'center',
+                transition:'all .15s'}}
+              onMouseEnter={e=>e.currentTarget.style.borderColor=C.purple}
+              onMouseLeave={e=>e.currentTarget.style.borderColor=C.bord2}>
+              <div>
+                <div style={{fontWeight:700,fontSize:13,color:C.blue}}>{cot.numero}</div>
+                <div style={{fontSize:12,color:C.text,marginTop:2}}>{cot.cliente_nombre}</div>
+                <div style={{fontSize:11,color:C.muted,marginTop:1}}>
+                  Válida hasta: {cot.fecha_validez ? String(cot.fecha_validez).slice(0,10) : '—'}
+                </div>
+              </div>
+              <div style={{textAlign:'right'}}>
+                <div style={{fontSize:18,fontWeight:900,color:C.green}}>{fmt$(cot.total)}</div>
+                <div style={{marginTop:6}}>
+                  <span style={{padding:'3px 10px',borderRadius:20,fontSize:11,fontWeight:700,
+                    background:'rgba(139,92,246,.15)',color:C.purple}}>APROBADA</span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{marginTop:16,paddingTop:12,borderTop:`1px solid ${C.bord2}`,
+          fontSize:11,color:C.hint}}>
+          💡 Al cargar, se llena automáticamente el cliente y los productos. Puedes modificar antes de emitir.
+        </div>
+      </div>
+    </div>
   )
 }
