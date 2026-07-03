@@ -505,9 +505,9 @@ function AccionesDropdown({cot, onEstado, onFacturar, onPDF, onEmail, onEditar, 
         Acciones <ChevronDown size={12}/>
       </button>
       {open && (
-        <div style={{position:'absolute',right:0,top:'100%',marginTop:4,zIndex:50,
+        <div style={{position:'absolute',right:0,top:'100%',marginTop:4,zIndex:500,
           background:C.surface,border:`1px solid ${C.bord2}`,borderRadius:8,minWidth:170,
-          boxShadow:'0 12px 32px rgba(0,0,0,.6)',overflow:'hidden'}}>
+          boxShadow:'0 12px 32px rgba(0,0,0,.8)',overflow:'hidden'}}>
 
           {(estado === 'BORRADOR' || estado === 'ENVIADA') && (
             <Item icon={<Edit3 size={13}/>} label="Editar" onClick={()=>{setOpen(false);onEditar()}}/>
@@ -737,8 +737,7 @@ export default function Cotizaciones() {
       </div>
 
       {/* Table */}
-      <div style={{background:C.surface,borderRadius:12,border:`1px solid ${C.border}`,
-        overflow:'hidden'}}>
+      <div style={{background:C.surface,borderRadius:12,border:`1px solid ${C.border}`}}>
         {loading ? (
           <div style={{padding:40,textAlign:'center',color:C.muted}}>Cargando...</div>
         ) : cots.length === 0 ? (
@@ -746,7 +745,7 @@ export default function Cotizaciones() {
             No se encontraron cotizaciones
           </div>
         ) : (
-          <div style={{overflowX:'auto'}}>
+          <div style={{overflowX:'auto',borderRadius:12}}>
             <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
               <thead>
                 <tr style={{background:C.sur2}}>
