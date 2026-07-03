@@ -125,6 +125,9 @@ CAMPOS_CONFIG = [
     # Caja y Bancos
     ("caja_id",                     "Caja General",                          "bancos"),
     ("banco_id",                    "Banco Principal",                       "bancos"),
+    # Caja Chica
+    ("caja_chica_id",               "Fondo Caja Chica (Activo)",             "bancos"),
+    ("caja_chica_gastos_id",        "Gastos Varios / Caja Chica",            "bancos"),
     # Retenciones
     ("retencion_ir_id",             "Retencion IR por Cobrar",               "impuestos"),
     ("retencion_iva_id",            "Retencion IVA por Cobrar",              "impuestos"),
@@ -249,6 +252,31 @@ def generar_asiento_automatico(tipo: str, datos: dict):
             if iess_patronal > 0 and cuenta_iess_g and cuenta_iess_p:
                 detalles.append({"cuenta_id": cuenta_iess_g, "descripcion": "Gasto IESS patronal", "debe": iess_patronal, "haber": 0})
                 detalles.append({"cuenta_id": cuenta_iess_p, "descripcion": "IESS patronal por pagar", "debe": 0, "haber": iess_patronal})
+
+        elif tipo == 'caja_chica_gasto':
+            # Gasto aprobado: Debe=Gasto / Haber=Fondo caja chica
+            cuenta_gasto  = cfg.get('caja_chica_gastos_id')
+            cuenta_fondo  = cfg.get('caja_chica_id')
+            if not (cuenta_gasto and cuenta_fondo): return None
+            monto       = float(datos.get('monto', 0))
+            concepto    = datos.get('concepto', 'Gasto caja chica')
+            descripcion = f"Gasto caja chica: {concepto}"
+            detalles = [
+                {"cuenta_id": cuenta_gasto, "descripcion": concepto, "debe": monto, "haber": 0},
+                {"cuenta_id": cuenta_fondo, "descripcion": "Fondo caja chica", "debe": 0, "haber": monto},
+            ]
+
+        elif tipo == 'caja_chica_reembolso':
+            # Reembolso: Debe=Fondo caja chica / Haber=Banco o Caja
+            cuenta_fondo = cfg.get('caja_chica_id')
+            cuenta_banco = cfg.get('banco_id') or cfg.get('caja_id')
+            if not (cuenta_fondo and cuenta_banco): return None
+            monto       = float(datos.get('monto', 0))
+            descripcion = f"Reembolso caja chica: {datos.get('num_gastos',0)} gastos"
+            detalles = [
+                {"cuenta_id": cuenta_fondo, "descripcion": "Reposición fondo caja chica", "debe": monto, "haber": 0},
+                {"cuenta_id": cuenta_banco, "descripcion": "Pago reposición caja chica",  "debe": 0, "haber": monto},
+            ]
 
         else:
             return None

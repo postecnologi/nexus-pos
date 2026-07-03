@@ -144,6 +144,16 @@ def aprobar_gasto(gid: int, u=Depends(get_current_user)):
         SET estado='APROBADO', aprobado_por=%s, aprobado_at=NOW()
         WHERE id=%s
     """, (u.get("id"), gid))
+    # Asiento contable automático
+    try:
+        from routers.contabilidad import generar_asiento_automatico
+        generar_asiento_automatico('caja_chica_gasto', {
+            "referencia": f"CC-{gid}",
+            "monto":      float(g.get("monto", 0)),
+            "concepto":   g.get("concepto", "Gasto caja chica"),
+        })
+    except Exception:
+        pass
     return {"msg": "Gasto aprobado"}
 
 
@@ -190,6 +200,17 @@ def generar_reembolso(fid: int, u=Depends(get_current_user)):
             (fondo_id, total_reembolsado, num_gastos, usuario_id)
         VALUES (%s,%s,%s,%s)
     """, (fid, total, len(gastos), u.get("id")))
+
+    # Asiento contable automático del reembolso
+    try:
+        from routers.contabilidad import generar_asiento_automatico
+        generar_asiento_automatico('caja_chica_reembolso', {
+            "referencia":  f"CC-REIMB-{fid}",
+            "monto":       total,
+            "num_gastos":  len(gastos),
+        })
+    except Exception:
+        pass
 
     return {
         "msg": f"Reembolso generado: ${total:.2f} por {len(gastos)} gastos",
