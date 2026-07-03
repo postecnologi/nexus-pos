@@ -176,7 +176,7 @@ export default function Depositos() {
                 {pagosFiltrados.map(p => (
                   <tr key={p.id} onClick={() => togglePago(p.id)} style={{
                     borderBottom: `1px solid ${C.bord2}`, cursor: 'pointer',
-                    background: selected.includes(p.id) ? `${C.blue}15` : 'transparent',
+                    background: selected.includes(p.id) ? `${C.blue}22` : C.surface,
                   }}>
                     <td style={{ padding: '8px 12px', textAlign: 'center' }}>
                       <input type="checkbox" checked={selected.includes(p.id)} readOnly
@@ -196,7 +196,7 @@ export default function Depositos() {
                 ))}
               </tbody>
               <tfoot>
-                <tr style={{ borderTop: `2px solid ${C.bord2}` }}>
+                <tr style={{ borderTop: `2px solid ${C.bord2}`, background: C.sur2 }}>
                   <td colSpan={6} style={{ padding: '10px 12px', fontWeight: 700, color: C.text }}>
                     {selected.length} seleccionados
                   </td>
@@ -225,8 +225,8 @@ export default function Depositos() {
                 </tr>
               </thead>
               <tbody>
-                {depositos.map(d => (
-                  <tr key={d.id} style={{ borderBottom: `1px solid ${C.bord2}` }}>
+                {depositos.map((d,di) => (
+                  <tr key={d.id} style={{ borderBottom: `1px solid ${C.bord2}`, background: di%2===0?C.surface:C.sur2 }}>
                     <td style={{ padding: '8px 12px', fontWeight: 700, color: C.text }}>{d.id}</td>
                     <td style={{ padding: '8px 12px', color: C.text }}>{String(d.fecha).slice(0, 10)}</td>
                     <td style={{ padding: '8px 12px', color: C.text }}>{d.cuenta_nombre} - {d.banco_nombre}</td>
@@ -333,8 +333,8 @@ export default function Depositos() {
                 </tr>
               </thead>
               <tbody>
-                {(detalle.pagos || []).map(p => (
-                  <tr key={p.id} style={{ borderBottom: `1px solid ${C.bord2}` }}>
+                {(detalle.pagos || []).map((p,pi) => (
+                  <tr key={p.id} style={{ borderBottom: `1px solid ${C.bord2}`, background: pi%2===0?C.surface:C.sur2 }}>
                     <td style={{ padding: '6px 8px', color: C.text }}>{String(p.pago_fecha).slice(0, 10)}</td>
                     <td style={{ padding: '6px 8px', fontWeight: 600, color: C.text }}>{p.numero_factura}</td>
                     <td style={{ padding: '6px 8px', color: C.text }}>{p.cliente}</td>
