@@ -159,9 +159,9 @@ export default function NotasDebito() {
               <tr><td colSpan={9} style={{ padding: 40, textAlign: 'center', color: C.hint }}>
                 No hay notas de debito</td></tr>
             ) : datos.map(r => (
-              <tr key={r.id} style={{ borderBottom: `1px solid ${C.border}` }}
+              <tr key={r.id} style={{ borderBottom: `1px solid ${C.border}`, background: C.surface }}
                 onMouseEnter={e => e.currentTarget.style.background = C.sur2}
-                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                onMouseLeave={e => e.currentTarget.style.background = C.surface}>
                 <td style={{ padding: '8px 12px', fontWeight: 600, color: C.blue }}>
                   {r.numero}</td>
                 <td style={{ padding: '8px 12px', color: C.text }}>

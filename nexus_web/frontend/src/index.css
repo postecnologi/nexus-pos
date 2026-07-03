@@ -68,14 +68,15 @@ input, select, textarea {
 }
 input:focus, select:focus { border-color: var(--azul); }
 
-table { width: 100%; border-collapse: collapse; }
+/* Las tablas heredan el fondo del contenedor padre (nunca blanco por defecto) */
+table { width: 100%; border-collapse: collapse; background: transparent; }
+tbody, thead, tfoot { background: transparent; }
+tbody tr { background: transparent; }
 thead th {
-  background: #F8FAFC;
   padding: 10px 14px;
   text-align: left;
   font-size: 12px;
   font-weight: 600;
-  color: var(--gris);
   border-bottom: 1px solid var(--borde);
 }
 tbody td {
@@ -83,7 +84,6 @@ tbody td {
   border-bottom: 1px solid #F1F5F9;
   font-size: 13px;
 }
-tbody tr:hover { background: #F8FAFC; }
 
 .badge {
   display: inline-block;
