@@ -1500,12 +1500,6 @@ export default function Facturas({ modo = 'factura' }){
               display:'flex',alignItems:'center',gap:6,fontWeight:600}}>
             Borradores
           </button>}
-          {!esNotaVenta && <button onClick={()=>setModalRecurrentes(true)}
-            style={{padding:'8px 14px',borderRadius:8,border:`1px solid ${C.cyan}44`,
-              background:'rgba(6,182,212,.12)',color:C.cyan,cursor:'pointer',fontSize:12,
-              display:'flex',alignItems:'center',gap:6,fontWeight:600}}>
-            Recurrentes
-          </button>}
           <button onClick={()=>setModalReimp(true)}
             style={{padding:'8px 14px',borderRadius:8,border:`1px solid ${C.bord2}`,
               background:C.sur2,color:C.muted,cursor:'pointer',fontSize:12,
@@ -1527,14 +1521,6 @@ export default function Facturas({ modo = 'factura' }){
               cursor:(saving||!cliente||items.length===0)?'not-allowed':'pointer'}}>
             {saving?'Guardando...':'Borrador'}
           </button>}
-          <button onClick={emitir} disabled={saving||!cliente||items.length===0}
-            style={{padding:'8px 20px',borderRadius:8,border:'none',fontSize:13,fontWeight:800,
-              background:(saving||!cliente||items.length===0)?C.sur3:C.blue,
-              color:(saving||!cliente||items.length===0)?C.hint:'white',
-              cursor:(saving||!cliente||items.length===0)?'not-allowed':'pointer',
-              boxShadow:(saving||!cliente||items.length===0)?'none':C.blueGlow.replace('.35','.5')}}>
-            {saving?'Emitiendo...':(esNotaVenta ? 'Emitir nota de venta' : 'Emitir factura')}
-          </button>
         </div>
       </div>
 
@@ -1891,26 +1877,6 @@ export default function Facturas({ modo = 'factura' }){
           api.get('/facturas-proximo-numero').then(r=>setProxNum(r.data.numero)).catch(()=>{})}}/>}
       {modalRecurrentes&&<ModalRecurrentes onCerrar={()=>setModalRecurrentes(false)}/>}
 
-      {/* ── Barra de atajos ── */}
-      <div style={{position:'fixed',bottom:0,left:0,right:0,height:28,
-        background:'rgba(17,24,39,.95)',borderTop:`1px solid ${C.bord2}`,
-        display:'flex',alignItems:'center',justifyContent:'center',gap:20,
-        padding:'0 20px',zIndex:500}}>
-        {[
-          {key:'F2', label:'Buscar producto'},
-          {key:'F4', label:'Nueva factura'},
-          {key:'F8', label:'Cobrar'},
-          {key:'F9', label:'Reimprimir'},
-          {key:'ESC', label:'Cerrar / Cancelar'},
-        ].map(s=>(
-          <div key={s.key} style={{display:'flex',alignItems:'center',gap:4}}>
-            <kbd style={{padding:'1px 6px',borderRadius:4,fontSize:10,fontWeight:800,
-              background:C.sur3,color:C.blue,border:`1px solid ${C.bord2}`,
-              fontFamily:'monospace'}}>{s.key}</kbd>
-            <span style={{fontSize:10,color:C.hint}}>{s.label}</span>
-          </div>
-        ))}
-      </div>
     </div>
   )
 }
